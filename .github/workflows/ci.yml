@@ -20,6 +20,7 @@ jobs:
           chaua_server_pid=$!
           trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
           npm run test:quality
+          npm run test:render-profile
           npm run test:snake-continuity
           npm run test:snake
           npm run test:reference-art
