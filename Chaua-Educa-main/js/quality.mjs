@@ -5,18 +5,46 @@ export function canvasResolution(width,height,deviceRatio=1,quality='high'){
  const dpr=Math.min(ratio,quality==='low'?1:2,Math.sqrt(4_000_000/(w*h)));
  return {dpr,width:Math.max(1,Math.floor(w*dpr)),height:Math.max(1,Math.floor(h*dpr))};
 }
-// Sustained thresholds avoid reacting to one delayed frame or rapid quality oscillation.
+const SAMPLE_WINDOW=2, SLOW_FRAME=1/42, SLOW_SHARE=.35, RECOVERY_SECONDS=12, EPSILON=1e-9;
+// A bounded rolling window counts time spent in slow frames, including active
+// stalls. Fast frames cannot erase recurring slowdown; one stall is insufficient.
 export class VisualQuality {
- constructor(mode='auto'){this.setMode(mode);}
+ constructor(mode='auto'){
+  this.samples=new Float64Array(1024);this.slowSamples=new Uint8Array(1024);
+  this.setMode(mode);
+ }
  setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.resetSamples();}
- resetSamples(){this.slow=0;this.fast=0;}
+ resetSamples(){this.head=0;this.count=0;this.windowSeconds=0;this.slowSeconds=0;this.fast=0;}
+ record(seconds){
+  if(this.count===this.samples.length){
+   const oldest=this.samples[this.head];
+   this.windowSeconds-=oldest;this.slowSeconds-=oldest*this.slowSamples[this.head];
+   this.head=(this.head+1)%this.samples.length;this.count--;
+  }
+  const index=(this.head+this.count)%this.samples.length,slow=Number(seconds>SLOW_FRAME);
+  this.samples[index]=seconds;this.slowSamples[index]=slow;this.count++;
+  this.windowSeconds+=seconds;this.slowSeconds+=seconds*slow;
+  while(this.windowSeconds>SAMPLE_WINDOW&&this.count){
+   const removed=Math.min(this.samples[this.head],this.windowSeconds-SAMPLE_WINDOW);
+   this.windowSeconds-=removed;this.slowSeconds-=removed*this.slowSamples[this.head];
+   this.samples[this.head]-=removed;
+   if(this.samples[this.head]<=EPSILON){this.head=(this.head+1)%this.samples.length;this.count--;}
+  }
+ }
  sample(seconds,active=true){
-  if(!active || !Number.isFinite(seconds) || seconds<=0 || seconds>.1){this.resetSamples();return false;}
+  if(!active || !Number.isFinite(seconds) || seconds<=0){this.resetSamples();return false;}
   if(this.mode!=='auto')return false;
-  this.slow=seconds>1/42?this.slow+seconds:0;
-  this.fast=seconds<1/55?this.fast+seconds:0;
-  if(this.level==='high'&&this.slow>=2){this.level='low';this.resetSamples();return true;}
-  if(this.level==='low'&&this.fast>=12){this.level='high';this.resetSamples();return true;}
+  // Match the flight clock's cap, so a single suspended frame cannot dominate.
+  seconds=Math.min(seconds,.25);
+  if(this.level==='high'){
+   this.record(seconds);
+   if(this.windowSeconds>=SAMPLE_WINDOW-EPSILON&&this.slowSeconds>=SAMPLE_WINDOW*SLOW_SHARE){
+    this.level='low';this.resetSamples();return true;
+   }
+  }else{
+   this.fast=seconds<1/55?this.fast+seconds:0;
+   if(this.fast>=RECOVERY_SECONDS-EPSILON){this.level='high';this.resetSamples();return true;}
+  }
   return false;
  }
 }
