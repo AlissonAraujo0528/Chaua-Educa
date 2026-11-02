@@ -101,6 +101,7 @@ function start(training = false) {
     cancelAnimationFrame(resultAnimation);
     app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
+    if(quality.beginFlight())renderer.setQuality(quality.level);
     resize();
     if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
     app.classList.toggle('training',training);

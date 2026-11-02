@@ -3,19 +3,30 @@ import assert from 'node:assert/strict';
 import {VisualQuality,canvasResolution} from '../Chaua-Educa-main/js/quality.mjs';
 import {Game,FlightClock} from '../Chaua-Educa-main/js/engine.mjs';
 
-test('automatic quality requires sustained slowdown and recovers with hysteresis',()=>{
+test('profile-dependent frame cost cannot cause repeated upgrades during a three-minute flight',()=>{
+ const q=new VisualQuality(),changes=[];let elapsed=0;
+ while(elapsed<180){
+  const dt=q.level==='high'?1/30:1/60;
+  elapsed+=dt;if(q.sample(dt))changes.push(q.level);
+ }
+ assert.deepEqual(changes,['low']);
+});
+
+test('automatic quality requires sustained slowdown and reassesses on a new flight',()=>{
  const q=new VisualQuality();
  for(let i=0;i<59;i++)assert.equal(q.sample(1/30),false);
  let changed=false;for(let i=0;i<3;i++)changed=q.sample(1/30)||changed;
  assert.equal(changed,true);assert.equal(q.level,'low');
  for(let i=0;i<600;i++)q.sample(1/60);assert.equal(q.level,'low');
- for(let i=0;i<130;i++)q.sample(1/60);assert.equal(q.level,'high');
+ for(let i=0;i<130;i++)q.sample(1/60);assert.equal(q.level,'low');
+ assert.equal(q.beginFlight(),true);assert.equal(q.level,'high');
+ for(let i=0;i<45;i++)assert.equal(q.sample(1/30),false);
 });
 test('hidden tabs and pauses discard samples, and manual quality stays selected',()=>{
  const q=new VisualQuality();
  for(let i=0;i<300;i++){q.sample(1/30,false);q.sample(.25);q.sample(1/60);}
  assert.equal(q.level,'high');
- for(const mode of ['high','low']){q.setMode(mode);for(let i=0;i<1000;i++)q.sample(1/30);assert.equal(q.level,mode);}
+ for(const mode of ['high','low']){q.setMode(mode);for(let i=0;i<1000;i++)q.sample(1/30);assert.equal(q.beginFlight(),false);assert.equal(q.level,mode);assert.equal(q.mode,mode);}
  q.setMode('corrupt');assert.equal(q.mode,'auto');
 });
 test('mixed fast and slow frames downgrade within three seconds of active flight',()=>{
@@ -57,7 +68,7 @@ test('changing quality mode starts with fresh measurements',()=>{
  for(let i=0;i<45;i++)assert.equal(q.sample(1/30),false);
  assert.equal(q.level,'high');
 });
-test('inactive and invalid samples reset partial slowdown and recovery',()=>{
+test('inactive and invalid samples clear partial slowdown without unlocking low quality',()=>{
  for(const [seconds,active] of [[.25,false],[NaN,true],[Infinity,true],[0,true],[-1,true]]){
   const q=new VisualQuality();
   for(let i=0;i<45;i++)q.sample(1/30);
@@ -72,7 +83,7 @@ test('inactive and invalid samples reset partial slowdown and recovery',()=>{
   assert.equal(q.level,'low');
  }
 });
-test('mixed load cannot oscillate quality, and recovery requires a fresh stable period',()=>{
+test('mixed load cannot oscillate quality even after a long healthy period',()=>{
  const q=new VisualQuality();let changes=0;
  for(let i=0;i<1500;i++)changes+=Number(q.sample(i%2?1/60:1/30));
  assert.equal(changes,1);assert.equal(q.level,'low');
@@ -81,9 +92,9 @@ test('mixed load cannot oscillate quality, and recovery requires a fresh stable 
  for(let i=0;i<660;i++)assert.equal(q.sample(1/60),false);
  assert.equal(q.level,'low');
  for(let i=0;i<70;i++)changes+=Number(q.sample(1/60));
- assert.equal(q.level,'high');assert.equal(changes,2);
+ assert.equal(q.level,'low');assert.equal(changes,1);
 });
-test('stable high-refresh displays remain high and recover by elapsed time',()=>{
+test('stable high-refresh displays remain high and only reassess at a new flight',()=>{
  for(const hz of [60,90,120,144,240]){
   const q=new VisualQuality();
   for(let i=0;i<hz*15;i++)assert.equal(q.sample(1/hz),false);
@@ -93,8 +104,17 @@ test('stable high-refresh displays remain high and recover by elapsed time',()=>
   for(let i=0;i<hz*11;i++)q.sample(1/hz);
   assert.equal(q.level,'low');
   for(let i=0;i<hz*2;i++)q.sample(1/hz);
-  assert.equal(q.level,'high');
+  assert.equal(q.level,'low');
+  assert.equal(q.beginFlight(),true);assert.equal(q.level,'high');
+  for(let i=0;i<hz*2;i++)assert.equal(q.sample(1/hz),false);
  }
+});
+test('a new flight discards unfinished slowdown measurements',()=>{
+ const q=new VisualQuality();
+ for(let i=0;i<45;i++)q.sample(1/30);
+ assert.equal(q.beginFlight(),false);
+ for(let i=0;i<45;i++)assert.equal(q.sample(1/30),false);
+ assert.equal(q.level,'high');
 });
 test('backing canvas respects pixel budget on 4K and extreme displays',()=>{
  for(const [w,h,dpr] of [[3840,2160,2],[1920,1080,3],[390,844,3],[12000,8000,4]]){

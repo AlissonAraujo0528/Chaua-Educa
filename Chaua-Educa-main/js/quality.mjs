@@ -5,7 +5,7 @@ export function canvasResolution(width,height,deviceRatio=1,quality='high'){
  const dpr=Math.min(ratio,quality==='low'?1:2,Math.sqrt(4_000_000/(w*h)));
  return {dpr,width:Math.max(1,Math.floor(w*dpr)),height:Math.max(1,Math.floor(h*dpr))};
 }
-const SAMPLE_WINDOW=2, SLOW_FRAME=1/42, SLOW_SHARE=.35, RECOVERY_SECONDS=12, EPSILON=1e-9;
+const SAMPLE_WINDOW=2, SLOW_FRAME=1/42, SLOW_SHARE=.35, EPSILON=1e-9;
 // A bounded rolling window counts time spent in slow frames, including active
 // stalls. Fast frames cannot erase recurring slowdown; one stall is insufficient.
 export class VisualQuality {
@@ -14,7 +14,10 @@ export class VisualQuality {
   this.setMode(mode);
  }
  setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.resetSamples();}
- resetSamples(){this.head=0;this.count=0;this.windowSeconds=0;this.slowSeconds=0;this.fast=0;}
+ // Low-cost frames cannot establish that the high-cost profile is sustainable.
+ // Reassess only at a new flight or an explicit setting change, never mid-flight.
+ beginFlight(){const previous=this.level;this.setMode(this.mode);return this.level!==previous;}
+ resetSamples(){this.head=0;this.count=0;this.windowSeconds=0;this.slowSeconds=0;}
  record(seconds){
   if(this.count===this.samples.length){
    const oldest=this.samples[this.head];
@@ -41,9 +44,6 @@ export class VisualQuality {
    if(this.windowSeconds>=SAMPLE_WINDOW-EPSILON&&this.slowSeconds>=SAMPLE_WINDOW*SLOW_SHARE){
     this.level='low';this.resetSamples();return true;
    }
-  }else{
-   this.fast=seconds<1/55?this.fast+seconds:0;
-   if(this.fast>=RECOVERY_SECONDS-EPSILON){this.level='high';this.resetSamples();return true;}
   }
   return false;
  }
