@@ -101,7 +101,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    const deadline=setTimeout(finish,seconds*1000);
    window.longDone=false;
   },seconds);
-  await page.waitForFunction(()=>window.longDone,{timeout:(seconds+20)*1000,polling:250});
+  await page.waitForFunction(()=>window.longDone,null,{timeout:(seconds+20)*1000,polling:250});
   const captured=await page.evaluate(()=>window.longResult);
   const {frameIntervals:frames,...details}=captured;
   assert.ok(frames.length>100,'native frames must be captured');
