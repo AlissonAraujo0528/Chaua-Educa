@@ -2,6 +2,13 @@
 
 ## Não lançado
 
+### Alterado
+
+- Resolução interna e densidade de decoração agora têm controles independentes
+  no renderizador. Detalhada e Econômica mantêm os mesmos limites de pixels e
+  efeitos; o modo Automático continua escolhendo os mesmos perfis. A separação
+  permite avaliar nitidez e efeitos individualmente antes de mudar o orçamento.
+
 ### Corrigido
 
 - A qualidade visual automática agora reconhece quadros rápidos e lentos

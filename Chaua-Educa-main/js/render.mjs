@@ -393,16 +393,22 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) { this.quality = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
+    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
     setQuality(level) {
         const next=level==='low'?'low':'high';
-        if(this.quality===next)return;
-        this.quality=next;this.resize();
+        this.quality=next;
+        this.setVisualProfile({resolution:next,decoration:next});
+    }
+    setVisualProfile({resolution=this.resolution,decoration=this.decoration}={}) {
+        const nextResolution=resolution==='low'?'low':'high';
+        this.decoration=decoration==='low'?'low':'high';
+        if(this.resolution===nextResolution)return;
+        this.resolution=nextResolution;this.resize();
     }
     resize() {
         const r = this.canvas.getBoundingClientRect();
         this.w = r.width; this.h = r.height;
-        const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.quality);
+        const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.resolution);
         this.dpr=size.dpr;
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
         if(this.canvas.height!==size.height)this.canvas.height=size.height;
@@ -469,7 +475,7 @@ export class Renderer {
             c.drawImage(forest,(w-fw)/2+drift,(h-fh)/2,fw,fh);c.restore();
 
         }
-        if(this.quality!=='low') {
+        if(this.decoration!=='low') {
             c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
             for(let i=0;i<3;i++){
                 const drift=reduced?0:Math.sin(time*.12+i*2)*w*.045;
@@ -478,7 +484,7 @@ export class Renderer {
             c.restore();
         }
         // Low-contrast tree layers are behind gameplay, at distinct parallax speeds.
-        for(let layer=0;layer<(this.quality==='low'?1:2);layer++) {
+        for(let layer=0;layer<(this.decoration==='low'?1:2);layer++) {
             const spacing=layer?340:240, travel=offset*(layer?.22:.09);
             c.save();c.globalAlpha=layer?.075:.045;
             for(let i=-1;i<=Math.ceil(w/spacing)+1;i++) {
@@ -498,7 +504,7 @@ export class Renderer {
         c.save();c.translate(reduced?0:Math.sin(time*.22)*18,0);
         for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(w * .65 + i * 95, 0); c.lineTo(w * .65 + 45 + i * 95, 0); c.lineTo(w * .13 + i * 110, h); c.lineTo(w * .13 - 120 + i * 110, h); c.fill(); }
         c.restore();
-        for (let i = 0; i < (this.quality==='low'?8:23); i++) {
+        for (let i = 0; i < (this.decoration==='low'?8:23); i++) {
             const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
             const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
             oval(c, x, y, 1.6, 1.6, '#ffedb275');
@@ -542,7 +548,7 @@ export class Renderer {
         const s = view.scale;
         // Tiny, muted butterflies stay in the distant layer; no pickup glow or collision.
         c.save();c.globalAlpha=.32;
-        for(let i=0;i<(this.quality==='low'?1:3);i++) {
+        for(let i=0;i<(this.decoration==='low'?1:3);i++) {
             const t=reduced?0:game.elapsed;
             const bx=view.x+view.w*(.38+i*.2)+Math.sin(t*.3+i)*12;
             const by=view.y+view.h*.11+Math.sin(t*.5+i*2)*7;
@@ -684,7 +690,7 @@ export class Renderer {
             defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
             stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won
         });
-        if (!reduced) for (const p of (this.quality==='low'?game.particles.slice(0,32):game.particles)) {
+        if (!reduced) for (const p of (this.decoration==='low'?game.particles.slice(0,32):game.particles)) {
             c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
             if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
             else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
@@ -714,7 +720,7 @@ export class Renderer {
             c.restore();
         }
         if (game.state === 'ended' && game.won) {
-            for (let i = 0; i < (this.quality==='low'?12:32); i++) {
+            for (let i = 0; i < (this.decoration==='low'?12:32); i++) {
                 const t = reduced ? 0 : visualTime * 25;
                 const x = (i * 151.7) % this.w, y = (i * 79 + t) % this.h;
                 leaf(c, x, y, 5 + i % 4, i + (reduced ? 0 : visualTime * .3), i % 3 ? '#b8cc6d' : '#f4c967', i % 3 ? '#79a05b' : '#d49c47');

@@ -1,8 +1,15 @@
 export const QUALITY_MODES=['auto','high','low'];
-export function canvasResolution(width,height,deviceRatio=1,quality='high'){
+// Resolution budgets are independent of decoration density. Keep the existing
+// presets until visual/performance measurements justify a different budget.
+export const RESOLUTION_BUDGETS=Object.freeze({
+ high:Object.freeze({maxDpr:2,maxPixels:4_000_000}),
+ low:Object.freeze({maxDpr:1,maxPixels:4_000_000})
+});
+export function canvasResolution(width,height,deviceRatio=1,resolution='high'){
  const w=Math.max(1,Number.isFinite(width)?width:1),h=Math.max(1,Number.isFinite(height)?height:1);
  const ratio=Number.isFinite(deviceRatio)&&deviceRatio>0?deviceRatio:1;
- const dpr=Math.min(ratio,quality==='low'?1:2,Math.sqrt(4_000_000/(w*h)));
+ const budget=RESOLUTION_BUDGETS[resolution==='low'?'low':'high'];
+ const dpr=Math.min(ratio,budget.maxDpr,Math.sqrt(budget.maxPixels/(w*h)));
  return {dpr,width:Math.max(1,Math.floor(w*dpr)),height:Math.max(1,Math.floor(h*dpr))};
 }
 const SAMPLE_WINDOW=2, SLOW_FRAME=1/42, SLOW_SHARE=.35, EPSILON=1e-9;
