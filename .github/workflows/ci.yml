@@ -28,3 +28,4 @@ jobs:
           npm run test:browser
           npm run test:journey
           npm run test:background
+          npm run test:hud

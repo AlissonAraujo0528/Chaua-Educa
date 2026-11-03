@@ -18,7 +18,8 @@
     "test:snake": "node tests/browser-snake-strike.cjs",
     "test:snake-continuity": "node tests/browser-snake-continuity.cjs",
     "test:background": "node tests/browser-background.cjs",
-    "benchmark:background": "node tests/browser-background.cjs --benchmark"
+    "benchmark:background": "node tests/browser-background.cjs --benchmark",
+    "test:hud": "node tests/browser-hud.cjs"
   },
   "engines": {
     "node": ">=22"

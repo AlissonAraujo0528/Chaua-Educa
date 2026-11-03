@@ -253,6 +253,27 @@ $('#open-guide').addEventListener('click', () => openDialog('#guide-dialog'));
 $('#open-credits').addEventListener('click', () => openDialog('#credits-dialog'));
 document.querySelectorAll('.close-dialog').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 
+// HUD nodes belong to the fixed page template, unlike dynamically built dialogs.
+const hudNodes=new Map();
+let lastHudProgress;
+function hud(selector){
+    if(!hudNodes.has(selector))hudNodes.set(selector,$(selector));
+    return hudNodes.get(selector);
+}
+function hudText(selector,value){
+    const node=hud(selector),text=String(value);
+    if(node.textContent!==text)node.textContent=text;
+}
+function hudAttribute(selector,name,value){
+    const node=hud(selector),text=String(value);
+    if(node.getAttribute(name)!==text)node.setAttribute(name,text);
+}
+function hudValue(selector,value){const node=hud(selector);if(node.value!==value)node.value=value;}
+function hudClass(selector,name,active){
+    const node=hud(selector);
+    if(node.classList.contains(name)!==active)node.classList.toggle(name,active);
+}
+
 function syncUI() {
     if (game.state !== previousState) {
         app.dataset.state = game.state;
@@ -270,34 +291,32 @@ function syncUI() {
         if (game.state === 'trained') {openDialog('#training-dialog');$('#training-home').focus();}
         previousState = game.state;
     }
-    $('#countdown').hidden = game.state !== 'countdown';
-    if (game.state === 'countdown') $('#count-number').textContent = Math.max(1, Math.ceil(game.countdown));
-    $('#score').textContent = game.score;
-    $('#stage-name').textContent = game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage];
-    $('#journey-destination').textContent=game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(game.distance/JOURNEY_LENGTH*100)}%`;
-    $('#progress-track').setAttribute('aria-valuenow',String(Math.floor(game.distance/JOURNEY_LENGTH*100)));
+    const hideCountdown=game.state!=='countdown';
+    if(hud('#countdown').hidden!==hideCountdown)hud('#countdown').hidden=hideCountdown;
+    if (game.state === 'countdown') hudText('#count-number',Math.max(1, Math.ceil(game.countdown)));
+    hudText('#score',game.score);
+    hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
+    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(game.distance/JOURNEY_LENGTH*100)}%`);
     const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,game.distance/JOURNEY_LENGTH*100);
-    $('#progress-fill').style.width = `${progress}%`;
-    $('#progress-track').setAttribute('aria-valuenow',String(Math.floor(progress)));
-    $('#progress-track').setAttribute('aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');
-    $('#energy').value = game.stamina;
-    $('#shield-status').classList.toggle('active', game.shield);
-    $('#shield-status span').textContent = game.shield ? 'Escudo pronto' : 'Sem escudo';
-    $('#feather-status').classList.toggle('golden', game.feather > 0);
-    $('#feather-status').classList.toggle('active', game.feather > 0);
-    $('#feather-status span').textContent = game.feather > 0 ? `×2 · ${Math.ceil(game.feather)}s` : 'Pena ×2';
-    $('#feather-status progress').value = game.feather;
-    const pepperChip = $('#pepper-status');
+    if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
+    hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
+    hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');
+    hudValue('#energy',game.stamina);
+    hudClass('#shield-status','active',game.shield);
+    hudText('#shield-status span',game.shield ? 'Escudo pronto' : 'Sem escudo');
+    hudClass('#feather-status','golden',game.feather>0);
+    hudClass('#feather-status','active',game.feather>0);
+    hudText('#feather-status span',game.feather > 0 ? `×2 · ${Math.ceil(game.feather)}s` : 'Pena ×2');
+    hudValue('#feather-status progress',game.feather);
+    const pepperChip = hud('#pepper-status');
     if (pepperChip) {
-        pepperChip.classList.toggle('spicy', game.pepper > 0);
-        pepperChip.classList.toggle('active', game.pepper > 0);
-        const pepperLabel = $('#pepper-status span');
-        if (pepperLabel) pepperLabel.textContent = game.pepper > 0 ? `Turbo · ${Math.ceil(game.pepper)}s` : 'Pimenta turbo';
-        const pepperProg = $('#pepper-status progress');
-        if (pepperProg) pepperProg.value = game.pepper;
+        hudClass('#pepper-status','spicy',game.pepper>0);
+        hudClass('#pepper-status','active',game.pepper>0);
+        if (hud('#pepper-status span')) hudText('#pepper-status span',game.pepper > 0 ? `Turbo · ${Math.ceil(game.pepper)}s` : 'Pimenta turbo');
+        if (hud('#pepper-status progress')) hudValue('#pepper-status progress',game.pepper);
     }
-    if (toastUntil < game.elapsed) $('#toast').classList.remove('visible');
-    if (pointsUntil < game.elapsed) $('#score-bonus').textContent = '';
+    if (toastUntil < game.elapsed) hudClass('#toast','visible',false);
+    if (pointsUntil < game.elapsed) hudText('#score-bonus','');
 }
 
 function frame(time) {
