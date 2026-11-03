@@ -36,7 +36,7 @@ fs.mkdirSync(out,{recursive:true});
    };
    c.fill=(...args)=>{
     if(active==='no-tree-parallax'&&(.044<c.globalAlpha&&c.globalAlpha<.076))return;
-    if(active==='no-sunbeams'&&c.fillStyle==='#ffffcb10')return;
+    if(active==='no-sunbeams'&&(/^rgba?\(255,\s*255,\s*203(?:,|\))/i).test(String(c.fillStyle)))return;
     return methods.fill(...args);
    };
    c.fillRect=(...args)=>{
