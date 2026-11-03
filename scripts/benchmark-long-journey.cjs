@@ -5,7 +5,8 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const out='test-results/long-flight';
+const out=process.env.LONG_OUTPUT||'test-results/long-flight';
+const requestedMode=['auto','high','low'].includes(process.env.LONG_MODE)?process.env.LONG_MODE:'auto';
 fs.mkdirSync(out,{recursive:true});
 const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);return ys[Math.floor((ys.length-1)*p)];};
 (async()=>{
@@ -13,33 +14,43 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
  try{
   const page=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:2}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(()=>{
-   localStorage.setItem('chaua-visual-quality',JSON.stringify('auto'));
+  await page.addInitScript(mode=>{
+   localStorage.setItem('chaua-visual-quality',JSON.stringify(mode));
    const native=requestAnimationFrame;
    let previous=0;
-   window.longFrames=[];
+   window.longFrames=[];window.longStageFrames=[];
    window.requestAnimationFrame=callback=>native.call(window,now=>{
     if(callback.name==='frame'&&window.longCapture){
-     if(previous)window.longFrames.push(now-previous);
+     if(previous){const dt=now-previous;window.longFrames.push(dt);window.longStageFrames.push({dt,stage:window.__longGame?.stage??-1,quality:window.__longRenderer?.quality??'unknown',decoration:window.__longRenderer?.decoration??'unknown',elapsed:window.__longGame?.elapsed??0,wall:now-(window.longStart||now)});}
      previous=now;
     }
     callback(now);
    });
-  });
+  },requestedMode);
   await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
   await page.locator('#inputPlayer').fill('Teste prolongado');
   await page.locator('input[value=aventura]').check();
   await page.locator('#btnStart:not([disabled])').click();
   await page.bringToFront();
   const seconds=Math.max(30,Math.min(140,Number(process.env.LONG_SECONDS)||90));
-  await page.evaluate(async seconds=>{
+  await page.evaluate(async ({seconds,requestedMode})=>{
    const {game:g}=await import('/js/script.js');
    const {flightViewport}=await import('/js/viewport.mjs');
    const {Renderer}=await import('/js/render.mjs');
    const qualityChanges=[];
-   const change=Renderer.prototype.setQuality;
-   Renderer.prototype.setQuality=function(level){if(this.quality!==level)qualityChanges.push({level,at:performance.now()});return change.call(this,level);};
-   g.start('aventura',[],104);
+   for(const method of ['setQuality','setAutomaticQuality']){
+    const change=Renderer.prototype[method];
+    Renderer.prototype[method]=function(level){
+     const old=this.quality,oldDecoration=this.decoration;
+     const result=change.call(this,level);
+     if(this.quality!==old||this.decoration!==oldDecoration)
+      qualityChanges.push({method,level:this.quality,at:performance.now(),stage:g.stage,gameSeconds:g.elapsed,decoration:this.decoration,oldDecoration});
+     return result;
+    };
+   }
+   const draw=Renderer.prototype.game;
+   Renderer.prototype.game=function(...args){window.__longRenderer=this;return draw.apply(this,args);};
+   g.start('aventura',[],104);window.__longGame=g;
    window.longCapture=true;
    window.longStart=performance.now();
    const encounters=new Set(),stages=new Set(),pickups=new Set();
@@ -49,12 +60,12 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
     clearInterval(pilot);clearTimeout(deadline);
     const elapsed=(performance.now()-window.longStart)/1000;
     window.longResult={
-     elapsedWallSeconds:elapsed,gameSeconds:g.elapsed,state:g.state,reason:g.reason,
+     requestedMode,elapsedWallSeconds:elapsed,gameSeconds:g.elapsed,state:g.state,reason:g.reason,
      won:g.won,stages:[...stages],encounters:[...encounters],pickups:[...pickups],
      questions,failures,decisions,qualityChanges,
      canvasWidth:document.querySelector('#forest').width,
      canvasHeight:document.querySelector('#forest').height,
-     frameIntervals:window.longFrames
+     frameIntervals:window.longFrames,stageFrames:window.longStageFrames
     };
     window.longDone=true;
    };
@@ -100,20 +111,29 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    },16);
    const deadline=setTimeout(finish,seconds*1000);
    window.longDone=false;
-  },seconds);
+  },{seconds,requestedMode});
   await page.waitForFunction(()=>window.longDone,null,{timeout:(seconds+20)*1000,polling:250});
   const captured=await page.evaluate(()=>window.longResult);
-  const {frameIntervals:frames,...details}=captured;
+  const {frameIntervals:frames,stageFrames,...details}=captured;
   assert.ok(frames.length>100,'native frames must be captured');
   assert.deepEqual(errors,[]);
-  const stats={...details,frames:frames.length,
+  const grouped={};
+  for(const sample of stageFrames){
+   const key='stage-'+sample.stage+'-'+sample.quality+'-decoration-'+sample.decoration;
+   (grouped[key]??=[]).push(sample.dt);
+  }
+  const segments=Object.fromEntries(Object.entries(grouped).map(([key,dt])=>[key,{
+   frames:dt.length,fps:1000*dt.length/dt.reduce((a,b)=>a+b,0),
+   p95Ms:pct(dt,.95),p99Ms:pct(dt,.99),over33:dt.filter(t=>t>33.33).length,over50:dt.filter(t=>t>50).length
+  }]));
+  const stats={...details,segments,frames:frames.length,
     fps:1000*frames.length/frames.reduce((a,b)=>a+b,0),
     frameP50Ms:pct(frames,.50),frameP95Ms:pct(frames,.95),
     frameP99Ms:pct(frames,.99),maxMs:Math.max(...frames),
     framesAbove33Ms:frames.filter(t=>t>33.33).length,
     framesAbove50Ms:frames.filter(t=>t>50).length,
     framesAbove100Ms:frames.filter(t=>t>100).length};
-  fs.writeFileSync(path.join(out,'long-flight.json'),JSON.stringify(stats,null,2));
+  fs.writeFileSync(path.join(out,'long-flight-'+requestedMode+'.json'),JSON.stringify(stats,null,2));
   console.log('LONG_FLIGHT_RESULT '+JSON.stringify(stats));
   await page.close();
  }finally{await browser.close();}

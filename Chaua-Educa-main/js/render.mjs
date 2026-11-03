@@ -399,6 +399,13 @@ export class Renderer {
         this.quality=next;
         this.setVisualProfile({resolution:next,decoration:next});
     }
+    // Auto changes only the pixel budget; the living forest retains its effects.
+    // Explicit High/Low presets still set both axes through setQuality().
+    setAutomaticQuality(level) {
+        const next=level==='low'?'low':'high';
+        this.quality=next;
+        this.setVisualProfile({resolution:next,decoration:'high'});
+    }
     setVisualProfile({resolution=this.resolution,decoration=this.decoration}={}) {
         const nextResolution=resolution==='low'?'low':'high';
         this.decoration=decoration==='low'?'low':'high';

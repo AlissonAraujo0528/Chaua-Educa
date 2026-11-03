@@ -16,7 +16,11 @@ const $ = selector => document.querySelector(selector);
 const app = $('#app');
 const renderer = new Renderer($('#forest'));
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
-renderer.setQuality(quality.level);
+function applyVisualQuality() {
+    if(quality.mode==='auto')renderer.setAutomaticQuality(quality.level);
+    else renderer.setQuality(quality.level);
+}
+applyVisualQuality();
 let lastHudTime=0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dialogs = [...document.querySelectorAll('dialog')];
@@ -101,7 +105,7 @@ function start(training = false) {
     cancelAnimationFrame(resultAnimation);
     app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
-    if(quality.beginFlight())renderer.setQuality(quality.level);
+    if(quality.beginFlight())applyVisualQuality();
     resize();
     if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
     app.classList.toggle('training',training);
@@ -325,7 +329,7 @@ function frame(time) {
     game.reducedMotion=reducedMotion.matches;
     clock.advance(delta);
     if(game.state!==previousState || time-lastHudTime>=80){syncUI();lastHudTime=time;}
-    if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))renderer.setQuality(quality.level);
+    if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
     forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage);
     if(document.hidden){requestAnimationFrame(frame);return;}
     if (game.state === 'menu') renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
@@ -421,10 +425,18 @@ $('#settings-dialog').addEventListener('close',()=>{
     settingsFromPause=false;
 });
 $('#quality-mode').addEventListener('change',event=>{
-    quality.setMode(event.target.value);renderer.setQuality(quality.level);saveSetting('chaua-visual-quality',quality.mode);
+    quality.setMode(event.target.value);applyVisualQuality();saveSetting('chaua-visual-quality',quality.mode);
 });
 $('#audio-volume').addEventListener('input',event=>{
     forestAudio.setVolume(Number(event.target.value)/100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
     saveSetting('chaua-volume',forestAudio.volume);
 });
+
+// Diagnostic tooling is opt-in and never loaded in normal gameplay.
+// All measurements remain in the device until the player downloads the JSON.
+if(new URLSearchParams(location.search).get('perf-test')==='1'){
+    import('./perf-probe.mjs')
+        .then(({mountPerformanceProbe})=>mountPerformanceProbe({game,quality,renderer}))
+        .catch(error=>console.error('Falha ao iniciar diagnóstico local:',error));
+}
