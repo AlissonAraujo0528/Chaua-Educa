@@ -28,7 +28,13 @@ function summarize(values) {
     const scenarios = [
       {name:'open-forest',stage:0,actors:false},
       {name:'fragmented-forest',stage:2,actors:false},
-      {name:'fragmented-forest-with-actors',stage:2,actors:true}
+      ...(process.env.PERF_ISOLATE==='1'?[
+        {name:'fragmented-wood-only',stage:2,actors:'wood'},
+        {name:'fragmented-wood-and-snake',stage:2,actors:'snake'},
+        {name:'fragmented-hawk-only',stage:2,actors:'hawk'},
+        {name:'fragmented-pickups-only',stage:2,actors:'pickups'}
+      ]:[]),
+      {name:'fragmented-forest-with-actors',stage:2,actors:'all'}
     ];
     const seconds=Math.max(2,Math.min(30,Number(process.env.PERF_SECONDS)||6));
     const results=[];
@@ -74,24 +80,23 @@ function summarize(values) {
           };
         };
         function assertMethod(condition,name){if(!condition)throw Error('Missing method: '+name);}
-        for(const name of ['background','game','obstacle','hawk','pickup','snake','flightBorders'])
+        for(const name of ['background','game','trunk','obstacle','hawk','pickup','snake','flightBorders'])
           record(Renderer.prototype,name);
         record(Game.prototype,'visual');
         record(FlightClock.prototype,'advance');
         const wood={id:9001,kind:'wood',x:490,top:155,bottom:465,variant:'plain',snake:{age:0}};
         advanceSnake(wood,.4,game.x);
-        const actors=[
-          wood,
-          {id:9002,kind:'hawk',x:680,y:255,startX:700,startY:255,targetX:280,targetY:230,warning:0,age:2,dive:false},
-          {id:9003,kind:'fruit',x:455,y:315,variety:0,collected:false},
-          {id:9004,kind:'pepper',x:790,y:310,collected:false}
-        ];
+        const bareWood={...wood,snake:null};
+        const hawk={id:9002,kind:'hawk',x:680,y:255,startX:700,startY:255,targetX:280,targetY:230,warning:0,age:2,dive:false};
+        const fruit={id:9003,kind:'fruit',x:455,y:315,variety:0,collected:false};
+        const pepper={id:9004,kind:'pepper',x:790,y:310,collected:false};
+        const groups={wood:[bareWood],snake:[wood],hawk:[hawk],pickups:[fruit,pepper],all:[wood,hawk,fruit,pepper]};
         if(scene.actors){
           const actual=Renderer.prototype.game;
           Renderer.prototype.game=function(view,...rest){
-            // Render-only sample: actors are NOT introduced into the physics model.
+            // Render-only isolated actor A/B: no extra physics or encounter planning.
             const renderView=Object.create(view);
-            renderView.entities=actors;
+            renderView.entities=groups[scene.actors]??groups.all;
             return actual.call(this,renderView,...rest);
           };
         }
