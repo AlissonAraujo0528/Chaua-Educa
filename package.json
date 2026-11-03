@@ -28,7 +28,8 @@
     "test:perf-probe": "node tests/browser-perf-probe.cjs",
     "test:auto-visual": "node scripts/capture-auto-visual.cjs",
     "test:snake-raster-parity": "node tests/browser-snake-raster-parity.cjs",
-    "benchmark:snake-mesh": "node scripts/benchmark-snake-mesh-ab.cjs"
+    "benchmark:snake-mesh": "node scripts/benchmark-snake-mesh-ab.cjs",
+    "benchmark:render-parts": "node scripts/benchmark-render-parts.cjs"
   },
   "engines": {
     "node": ">=22"
