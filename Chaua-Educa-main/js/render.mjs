@@ -12,6 +12,7 @@ import { impactPose, smoothstep } from './motion.mjs';
 import { FRUITS } from './fruits.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
 const TAU = Math.PI * 2;
+const BACKGROUND_PALETTE=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
 const mixColor = (a, b, t) => `rgb(${[1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t)).join(',')})`;
 
 let blendSurface;
@@ -411,21 +412,49 @@ export class Renderer {
         this.dpr=size.dpr;
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
         if(this.canvas.height!==size.height)this.canvas.height=size.height;
+        if(this.skyCache&&(this.skyCache.width!==size.width||this.skyCache.height!==size.height||this.skyCache.dpr!==this.dpr)){
+            this.skyCache.surface.width=0;this.skyCache=null;
+        }
     }
     base() { this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.c.clearRect(0, 0, this.w, this.h); }
-
-    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
-        if (reduced) offset = 0;
-        const c = this.c, w = this.w, h = this.h;
+    paintSky(c,light){
+        const w=this.w,h=this.h;
         const bg = c.createLinearGradient(0, 0, 0, h);
-        const palette = ['#dbe7b5', '#dde0a1', '#e6d8a0', '#d9e9b7'];
-        const light = reduced ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
         bg.addColorStop(0, light); bg.addColorStop(.5, '#abc68d'); bg.addColorStop(1, '#355f45');
         c.fillStyle = bg; c.fillRect(0, 0, w, h);
         // Filtered sunlight through distant crowns.
         const sun = c.createRadialGradient(w * .7, h * .15, 0, w * .7, h * .15, h * .8);
         sun.addColorStop(0, '#fff4c299'); sun.addColorStop(.5, '#fff0b52a'); sun.addColorStop(1, '#fff0b500');
         c.fillStyle = sun; c.fillRect(0, 0, w, h);
+    }
+    prepareSky(light){
+        if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
+        const width=this.canvas.width,height=this.canvas.height;
+        let cache=this.skyCache;
+        if(!cache||cache.light!==light||cache.dpr!==this.dpr||cache.w!==this.w||cache.h!==this.h){
+            const surface=cache?.surface??(typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):document.createElement('canvas'));
+            surface.width=width;surface.height=height;
+            const layer=surface.getContext('2d',{alpha:false});layer.setTransform(this.dpr,0,0,this.dpr,0,0);
+            this.paintSky(layer,light);
+            cache=this.skyCache={surface,light,width,height,dpr:this.dpr,w:this.w,h:this.h};
+        }
+        return cache;
+    }
+    skyLayer(light,cacheAllowed){
+        const cache=cacheAllowed?this.prepareSky(light):null;
+        if(!cache){this.paintSky(this.c,light);return;}
+        // The cache is already at backing resolution: copy without rescaling.
+        this.c.save();this.c.setTransform(1,0,0,1,0,0);this.c.drawImage(cache.surface,0,0);this.c.restore();
+    }
+
+    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
+        if (reduced) offset = 0;
+        const c = this.c, w = this.w, h = this.h;
+        const palette=BACKGROUND_PALETTE;
+        const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
+        // The sky and sun are static once this translucent section has settled.
+        // Animated transitions and the other background layers keep their clocks.
+        this.skyLayer(light,stage===2&&stageMix===1);
         for (let layer = 0; !images.has('forest') && layer < 3; layer++) {
             const gap = 180 - layer * 25, travel = (offset * (.07 + layer * .06)) % gap;
             c.globalAlpha = .12 + layer * .08;
@@ -510,6 +539,8 @@ export class Renderer {
 
     game(game, reduced, visualTime = 0) {
         this.base();
+        // Prepare before active flight, rather than allocate on entering the fog.
+        if(game.state==='countdown')this.prepareSky(BACKGROUND_PALETTE[2]);
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4));

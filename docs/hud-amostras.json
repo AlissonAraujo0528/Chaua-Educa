@@ -1,0 +1,142 @@
+{
+  "date": "2026-11-02",
+  "base": "b2fe1a0ccc440122321f633ac4ea9e0c14f66572",
+  "viewport": {
+    "width": 1440,
+    "height": 960
+  },
+  "requestedDpr": 2,
+  "quality": "high",
+  "warmupSeconds": 1,
+  "captureSeconds": 8,
+  "seed": 104,
+  "renderer": "SwiftShader/software",
+  "samples": [
+    {
+      "run": "game-0-after",
+      "state": "playing",
+      "fps": 31.86854226316445,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 50,
+        "p99": 50,
+        "max": 66.59999999999991,
+        "over25": 203,
+        "over50": 1
+      },
+      "layouts": 21,
+      "styleRecalculations": 261,
+      "hudMutations": 165,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    },
+    {
+      "run": "game-0-before",
+      "state": "playing",
+      "fps": 30.313236780060627,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 50,
+        "p99": 66.60000000000036,
+        "max": 100,
+        "over25": 211,
+        "over50": 7
+      },
+      "layouts": 249,
+      "styleRecalculations": 251,
+      "hudMutations": 670,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    },
+    {
+      "run": "game-1-after",
+      "state": "playing",
+      "fps": 31.81018674450807,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 50,
+        "p99": 50,
+        "max": 50.100000000000364,
+        "over25": 212,
+        "over50": 1
+      },
+      "layouts": 21,
+      "styleRecalculations": 263,
+      "hudMutations": 165,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    },
+    {
+      "run": "game-1-before",
+      "state": "playing",
+      "fps": 32.73994771567284,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 33.400000000000546,
+        "p99": 50,
+        "max": 66.59999999999991,
+        "over25": 210,
+        "over50": 1
+      },
+      "layouts": 268,
+      "styleRecalculations": 270,
+      "hudMutations": 678,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    },
+    {
+      "run": "game-2-after",
+      "state": "playing",
+      "fps": 31.121623303871534,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 50,
+        "p99": 66.69999999999982,
+        "max": 83.40000000000055,
+        "over25": 211,
+        "over50": 7
+      },
+      "layouts": 20,
+      "styleRecalculations": 257,
+      "hudMutations": 163,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    },
+    {
+      "run": "game-2-before",
+      "state": "playing",
+      "fps": 30.93696593191373,
+      "frameInterval": {
+        "p50": 33.30000000000018,
+        "p95": 50,
+        "p99": 50.099999999999454,
+        "max": 66.60000000000036,
+        "over25": 208,
+        "over50": 5
+      },
+      "layouts": 252,
+      "styleRecalculations": 254,
+      "hudMutations": 686,
+      "errors": [],
+      "backing": [
+        2449,
+        1632
+      ]
+    }
+  ]
+}
