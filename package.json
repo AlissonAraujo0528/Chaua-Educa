@@ -21,7 +21,10 @@
     "test:snake-continuity": "node tests/browser-snake-continuity.cjs",
     "test:background": "node tests/browser-background.cjs",
     "benchmark:background": "node tests/browser-background.cjs --benchmark",
-    "test:hud": "node tests/browser-hud.cjs"
+    "test:hud": "node tests/browser-hud.cjs",
+    "benchmark:hotspots": "node scripts/diagnose-render-cost.cjs",
+    "benchmark:resolution": "node scripts/benchmark-resolution-ladder.cjs",
+    "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs"
   },
   "engines": {
     "node": ">=22"
