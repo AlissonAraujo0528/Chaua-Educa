@@ -25,7 +25,8 @@
     "benchmark:hotspots": "node scripts/diagnose-render-cost.cjs",
     "benchmark:resolution": "node scripts/benchmark-resolution-ladder.cjs",
     "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs",
-    "test:perf-probe": "node tests/browser-perf-probe.cjs"
+    "test:perf-probe": "node tests/browser-perf-probe.cjs",
+    "test:auto-visual": "node scripts/capture-auto-visual.cjs"
   },
   "engines": {
     "node": ">=22"
