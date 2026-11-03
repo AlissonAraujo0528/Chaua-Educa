@@ -23,6 +23,9 @@ fs.mkdirSync('test-results/fragmented-composite',{recursive:true});
      const r=new Renderer(canvas);await r.ready;return r;
     };
     const direct=await create(),optimized=await create();
+    window.__fragmentedCompare={direct,optimized};
+    direct.canvas.id='forest-comparison-baseline';
+    optimized.canvas.id='forest-comparison-cached';
     direct.prepareFragmentedBackdrop=()=>null;
     const out=[];
     for(const quality of ['high','low']){
@@ -79,6 +82,22 @@ fs.mkdirSync('test-results/fragmented-composite',{recursive:true});
       direct:stat(samples.direct),optimized:stat(samples.optimized)};
    });
    assert.deepEqual(errors,[]);
+   assert.equal(stats.fallbackErrors,0,'Other stages and transitions must remain pixel-identical');
+   assert.ok(stats.cacheAllocated,'Fragmented backdrop cache must be allocated');
+   assert.ok(stats.totalMAE<.75,'Excessive average image difference: '+stats.totalMAE);
+   assert.ok(stats.maximum<=32,'Large individual channel difference: '+stats.maximum);
+   assert.ok(stats.maximumLargeFraction<.02,'Too many perceptible color differences: '+stats.maximumLargeFraction);
+   // A paired within-run ratio reduces susceptibility to differing CI runners.
+   assert.ok(stats.optimized.mean<stats.direct.mean*.9,'No material background composite benefit observed');
+   await page.evaluate(()=>{
+    const {direct,optimized}=window.__fragmentedCompare;
+    for(const r of [direct,optimized]){
+     r.setQuality('high');r.base();r.background(35,15000,2,false,false,1);
+    }
+   });
+   const suffix=viewport.width+'x'+viewport.height;
+   await page.locator('#forest-comparison-baseline').screenshot({path:'test-results/fragmented-composite/'+suffix+'-original.png'});
+   await page.locator('#forest-comparison-cached').screenshot({path:'test-results/fragmented-composite/'+suffix+'-optimized.png'});
    reports.push({viewport,...stats});
    console.log('FRAGMENTED_COMPOSITE_ROW '+JSON.stringify({viewport,...stats}));
    await page.close();
