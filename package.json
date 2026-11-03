@@ -16,7 +16,9 @@
     "test:immersion": "node tests/browser-immersion.cjs",
     "test:reference-art": "node tests/browser-reference-art.cjs",
     "test:snake": "node tests/browser-snake-strike.cjs",
-    "test:snake-continuity": "node tests/browser-snake-continuity.cjs"
+    "test:snake-continuity": "node tests/browser-snake-continuity.cjs",
+    "test:background": "node tests/browser-background.cjs",
+    "benchmark:background": "node tests/browser-background.cjs --benchmark"
   },
   "engines": {
     "node": ">=22"

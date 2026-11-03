@@ -27,3 +27,4 @@ jobs:
           npm run test:immersion
           npm run test:browser
           npm run test:journey
+          npm run test:background
