@@ -24,4 +24,5 @@ jobs:
           npm run test:snake-raster-parity
           npm run benchmark:snake-mesh
           npm run benchmark:render-parts
+          npm run benchmark:background-passes
           PERF_ISOLATE=1 PERF_SECONDS=4 npm run benchmark:hotspots
