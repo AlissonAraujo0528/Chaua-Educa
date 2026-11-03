@@ -7,6 +7,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const out=process.env.LONG_OUTPUT||'test-results/long-flight';
 const requestedMode=['auto','high','low'].includes(process.env.LONG_MODE)?process.env.LONG_MODE:'auto';
+const requestedDpr=Number(process.env.LONG_DPR)||null;
 fs.mkdirSync(out,{recursive:true});
 const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);return ys[Math.floor((ys.length-1)*p)];};
 (async()=>{
@@ -14,8 +15,9 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
  try{
   const page=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:2}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(mode=>{
+  await page.addInitScript(({mode,dpr})=>{
    localStorage.setItem('chaua-visual-quality',JSON.stringify(mode));
+   if(dpr>0)Object.defineProperty(window,'devicePixelRatio',{configurable:true,get:()=>dpr});
    const native=requestAnimationFrame;
    let previous=0;
    window.longFrames=[];window.longStageFrames=[];
@@ -26,7 +28,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
     }
     callback(now);
    });
-  },requestedMode);
+  },{mode:requestedMode,dpr:requestedDpr});
   await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
   await page.locator('#inputPlayer').fill('Teste prolongado');
   await page.locator('input[value=aventura]').check();
@@ -126,7 +128,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    frames:dt.length,fps:1000*dt.length/dt.reduce((a,b)=>a+b,0),
    p95Ms:pct(dt,.95),p99Ms:pct(dt,.99),over33:dt.filter(t=>t>33.33).length,over50:dt.filter(t=>t>50).length
   }]));
-  const stats={...details,segments,frames:frames.length,
+  const stats={...details,requestedDpr,segments,frames:frames.length,
     fps:1000*frames.length/frames.reduce((a,b)=>a+b,0),
     frameP50Ms:pct(frames,.50),frameP95Ms:pct(frames,.95),
     frameP99Ms:pct(frames,.99),maxMs:Math.max(...frames),
