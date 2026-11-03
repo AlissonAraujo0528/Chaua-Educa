@@ -79,8 +79,8 @@ const {chromium}=require('playwright');
   await live.evaluate(async()=>{
    const {game}=await import('/js/script.js'),{Renderer}=await import('/js/render.mjs');
    window.qualityTransitions=[];
-   const set=Renderer.prototype.setQuality;
-   Renderer.prototype.setQuality=function(level){const old=this.quality;const result=set.call(this,level);if(old!==level)window.qualityTransitions.push(level);window.profileDecoration=this.decoration;return result;};
+   const set=Renderer.prototype.setAutomaticQuality;
+   Renderer.prototype.setAutomaticQuality=function(level){const old=this.quality;const result=set.call(this,level);if(old!==level)window.qualityTransitions.push(level);window.profileDecoration=this.decoration;return result;};
    const draw=Renderer.prototype.game;
    Renderer.prototype.game=function(...args){const start=performance.now();const result=draw.apply(this,args);if(this.quality==='high')while(performance.now()-start<35){}return result;};
    game.startTutorial();game.state='playing';game.elapsed=35;game.distance=15000;game.stage=2;game.stageAge=10;game.y=320;game.snapshot();
