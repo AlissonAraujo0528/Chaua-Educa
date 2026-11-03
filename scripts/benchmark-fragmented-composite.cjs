@@ -89,15 +89,22 @@ fs.mkdirSync('test-results/fragmented-composite',{recursive:true});
    assert.ok(stats.maximumLargeFraction<.02,'Too many perceptible color differences: '+stats.maximumLargeFraction);
    // A paired within-run ratio reduces susceptibility to differing CI runners.
    assert.ok(stats.optimized.mean<stats.direct.mean*.9,'No material background composite benefit observed');
-   await page.evaluate(()=>{
+   // Export each backing canvas's true pixels. Element screenshots would
+   // accidentally capture the *topmost* overlapping canvas in both files.
+   const captures=await page.evaluate(()=>{
     const {direct,optimized}=window.__fragmentedCompare;
     for(const r of [direct,optimized]){
      r.setQuality('high');r.base();r.background(35,15000,2,false,false,1);
     }
+    return {
+     original:direct.canvas.toDataURL('image/png').split(',')[1],
+     optimized:optimized.canvas.toDataURL('image/png').split(',')[1]
+    };
    });
    const suffix=viewport.width+'x'+viewport.height;
-   await page.locator('#forest-comparison-baseline').screenshot({path:'test-results/fragmented-composite/'+suffix+'-original.png'});
-   await page.locator('#forest-comparison-cached').screenshot({path:'test-results/fragmented-composite/'+suffix+'-optimized.png'});
+   for(const [version,base64] of Object.entries(captures)){
+    fs.writeFileSync('test-results/fragmented-composite/'+suffix+'-'+version+'.png',Buffer.from(base64,'base64'));
+   }
    reports.push({viewport,...stats});
    console.log('FRAGMENTED_COMPOSITE_ROW '+JSON.stringify({viewport,...stats}));
    await page.close();
