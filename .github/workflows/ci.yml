@@ -21,6 +21,7 @@ jobs:
           trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
           npm run test:quality
           npm run test:render-profile
+          npm run test:auto-visual
           npm run test:perf-probe
           npm run test:snake-continuity
           npm run test:snake
@@ -32,3 +33,10 @@ jobs:
           npm run test:background
           npm run test:hud
           PERF_SECONDS=6 npm run benchmark:hotspots
+      - name: Save automatic graphics visual comparisons
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: auto-visual-captures
+          path: test-results/auto-visual/
+          if-no-files-found: ignore
