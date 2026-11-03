@@ -18,7 +18,8 @@
     "test:immersion": "node tests/browser-immersion.cjs",
     "test:reference-art": "node tests/browser-reference-art.cjs",
     "test:snake": "node tests/browser-snake-strike.cjs",
-    "test:snake-continuity": "node tests/browser-snake-continuity.cjs"
+    "test:snake-continuity": "node tests/browser-snake-continuity.cjs",
+    "benchmark:hotspots": "node scripts/diagnose-render-cost.cjs"
   },
   "engines": {
     "node": ">=22"
