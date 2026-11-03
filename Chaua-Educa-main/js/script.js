@@ -432,3 +432,11 @@ $('#audio-volume').addEventListener('input',event=>{
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
     saveSetting('chaua-volume',forestAudio.volume);
 });
+
+// Diagnostic tooling is opt-in and never loaded in normal gameplay.
+// All measurements remain in the device until the player downloads the JSON.
+if(new URLSearchParams(location.search).get('perf-test')==='1'){
+    import('./perf-probe.mjs')
+        .then(({mountPerformanceProbe})=>mountPerformanceProbe({game,quality,renderer}))
+        .catch(error=>console.error('Falha ao iniciar diagnóstico local:',error));
+}
