@@ -34,6 +34,23 @@ const {chromium}=require('playwright');
      check(identical(before,pixels(r)),`preset parity: ${mode}/${stage}/${reduced}`);
      if(old){old.setQuality(mode);old.game(g,reduced,50);check(identical(before,pixels(old)),`baseline parity: ${mode}/${stage}/${reduced}`);}
     }
+    // Auto Low is resolution-only: its pixels and scene must match the full-
+    // effects profile at exactly the same low backing resolution.
+    for(let stage=0;stage<4;stage++)for(const reduced of [false,true]){
+     g.stage=stage;
+     r.setAutomaticQuality('low');r.game(g,reduced,50);
+     const auto=pixels(r);
+     check(r.quality==='low'&&r.resolution==='low'&&r.decoration==='high','automatic downgrade must preserve decoration');
+     r.setVisualProfile({resolution:'low',decoration:'high'});r.game(g,reduced,50);
+     check(identical(auto,pixels(r)),`Automatic low full-effects pixel parity: ${stage}/${reduced}`);
+    }
+    r.setAutomaticQuality('high');
+    check(r.quality==='high'&&r.resolution==='high'&&r.decoration==='high','automatic restore must keep all effects');
+    r.setQuality('low');
+    check(r.quality==='low'&&r.resolution==='low'&&r.decoration==='low','manual Low still reduces decoration');
+    r.setQuality('high');
+    check(r.quality==='high'&&r.resolution==='high'&&r.decoration==='high','manual High still restores decoration');
+
     // Resolution changes must preserve the logical drawing commands, including
     // all particles and snake geometry; only the backing transform may differ.
     let commands=[];const context=r.c;
