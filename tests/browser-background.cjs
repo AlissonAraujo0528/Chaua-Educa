@@ -44,7 +44,12 @@ async function pixels(browser){
      const b=cached.c.getImageData(0,0,cached.canvas.width,cached.canvas.height).data;
      for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);maximum=Math.max(maximum,delta);different+=Number(delta!==0);}
      total+=a.length;
-     if(stage===2&&mix===1){const cache=cached.skyCache;cached.base();cached.background(time+.01,9000,2,false,reduced,1);reused||=cache===cached.skyCache;}
+     if(stage===2&&mix===1){
+       const active=()=>reduced?cached.skyCache:cached.fragmentedBackdrop;
+       const cache=active();
+       cached.base();cached.background(time+.01,9000,2,false,reduced,1);
+       reused ||= !!cache&&cache===active();
+      }
     }
    }
    const forest=images.get('forest');images.delete('forest');
@@ -63,15 +68,19 @@ async function pixels(browser){
    const viewport=cycle%2?{width:390,height:844}:{width:1000,height:700};
    await page.setViewportSize(viewport);
    const released=await page.evaluate(()=>{
-    const {cached:r}=window.backgroundTest,old=r.skyCache.surface;r.resize();
-    const released=old.width===0&&r.skyCache===null;
+    const {cached:r}=window.backgroundTest;
+    const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface].filter(Boolean);
+    r.resize();
+    const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null;
     r.base();r.background(44,9000,2,false,false,1);return released;
    });
    assert.equal(released,true);
   }
   assert.equal(await page.evaluate(()=>{
-   const {cached:r}=window.backgroundTest,old=r.skyCache.surface;r.setQuality('high');
-   const released=old.width===0&&r.skyCache===null;
+   const {cached:r}=window.backgroundTest;
+   const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface].filter(Boolean);
+   r.setQuality('high');
+   const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null;
    r.base();r.background(44,9000,2,false,false,1);return released;
   }),true,'quality change must release the old backing');
   await page.screenshot({path:path.join(out,'scene-'+summaries.length+'.png')});
@@ -82,7 +91,7 @@ async function pixels(browser){
   const {direct,cached}=window.backgroundTest;
   for(const r of [direct,cached]){r.base();r.background(44,9000,2,false,false,1);}
   const a=direct.c.getImageData(0,0,780,1688).data,b=cached.c.getImageData(0,0,780,1688).data;
-  return a.every((v,i)=>v===b[i])&&cached.skyCache.surface instanceof HTMLCanvasElement;
+  return a.every((v,i)=>v===b[i])&&cached.fragmentedBackdrop?.surface instanceof HTMLCanvasElement;
  }),true,'HTML canvas fallback differs');assert.deepEqual(errors,[]);await page.close();
  console.log(JSON.stringify(summaries));
  console.log('PASS background: identical pixels, all stages/transitions, drift, reduced motion, high/low, fallback and cache release.');

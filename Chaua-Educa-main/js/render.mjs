@@ -393,7 +393,7 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
+    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
     setQuality(level) {
         const next=level==='low'?'low':'high';
         this.quality=next;
@@ -421,6 +421,10 @@ export class Renderer {
         if(this.canvas.height!==size.height)this.canvas.height=size.height;
         if(this.skyCache&&(this.skyCache.width!==size.width||this.skyCache.height!==size.height||this.skyCache.dpr!==this.dpr)){
             this.skyCache.surface.width=0;this.skyCache=null;
+        }
+        if(this.fragmentedBackdrop&&(this.fragmentedBackdrop.width!==size.width||this.fragmentedBackdrop.height!==size.height||this.fragmentedBackdrop.dpr!==this.dpr)){
+            this.fragmentedBackdrop.surface.width=0;this.fragmentedBackdrop.surface.height=0;
+            this.fragmentedBackdrop=null;
         }
     }
     base() { this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.c.clearRect(0, 0, this.w, this.h); }
@@ -454,14 +458,53 @@ export class Renderer {
         this.c.save();this.c.setTransform(1,0,0,1,0,0);this.c.drawImage(cache.surface,0,0);this.c.restore();
     }
 
+    prepareFragmentedBackdrop(forest,light,drift) {
+        // The settled fragmented forest has a static sun/sky plus one slowly
+        // drifting semi-transparent WebP. Composite them into one opaque layer.
+        // The tiny half-device-pixel motion step prevents a full 4Mpx resample
+        // for every ~0.02px drift while retaining smooth wind displacement.
+        if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
+        const width=this.canvas.width,height=this.canvas.height;
+        const sourceDrift=Math.round(drift*this.dpr*2)/2;
+        let cache=this.fragmentedBackdrop;
+        if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.light!==light||cache.forest!==forest){
+            if(cache){cache.surface.width=0;cache.surface.height=0;}
+            const surface=typeof OffscreenCanvas!=='undefined'?
+                new OffscreenCanvas(width,height):document.createElement('canvas');
+            surface.width=width;surface.height=height;
+            const c=surface.getContext('2d',{alpha:false});
+            if(!c)return null;
+            cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,sourceDrift:null};
+        }
+        if(cache.sourceDrift!==sourceDrift){
+            const c=cache.c;
+            c.setTransform(this.dpr,0,0,this.dpr,0,0);
+            c.globalAlpha=1;
+            this.paintSky(c,light);
+            const fw=forest.naturalWidth*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+            const fh=forest.naturalHeight*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+            c.globalAlpha=.6;
+            c.drawImage(forest,(this.w-fw)/2+sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
+            c.globalAlpha=1;
+            cache.sourceDrift=sourceDrift;
+        }
+        return cache;
+    }
     background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
         if (reduced) offset = 0;
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
-        // The sky and sun are static once this translucent section has settled.
-        // Animated transitions and the other background layers keep their clocks.
-        this.skyLayer(light,stage===2&&stageMix===1);
+        // Composite the settled translucent sky/forest as one reusable layer.
+        // Transitions and other stages keep their original exact draw path.
+        const forest=images.get('forest');
+        const cachedBackdrop=stage===2&&stageMix===1&&!home&&!reduced&&forest?
+            this.prepareFragmentedBackdrop(forest,light,Math.sin(time*.035)*Math.min(24,
+                (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2)):null;
+        if(cachedBackdrop){
+            c.save();c.setTransform(1,0,0,1,0,0);
+            c.drawImage(cachedBackdrop.surface,0,0);c.restore();
+        }else this.skyLayer(light,stage===2&&stageMix===1);
         for (let layer = 0; !images.has('forest') && layer < 3; layer++) {
             const gap = 180 - layer * 25, travel = (offset * (.07 + layer * .06)) % gap;
             c.globalAlpha = .12 + layer * .08;
@@ -473,8 +516,7 @@ export class Renderer {
             }
         }
         c.globalAlpha = 1;
-        const forest=images.get('forest');
-        if (forest) {
+        if (forest&&!cachedBackdrop) {
             const scale=Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08;
             const fw=forest.naturalWidth*scale, fh=forest.naturalHeight*scale;
             const drift=reduced?0:Math.sin(time*.035)*Math.min(24,(fw-w)/2);
