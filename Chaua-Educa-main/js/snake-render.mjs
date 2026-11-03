@@ -9,13 +9,7 @@ function triangle(c,image,src,dst){
  // Subpixel overlap prevents antialiasing cracks between adjacent triangles.
  const edge=dst.map(v=>{const dx=v.x-center.x,dy=v.y-center.y,len=Math.hypot(dx,dy);return {x:v.x+dx/len*.35,y:v.y+dy/len*.35};});
  c.save();c.beginPath();c.moveTo(edge[0].x,edge[0].y);c.lineTo(edge[1].x,edge[1].y);c.lineTo(edge[2].x,edge[2].y);c.closePath();c.clip();
- c.transform(A,B,C,D,p.x-A*a.x-C*a.y,p.y-B*a.x-D*a.y);
- // Each triangle covers only one horizontal strip. Fetch that strip rather
- // than sampling the entire 384x384 texture 24 times per animation frame.
- // The 2px guard preserves expanded anti-aliased edges and interpolation.
- const top=Math.max(0,Math.min(a.y,b.y,d.y)-2);
- const bottom=Math.min(384,Math.max(a.y,b.y,d.y)+2);
- c.drawImage(image,0,top,384,bottom-top,0,top,384,bottom-top);c.restore();
+ c.transform(A,B,C,D,p.x-A*a.x-C*a.y,p.y-B*a.x-D*a.y);c.drawImage(image,0,0,384,384,0,0,384,384);c.restore();
 }
 function drawMesh(c,image,s,factor){
  const data=SPRITES.snake,pose=snakeMotion(s,false);
