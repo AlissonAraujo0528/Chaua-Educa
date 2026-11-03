@@ -214,7 +214,7 @@ Validação: 102 testes automatizados aprovados e build Sass concluído. O rotei
 
 ## Etapa 12 — Ajustes audiovisuais e orçamento de renderização
 
-“Ajustes” fica no início e na pausa. Qualidade Automática começa detalhada, reduz decoração após 2 segundos consecutivos abaixo de aproximadamente 42 frames/s e tenta recuperar detalhes após 12 segundos consecutivos acima de 55 frames/s. Pausas, abas ocultas e travamentos isolados descartam as amostras. Também é possível fixar Detalhada ou Econômica. A preferência é local e não modifica física, hitboxes, geração de encontros ou placar.
+“Ajustes” fica no início e na pausa. Qualidade Automática começa detalhada e reduz a qualidade quando pelo menos 35% de uma janela móvel de 2 segundos ocorre em quadros abaixo de aproximadamente 42 frames/s. Um atraso isolado não provoca a redução. Depois de reduzir, mantém Econômica até o fim daquele voo; uma nova partida ou a seleção explícita de Automática permite reavaliar Detalhada. Pausas e abas ocultas limpam as amostras sem elevar a qualidade. Também é possível fixar Detalhada ou Econômica, preservando a escolha entre partidas. A preferência é local e não modifica física, hitboxes, geração de encontros ou placar. Veja a [política e a validação](docs/qualidade-estavel.md).
 
 Canvas limitado a 4 milhões de pixels em qualquer resolução; DPR máximo 2 na qualidade detalhada e 1 na econômica. Redimensionamentos sem mudança de dimensões não recriam o backing buffer. Econômica reduz camadas decorativas, pólen, borboletas, partículas e folhas de celebração; mantém sprites, pistas de coleta e avisos de perigo. Não há descarte de obstáculos.
 
