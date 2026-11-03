@@ -20,6 +20,7 @@ jobs:
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-http.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null' EXIT
+          npm run test:background
           node scripts/benchmark-fragmented-composite.cjs
       - name: Persist metrics
         if: always()
