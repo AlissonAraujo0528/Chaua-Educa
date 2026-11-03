@@ -1,0 +1,23 @@
+name: Render performance diagnostics
+on:
+  push:
+    branches:
+      - perf/diagnose-render-bottlenecks
+jobs:
+  hotspot-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Measure render hotspots
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null' EXIT
+          PERF_SECONDS=6 npm run benchmark:hotspots
