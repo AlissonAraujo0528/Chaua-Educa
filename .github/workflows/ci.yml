@@ -28,3 +28,4 @@ jobs:
           npm run test:immersion
           npm run test:browser
           npm run test:journey
+          PERF_SECONDS=6 npm run benchmark:hotspots
