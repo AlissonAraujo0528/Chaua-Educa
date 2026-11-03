@@ -17,7 +17,7 @@ const {chromium}=require('playwright');
   await page.bringToFront();
   await page.locator('#start-training').click();
   await page.evaluate(async()=>{
-   const {game}=await import('/js/script.js');game.startTutorial();game.state='playing';game.snapshot();window.stepQuality(1/60);
+   const {game}=await import('/js/script.js');const {Renderer}=await import('/js/render.mjs');const draw=Renderer.prototype.game;Renderer.prototype.game=function(...args){window.activeRenderer=this;return draw.apply(this,args);};game.startTutorial();game.state='playing';game.snapshot();window.stepQuality(1/60);
   });
   const step=(pattern,count)=>page.evaluate(({pattern,count})=>{
    for(let i=0;i<count;i++)window.stepQuality(pattern[i%pattern.length]);
@@ -25,17 +25,20 @@ const {chromium}=require('playwright');
   const state=()=>page.evaluate(async()=>({
    state:(await import('/js/script.js')).game.state,
    width:document.querySelector('#forest').width,
-   stored:JSON.parse(localStorage.getItem('chaua-visual-quality'))
+   stored:JSON.parse(localStorage.getItem('chaua-visual-quality')),
+   decoration:window.activeRenderer?.decoration,
+   resolution:window.activeRenderer?.resolution
   }));
   const mode=async value=>{
    await page.locator('#quality-mode').evaluate((select,value)=>{select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));},value);
   };
   // Exercise the real frame loop, controller, renderer resize and setting handler.
-  await mode('auto');assert.equal((await state()).width,780);
+  await mode('auto');assert.equal((await state()).width,780);assert.equal((await state()).decoration,'high');
   await step([.25],1);await step([1/60],180);
   assert.equal((await state()).width,780,'one stall must not lower quality');
   await step([1/60,1/30],100);
   assert.equal((await state()).width,390,'mixed active slowdown must resize the renderer');
+  assert.equal((await state()).decoration,'high','Automatic must keep all forest effects when resolution falls');
   assert.equal((await state()).state,'playing');
   await step([1/60],660);assert.equal((await state()).width,390,'healthy low frames cannot prove high is sustainable');
   await page.locator('#pause-button').click();await step([1/30],90);
@@ -45,10 +48,13 @@ const {chromium}=require('playwright');
   await step([1/60],120);assert.equal((await state()).width,390);
   await mode('high');await step([.12,1/60],60);
   assert.equal((await state()).width,780);assert.equal((await state()).stored,'high');
+  assert.equal((await state()).decoration,'high','Manual High keeps full effects');
   await mode('low');await step([1/60],780);
   assert.equal((await state()).width,390);assert.equal((await state()).stored,'low');
+  assert.equal((await state()).decoration,'low','Manual Low must retain its existing reduced decoration');
   await mode('auto');await step([.12,1/60],40);
   assert.equal((await state()).width,390,'recurring active stalls above 100 ms must count');
+  assert.equal((await state()).decoration,'high','Automatic must restore full effects after Manual Low');
   assert.equal((await state()).stored,'auto');
   const restart=async()=>{
    await page.locator('#pause-button').click();
@@ -74,15 +80,15 @@ const {chromium}=require('playwright');
    const {game}=await import('/js/script.js'),{Renderer}=await import('/js/render.mjs');
    window.qualityTransitions=[];
    const set=Renderer.prototype.setQuality;
-   Renderer.prototype.setQuality=function(level){const old=this.quality;const result=set.call(this,level);if(old!==level)window.qualityTransitions.push(level);return result;};
+   Renderer.prototype.setQuality=function(level){const old=this.quality;const result=set.call(this,level);if(old!==level)window.qualityTransitions.push(level);window.profileDecoration=this.decoration;return result;};
    const draw=Renderer.prototype.game;
    Renderer.prototype.game=function(...args){const start=performance.now();const result=draw.apply(this,args);if(this.quality==='high')while(performance.now()-start<35){}return result;};
    game.startTutorial();game.state='playing';game.elapsed=35;game.distance=15000;game.stage=2;game.stageAge=10;game.y=320;game.snapshot();
   });
   for(let i=0;i<4;i++)await live.waitForTimeout(10000);
-  const native=await live.evaluate(async()=>({changes:window.qualityTransitions,state:(await import('/js/script.js')).game.state,width:document.querySelector('#forest').width}));
+  const native=await live.evaluate(async()=>({changes:window.qualityTransitions,state:(await import('/js/script.js')).game.state,width:document.querySelector('#forest').width,decoration:window.profileDecoration}));
   assert.deepEqual(native.changes,['low'],'native scheduling must not repeatedly retry expensive High');
-  assert.equal(native.state,'playing');assert.equal(native.width,1440);assert.deepEqual(liveErrors,[]);
+  assert.equal(native.state,'playing');assert.equal(native.width,1440);assert.equal(native.decoration,'high');assert.deepEqual(liveErrors,[]);
   console.log('Automatic quality: 40-second native rendering under profile-dependent load passed.',native);
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
