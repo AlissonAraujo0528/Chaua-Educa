@@ -49,6 +49,7 @@ fs.mkdirSync(path,{recursive:true});
       r.background(35,15500,stage-1,false,false,1);
      }
      const timeseries=[],n=160;
+     let previousOriginal=null,previousOptimized=null;
      for(let i=0;i<=n;i++){
       const mix=i/n,time=35+4*mix,offset=15500+i*4;
       const snapshots=[];
@@ -64,13 +65,37 @@ fs.mkdirSync(path,{recursive:true});
        const diff=Math.abs(snapshots[0][k]-snapshots[1][k]);
        total+=diff;if(diff>5)large++;max=Math.max(max,diff);
       }
-      timeseries.push({mix,mae:total/snapshots[0].length,over5Fraction:large/snapshots[0].length,maxDelta:max});
+      // Difference of consecutive frames, compared with the original
+      // renderer's consecutive-frame changes. This catches visible stepping
+      // even if an eventual static image matches the reference exactly.
+      let extraDeltaTotal=0,extraDeltaOver5=0,extraDeltaMax=0;
+      if(previousOriginal&&previousOptimized){
+       for(let k=0;k<snapshots[0].length;k++){
+        const referenceMotion=snapshots[0][k]-previousOriginal[k];
+        const candidateMotion=snapshots[1][k]-previousOptimized[k];
+        const extra=Math.abs(candidateMotion-referenceMotion);
+        extraDeltaTotal+=extra;
+        if(extra>5)extraDeltaOver5++;
+        extraDeltaMax=Math.max(extraDeltaMax,extra);
+       }
+      }
+      timeseries.push({mix,mae:total/snapshots[0].length,over5Fraction:large/snapshots[0].length,maxDelta:max,
+       extraMotionMAE:previousOriginal?extraDeltaTotal/snapshots[0].length:null,
+       extraMotionOver5Fraction:previousOriginal?extraDeltaOver5/snapshots[0].length:null,
+       extraMotionMax:previousOriginal?extraDeltaMax:null});
+      previousOriginal=snapshots[0];
+      previousOptimized=snapshots[1];
      }
      const sorted=[...timeseries.map(x=>x.mae)].sort((a,b)=>a-b);
      const p=q=>sorted[Math.floor((sorted.length-1)*q)];
+     const extraMotion=timeseries.slice(1).map(x=>x.extraMotionMAE);
+     const sortedExtra=[...extraMotion].sort((a,b)=>a-b);
      records.push({stage,frames:timeseries.length,meanMAE:timeseries.reduce((s,x)=>s+x.mae,0)/timeseries.length,
       p95MAE:p(.95),maxMAE:sorted[sorted.length-1],maxChannelDelta:Math.max(...timeseries.map(x=>x.maxDelta)),
       maxOver5Fraction:Math.max(...timeseries.map(x=>x.over5Fraction)),
+      p95ExtraMotionMAE:sortedExtra[Math.floor((sortedExtra.length-1)*.95)],
+      maxExtraMotionMAE:sortedExtra[sortedExtra.length-1],
+      worstMotionFrames:[...timeseries].slice(1).sort((a,b)=>b.extraMotionMAE-a.extraMotionMAE).slice(0,6),
       worstFrames:[...timeseries].sort((a,b)=>b.mae-a.mae).slice(0,6)});
     }
     return records;
