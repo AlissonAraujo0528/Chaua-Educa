@@ -59,7 +59,7 @@ const summarize=a=>{
        }
        // Finish each constant key before checking exact-frame colors.
        // Transition input progression is checked separately below.
-       for(let j=0;j<8&&mix<1;j++){
+       for(let j=0;j<8;j++){
         candidate.base();candidate.background(42.15+mix,13000+mix*100,stage,false,false,mix);
        }
        const left=old.c.getImageData(0,0,old.canvas.width,old.canvas.height).data;
