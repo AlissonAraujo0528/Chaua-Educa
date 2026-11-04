@@ -29,3 +29,23 @@ A adição de otimizações de céu/cache produziu resultados mistos em voos com
 - Teste final no aparelho real antes de declarar 60 FPS garantidos.
 
 **Não realizar merge na `main` até validar resultados.** Nenhum critério autoriza apagar testes ou sacrificar imagens para obter artificialmente mais FPS.
+
+## Resultado do teste final pareado (4 de novembro de 2026)
+
+**GitHub Actions:** [final-premerge A/B, execução 41855711029](https://github.com/SilvAlisson/Chaua-Educa/actions/runs/41855711029). Os dois voos completaram os quatro estágios com qualidade Alta e Canvas de 2449×1632 pixels, no mesmo runner Chromium/SwiftShader. A variante de referência desativou apenas as três melhorias de fundo; o candidato deixou as três ativas.
+
+| Indicador | Referência sem as três melhorias | Consolidação final |
+|---|---:|---:|
+| FPS médio | 58,46 | **59,70** |
+| P95 de intervalo | 16,8 ms | **16,8 ms** |
+| P99 de intervalo | 33,3 ms | **16,8 ms** |
+| Quadros acima de 33,33 ms | 55 | **10** |
+| Quadros acima de 50 ms | 4 | **2** |
+| Intervalo máximo | 100 ms | **83,4 ms** |
+| FPS da transição 0→1 | 51,50 | **57,50** |
+| FPS da transição 1→2 | 53,50 | **58,25** |
+| FPS da transição 2→3 | 53,50 | **59,75** |
+
+**Decisão de engenharia:** aprovar a consolidação como candidata à promoção para a branch experimental. Ganho de 1,24 FPS e queda de 81,8% no total de quadros acima de 33 ms neste par de voos; o P99 caiu para a cadência de 60 Hz. Os resultados não demonstram fluidez perfeita em 100% dos quadros e não são extrapoláveis a todo hardware: o máximo ainda atingiu 83,4 ms. Confirmar também em aparelhos reais antes do merge de produção.
+
+O teste pode ser executado novamente manualmente pelo workflow `Graphics full-flight A/B (manual)`, sem adicionar monitoramento caro a cada push. O `test-results/final-premerge/comparison.json` é disponibilizado como artefato da execução.

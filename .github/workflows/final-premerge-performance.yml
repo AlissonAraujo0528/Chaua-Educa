@@ -1,7 +1,5 @@
-name: Final pre-merge native long-flight A/B
+name: Graphics full-flight A/B (manual)
 on:
-  push:
-    branches: [perf/final-grafico-premerge-20261104]
   workflow_dispatch:
 jobs:
   longflight:
