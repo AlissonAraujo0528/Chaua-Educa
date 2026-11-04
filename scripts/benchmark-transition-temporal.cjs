@@ -33,7 +33,7 @@ fs.mkdirSync(path,{recursive:true});
     if(!forest||!forest.complete||!forest.naturalWidth)throw Error('forest asset not ready after Renderer.ready');
     original.renderer.prepareStagedBackdrop=()=>null;
     const records=[];
-    for(const stage of [2,3]){
+    for(const stage of [1,2,3]){
      // Prime the exact displayed last frame of the PREVIOUS stage, including
      // its real-time wind displacement. A drift=0 prewarm would falsely mark
      // the first 8 frames as a visual jump, even though gameplay never starts
@@ -101,8 +101,19 @@ fs.mkdirSync(path,{recursive:true});
     return records;
    });
    assert.deepEqual(errors,[]);
+   for(const result of measurements){
+    // An error of 1 is one 8-bit color channel level out of 255.
+    // Static and temporal criteria both gate the staged-paint approach.
+    assert.ok(result.p95MAE<1.5&&result.maxMAE<1.8,
+     'Visible deviation between original and candidate: '+JSON.stringify({viewport,...result}));
+    assert.ok(result.p95ExtraMotionMAE<.95&&result.maxExtraMotionMAE<1.5,
+     'Frame-to-frame visual stepping detected: '+JSON.stringify({viewport,...result}));
+    assert.ok(result.maxOver5Fraction<.05&&result.maxChannelDelta<=50,
+     'Localized pixel mismatch is excessive: '+JSON.stringify({viewport,...result}));
+   }
    reports.push({viewport,measurements});
    console.log('TRANSITION_TEMPORAL_ROW '+JSON.stringify({viewport,measurements}));
+   console.log('PASS temporal continuity: three stage changes, no frame-step violations '+JSON.stringify(viewport));
    await page.close();
   }
   fs.writeFileSync(path+'/temporal-visual.json',JSON.stringify(reports,null,2));
