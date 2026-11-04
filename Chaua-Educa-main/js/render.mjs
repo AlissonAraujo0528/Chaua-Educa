@@ -465,7 +465,10 @@ export class Renderer {
         // Quantize only the forest's subpixel drift, never the camera or actors.
         if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
         const width=this.canvas.width,height=this.canvas.height;
-        const sourceDrift=Math.round(drift*this.dpr*2)/2;
+        // Fully opaque stages use quarter-pixel wind steps to protect sharp
+        // leaf edges; keep the already-validated stage-2 half-pixel budget.
+        const driftSteps=forestAlpha===1?4:2;
+        const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         let cache=this.fragmentedBackdrop;
         if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.light!==light||cache.forest!==forest||cache.forestAlpha!==forestAlpha){
             if(cache){cache.surface.width=0;cache.surface.height=0;}
