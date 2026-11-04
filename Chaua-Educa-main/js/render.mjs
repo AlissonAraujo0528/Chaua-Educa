@@ -535,14 +535,14 @@ export class Renderer {
             if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
                 return normal;
             }
-            // Freeze one destination snapshot until all four stripes are
+            // Freeze one destination snapshot until all eight stripes are
             // painted. The fully rendered previous surface is always visible.
             pending.target={light,forestAlpha,sourceDrift};
             pending.rowsDone=0;
         }
         const stripe=pending.rowsDone++;
-        const y0=Math.floor(pending.height*stripe/4);
-        const y1=stripe===3?pending.height:Math.floor(pending.height*(stripe+1)/4);
+        const y0=Math.floor(pending.height*stripe/8);
+        const y1=stripe===7?pending.height:Math.floor(pending.height*(stripe+1)/8);
         const c=pending.c;
         c.save();
         c.setTransform(1,0,0,1,0,0);
@@ -555,7 +555,7 @@ export class Renderer {
         c.globalAlpha=pending.target.forestAlpha;
         c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
         c.restore();
-        if(pending.rowsDone===4){
+        if(pending.rowsDone===8){
             // Publish only a complete RGBA frame: never show a partially
             // repainted stripe, even during a camera shake or phase change.
             const previousSurface=normal.surface,previousContext=normal.c;
