@@ -460,6 +460,12 @@ export class Renderer {
         this.transitionBackdrop = null;
         this.transitionRasterDisabled = false;
         this.transitionSlowReadbacks = 0;
+        // Diagnostic-only opt-out for paired A/B; production keeps bounded readbacks.
+        this.transitionSyncEnabled = true;
+        // The forest WebP is fully opaque; the sky behind an alpha=1 forest is invisible.
+        // Keep an A/B override to verify exact parity against the original composition.
+        this.opaqueForestSkyEnabled = true;
+        this.opaqueForestLightKeyEnabled = true;
         this.cachedView = null;
         this.ready = loadAssets().then(() => {
             this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
@@ -570,14 +576,24 @@ export class Renderer {
             if(!c)return null;
             cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,forestAlpha,sourceDrift:null};
         }
-        if(cache.light!==light||cache.forestAlpha!==forestAlpha){
-            cache.light=light;cache.forestAlpha=forestAlpha;cache.sourceDrift=null;
+        // The opaque source hides the sky palette entirely. A change to a
+        // hidden sky must not invalidate millions of cached pixels. Still
+        // invalidate for the visible opacity and for forest drift.
+        const skyHidden=forestAlpha===1&&this.opaqueForestSkyEnabled!==false&&
+            this.opaqueForestLightKeyEnabled!==false;
+        if((!skyHidden&&cache.light!==light)||cache.forestAlpha!==forestAlpha){
+            cache.forestAlpha=forestAlpha;cache.sourceDrift=null;
         }
+        cache.light=light;
         if(cache.sourceDrift!==sourceDrift){
             const c=cache.c;
             c.setTransform(this.dpr,0,0,this.dpr,0,0);
             c.globalAlpha=1;
-            this.paintSky(c,light);
+            // Source forest.webp has 2,073,600 opaque pixels, and the scaled
+            // image covers the entire viewport. The hidden sky is redundant
+            // when drawing that source at full opacity.
+            if(forestAlpha!==1||this.opaqueForestSkyEnabled===false)
+                this.paintSky(c,light);
             const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
             const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
             c.globalAlpha=forestAlpha;
@@ -613,7 +629,10 @@ export class Renderer {
         const driftSteps=forestAlpha===1?4:2;
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         if(!pending.target){
-            if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
+            const skyHidden=forestAlpha===1&&this.opaqueForestSkyEnabled!==false&&
+                this.opaqueForestLightKeyEnabled!==false;
+            if((skyHidden||normal.light===light)&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
+                normal.light=light;
                 if(settled&&forestAlpha===1)pending.active=false;
                 return normal;
             }
@@ -629,12 +648,41 @@ export class Renderer {
         c.beginPath();c.rect(0,y0,pending.width,y1-y0);c.clip();
         c.setTransform(this.dpr,0,0,this.dpr,0,0);
         c.globalAlpha=1;
-        this.paintSky(c,pending.target.light);
+        if(pending.target.forestAlpha!==1||this.opaqueForestSkyEnabled===false)
+            this.paintSky(c,pending.target.light);
         const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
         const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
         c.globalAlpha=pending.target.forestAlpha;
         c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
         c.restore();
+
+        // Canvas 2D can defer the eight clipped raster passes until the
+        // completed buffer is presented. Flushing one pixel after each pass
+        // distributes that work across frames without altering output pixels.
+        // On GPUs where readback itself is costly or unsupported, abandon
+        // incremental staging rather than making repeated slow frames.
+        if(this.transitionSyncEnabled){
+            let readMs;
+            try {
+                const start=performance.now();
+                c.getImageData(0,y0,1,1);
+                readMs=performance.now()-start;
+            } catch {
+                this.transitionRasterDisabled=true;
+            }
+            if(readMs!==undefined){
+                this.transitionSlowReadbacks=readMs>18?
+                    this.transitionSlowReadbacks+1:0;
+                if(this.transitionSlowReadbacks>=2)
+                    this.transitionRasterDisabled=true;
+            }
+            if(this.transitionRasterDisabled){
+                pending.surface.width=0;
+                pending.surface.height=0;
+                this.transitionBackdrop=null;
+                return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+            }
+        }
 
         if(pending.rowsDone===8){
             const previousSurface=normal.surface,previousContext=normal.c;

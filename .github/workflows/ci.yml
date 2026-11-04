@@ -34,6 +34,8 @@ jobs:
           npm run test:journey
           npm run test:background
           node tests/browser-transition-fallback.cjs
+          node scripts/benchmark-transition-temporal.cjs
+          node scripts/benchmark-opaque-forest.cjs
           npm run test:hud
           PERF_SECONDS=6 npm run benchmark:hotspots
           npm run benchmark:render-parts
