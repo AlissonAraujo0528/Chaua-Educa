@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -18,6 +18,6 @@ jobs:
       - run: npm ci
       - name: Compare exact pre-optimization engine to candidate
         run: |
-          git show HEAD^:Chaua-Educa-main/js/engine.mjs > Chaua-Educa-main/js/engine-before-audit.mjs
+          git show d047eab0c081c8030cb0b25fe12532c6165fef32:Chaua-Educa-main/js/engine.mjs > Chaua-Educa-main/js/engine-before-audit.mjs
           node scripts/compare-engine-equivalence.cjs
           rm Chaua-Educa-main/js/engine-before-audit.mjs
