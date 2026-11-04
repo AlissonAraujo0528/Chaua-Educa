@@ -533,6 +533,11 @@ export class Renderer {
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         if(!pending.target){
             if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
+                // Opaque settled stages already have an efficient native cache.
+                // Stop the incremental painter once the final transition frame
+                // is complete. Keep staging active for translucent stage 2,
+                // where direct re-rasterization is still demonstrably costly.
+                if(settled&&forestAlpha===1)pending.active=false;
                 return normal;
             }
             // Freeze one destination snapshot until all eight stripes are
@@ -584,8 +589,11 @@ export class Renderer {
             normal.sourceDrift=pending.target.sourceDrift;
             pending.surface=previousSurface;pending.c=previousContext;
             pending.rowsDone=0;pending.target=null;
-            // Keep the tile buffer available for later wind-driven refreshes.
-            // This also flattens raster spikes after the transition has ended.
+            // Stage 1 and 3 are opaque. Return to the simpler settled-stage
+            // compositor only after publishing a complete final image.
+            // Translucent stage 2 retains incremental painting after settling.
+            if(settled&&forestAlpha===1&&normal.light===light&&normal.forestAlpha===forestAlpha)
+                pending.active=false;
         }
         return normal;
     }
