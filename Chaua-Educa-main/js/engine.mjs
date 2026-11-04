@@ -375,15 +375,18 @@ export class Game {
         this.powerFade=Math.max(0,this.powerFade-dt);
         this.flapImpulse=Math.max(0,this.flapImpulse-dt*5.0);
         if(this.shakeTime>0){this.shakeTime=Math.max(0,this.shakeTime-dt);if(this.shakeTime===0){this.shakeDuration=0;this.shakeIntensity=0;}}
-        for(const p of this.popups){p.life-=dt;if(!this.reducedMotion)p.y-=24*dt;}
-        this.popups=this.popups.filter(p=>p.life>0);
+        let deadPopups=false;
+        for(const p of this.popups){p.life-=dt;if(!this.reducedMotion)p.y-=24*dt;if(!(p.life>0))deadPopups=true;}
+        if(deadPopups)this.popups=this.popups.filter(p=>p.life>0);
         for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.24)delete e.breakFx;}
         if(this.hit) {this.hit.age+=dt;if(this.hit.age>=.3)this.hit=null;}
+        let deadParticles=false;
         for(const p of this.particles) {
             p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
             if(p.feather||p.chip) {p.vy+=(p.chip?380:210)*dt;p.rotation+=p.spin*dt;}
+            if(!(p.life>0))deadParticles=true;
         }
-        this.particles=this.particles.filter(p=>p.life>0);
+        if(deadParticles)this.particles=this.particles.filter(p=>p.life>0);
     }
 
     woodRects(entity) { return livingWoodRects(entity,HEIGHT); }
@@ -521,29 +524,48 @@ export class Game {
         }
         this.nextSpawn -= dt;
         if (this.nextSpawn <= 0 && !this.quizDue && this.distance<JOURNEY_LENGTH) this.spawn();
+
+        // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
+        let cachedPlayerBody = null;
+        let cachedX = NaN, cachedY = NaN, cachedAngle = NaN;
+        const getPlayerBody = () => {
+            const px = this.x, py = this.y, pa = this.angle;
+            if (!cachedPlayerBody || cachedX !== px || cachedY !== py || cachedAngle !== pa) {
+                cachedX = px; cachedY = py; cachedAngle = pa;
+                cachedPlayerBody = playerShapes(px, py, pa);
+            }
+            return cachedPlayerBody;
+        };
+
         for (const e of this.entities) {
             if (this.state !== 'playing') break;
-            const playerBody=playerShapes(this.x,this.y,this.angle);
+            const px = this.x;
             if (e.kind === 'hawk') {
-                advanceHawk(e,dt,this.speed,this.x);
-                if (e.phase !== 'warning' && !e.harmless && shapesIntersect(playerBody,hawkShapes(e))) this.collide(e, true);
+                advanceHawk(e,dt,this.speed,px);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 80 && Math.abs(e.y - this.y) < 60 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
                 continue;
             }
             e.x -= this.speed * dt;
             if (e.kind === 'wood') {
-                advanceSnake(e,dt,this.x);
-                if (e.snake && !e.snake.retreat && Math.abs(e.x-this.x)<230) {
-                    if (this.snakeRects(e).some(rect => rect.x<this.x+35&&rect.x+rect.w>this.x-35&&rect.y<this.y+35&&rect.y+rect.h>this.y-35&&shapesIntersect(playerBody,[roundedShape(rect)]))) this.collide(e.snake, true, e);
+                advanceSnake(e,dt,px);
+                if (e.snake && !e.snake.retreat && Math.abs(e.x-px)<230) {
+                    if (this.snakeRects(e).some(rect => rect.x<px+35&&rect.x+rect.w>px-35&&rect.y<this.y+35&&rect.y+rect.h>this.y-35&&shapesIntersect(getPlayerBody(),[roundedShape(rect)]))) this.collide(e.snake, true, e);
                 }
-                const woodHit = this.woodRects(e).find(rect => shapesHitRect(playerBody,rect));
-                if (woodHit) { e.hitRect=woodHit; e.hitPart = woodHit.part; e.hitSide = woodHit.y >= e.bottom ? 'bottom' : 'top'; this.collide(e); }
+                // Broad-phase horizontal check: livingWoodRects span at most [e.x - 73, e.x + 108]
+                if (e.x + 115 >= px - 28 && e.x - 80 <= px + 28) {
+                    const pBody = getPlayerBody();
+                    const woodHit = this.woodRects(e).find(rect => shapesHitRect(pBody,rect));
+                    if (woodHit) { e.hitRect=woodHit; e.hitPart = woodHit.part; e.hitSide = woodHit.y >= e.bottom ? 'bottom' : 'top'; this.collide(e); }
+                }
                 if (this.state !== 'playing') break;
-                if (!e.scored && e.x + 85 < this.x - 20) { e.scored = true; if (!e.broken && !e.contacted) this.addScore(1); }
-            } else if (!e.collected && overlaps(this.body, { x: e.x - 18, y: e.y - 18, w: 36, h: 36 })) this.collect(e);
+                if (!e.scored && e.x + 85 < px - 20) { e.scored = true; if (!e.broken && !e.contacted) this.addScore(1); }
+            } else if (!e.collected && Math.abs(e.x - px) < 36 && Math.abs(e.y - this.y) < 36 && overlaps(this.body, { x: e.x - 18, y: e.y - 18, w: 36, h: 36 })) this.collect(e);
         }
         const minBound = (this.viewLeft !== undefined ? this.viewLeft : 0) - 260;
         const maxBound = Math.max(this.width, this.viewWidth || this.width) + 800;
-        this.entities = this.entities.filter(e => e.x > minBound && e.x < maxBound && !e.collected && !e.finished);
+        if (this.entities.some(e => !(e.x > minBound && e.x < maxBound && !e.collected && !e.finished))) {
+            this.entities = this.entities.filter(e => e.x > minBound && e.x < maxBound && !e.collected && !e.finished);
+        }
         for(const id of this.routes.keys())if(!this.entities.some(e=>e.kind==='fruit'&&e.route===id))this.routes.delete(id);
         this.advanceEffects(dt);
         this.maybeOpenQuiz();

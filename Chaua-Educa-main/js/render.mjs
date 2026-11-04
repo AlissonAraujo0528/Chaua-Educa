@@ -469,6 +469,12 @@ export class Renderer {
         this.cachedView = null;
         this.ready = loadAssets().then(() => {
             this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
+            // Prepare static pickup glows before the first encounter.
+            getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
+            getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
+            getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
+            getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
+            getPepperSprite();
         });
         this.resize();
     }
