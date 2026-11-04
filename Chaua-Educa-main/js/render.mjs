@@ -11,11 +11,19 @@ import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { FRUITS } from './fruits.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
+
 const TAU = Math.PI * 2;
 const BACKGROUND_PALETTE=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
-const mixColor = (a, b, t) => `rgb(${[1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t)).join(',')})`;
+const TINT_PALETTE=['#bdcf8c','#e4c16b','#507b63','#92bf74'];
 
-let blendSurface;
+const mixColor = (a, b, t) => {
+    const r = Math.round(parseInt(a.slice(1, 3), 16) * (1 - t) + parseInt(b.slice(1, 3), 16) * t);
+    const g = Math.round(parseInt(a.slice(3, 5), 16) * (1 - t) + parseInt(b.slice(3, 5), 16) * t);
+    const bl = Math.round(parseInt(a.slice(5, 7), 16) * (1 - t) + parseInt(b.slice(5, 7), 16) * t);
+    return `rgb(${r},${g},${bl})`;
+};
+
+let blendSurface, blendSurfaceCtx;
 function blendSprite(c, first, second, blend) {
     // Add the two weighted sprites on transparency, then composite once onto
     // the forest. Source-over crossfades make opaque bodies look like ghosts.
@@ -24,7 +32,8 @@ function blendSprite(c, first, second, blend) {
         blendSurface=document.createElement('canvas');blendSurface.width=512;blendSurface.height=512;
     }
     if(!blendSurface){(blend<.5?first:second)(c);return;}
-    const layer=blendSurface.getContext('2d');
+    if(!blendSurfaceCtx)blendSurfaceCtx=blendSurface.getContext('2d');
+    const layer=blendSurfaceCtx;
     layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,512,512);
     layer.setTransform(2,0,0,2,256,256);
     layer.globalCompositeOperation='source-over';layer.globalAlpha=1-blend;first(layer);
@@ -54,22 +63,30 @@ function perchedSprite(c,clip,factor){
     c.globalAlpha*=closed;
     atlasFrame(c,'chaua',13,factor);c.restore();
 }
+
 export function woodContactPosition(game,progress=0,reduced=false){
     const rect=game.impactContact;
     if(!rect||!['impact','ended'].includes(game.state)||game.won)return {x:game.x,y:game.y};
     const pose=reduced?{x:0,y:0,angle:0}:impactPose(progress),angle=game.angle+pose.angle;
     const clip=birdAnimation({wing:game.wing,defeated:true,impactProgress:progress,reduced});
-    const points=[];const factor=27.7027*.74/SPRITES.chaua.landmarkWidth;
-    for(const i of new Set([clip.frame,clip.next])){
-        const f=SPRITES.chaua.frames[i],[x,y,w,h]=f.content;
-        for(const [px,py]of [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]){
-            const dx=(px-192)*factor,dy=(py-192)*factor;
-            points.push({x:dx*Math.cos(angle)-dy*Math.sin(angle)+pose.x,y:dx*Math.sin(angle)+dy*Math.cos(angle)+pose.y});
-        }
+    const factor=27.7027*.74/SPRITES.chaua.landmarkWidth;
+    const cos=Math.cos(angle),sin=Math.sin(angle);
+    let maxX=-Infinity;
+    const f0=clip.frame,f1=clip.next;
+    for(let pass=0;pass<2;pass++){
+        const idx=pass===0?f0:f1;
+        if(pass===1&&f1===f0)break;
+        const [x,y,w,h]=SPRITES.chaua.frames[idx].content;
+        const x0=(x-192)*factor,x1=(x+w-192)*factor;
+        const y0=(y-192)*factor,y1=(y+h-192)*factor;
+        const p0=x0*cos-y0*sin+pose.x;if(p0>maxX)maxX=p0;
+        const p1=x1*cos-y0*sin+pose.x;if(p1>maxX)maxX=p1;
+        const p2=x0*cos-y1*sin+pose.x;if(p2>maxX)maxX=p2;
+        const p3=x1*cos-y1*sin+pose.x;if(p3>maxX)maxX=p3;
     }
-    const maxX=Math.max(...points.map(p=>p.x));
     return {x:Math.min(game.x,rect.x-maxX-2),y:game.y};
 }
+
 function birdFoot(scale){
     const f=SPRITES.chaua.frames[12];return (f.content[1]+f.content[3]-5-f.anchor[1])*27.7027*scale/SPRITES.chaua.landmarkWidth;
 }
@@ -104,7 +121,11 @@ function leaf(c, x, y, size, rotation, light = '#87b36a', dark = '#3d7349') {
     c.save(); c.translate(x, y); c.rotate(rotation);
     c.beginPath();c.moveTo(-size,0);c.bezierCurveTo(-size*.4,-size*.65,size*.55,-size*.45,size,0);
     c.bezierCurveTo(size*.35,size*.45,-size*.5,size*.5,-size,0);
-    const shade=c.createLinearGradient(0,-size*.45,0,size*.45);shade.addColorStop(0,light);shade.addColorStop(.52,dark);shade.addColorStop(1,light);c.fillStyle=shade;c.fill();
+    if(light===dark){
+        c.fillStyle=light;c.fill();
+    }else{
+        const shade=c.createLinearGradient(0,-size*.45,0,size*.45);shade.addColorStop(0,light);shade.addColorStop(.52,dark);shade.addColorStop(1,light);c.fillStyle=shade;c.fill();
+    }
     c.beginPath();c.moveTo(-size*.9,0);c.bezierCurveTo(-size*.3,-size*.5,size*.5,-size*.35,size*.9,0);
     c.quadraticCurveTo(0,-size*.07,-size*.9,0);const opacity=Number.isFinite(c.globalAlpha)?c.globalAlpha:1;c.globalAlpha=opacity*.35;c.fillStyle=light;c.fill();c.globalAlpha=opacity;
     c.beginPath();c.moveTo(-size*.88,0);c.quadraticCurveTo(0,-size*.1,size*.85,0);
@@ -190,25 +211,6 @@ function drawOrbitingStars(c, hx, hy, size, t) {
         }
         c.restore();
     }
-    c.restore();
-}
-
-function drawHappyEye(c, ex, ey, r) {
-    c.save();
-    c.beginPath();
-    c.arc(ex, ey, r, 0, TAU);
-    c.fillStyle = '#ffffff';
-    c.fill();
-    c.lineWidth = Math.max(.7,r*.2);
-    c.strokeStyle = '#18311a';
-    c.stroke();
-
-    c.beginPath();
-    c.arc(ex, ey + 3, r * 0.85, Math.PI * 1.15, Math.PI * 1.85);
-    c.lineWidth = Math.max(.9,r*.3);
-    c.strokeStyle = '#152b17';
-    c.lineCap = 'round';
-    c.stroke();
     c.restore();
 }
 
@@ -374,6 +376,61 @@ function drawRefugeHearts(c, x, y, size, t) {
     c.restore();
 }
 
+// Pre-rendered radial glows and static vector sprites for zero-cost drawImage in gameplay loop.
+const pickupCaches = new Map();
+function getPickupCache(key, radius, stops) {
+    let surface = pickupCaches.get(key);
+    if (surface) return surface;
+    const size = radius * 2;
+    surface = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) :
+        typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!surface) return null;
+    surface.width = size; surface.height = size;
+    const gc = surface.getContext('2d');
+    if (!gc) return null;
+    const g = gc.createRadialGradient(radius, radius, stops[0][0], radius, radius, radius);
+    for (const [, stop, color] of stops) g.addColorStop(stop, color);
+    oval(gc, radius, radius, radius, radius, g);
+    pickupCaches.set(key, surface);
+    return surface;
+}
+
+let pepperVectorCache = null;
+function getPepperSprite() {
+    if (pepperVectorCache) return pepperVectorCache;
+    const surface = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(48, 56) :
+        typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!surface) return null;
+    surface.width = 48; surface.height = 56;
+    const gc = surface.getContext('2d');
+    if (!gc) return null;
+    gc.translate(24, 28);
+    gc.beginPath();
+    gc.moveTo(0, -14);
+    gc.bezierCurveTo(14, -10, 16, 6, 4, 16);
+    gc.bezierCurveTo(0, 20, -4, 18, -3, 15);
+    gc.bezierCurveTo(-10, 6, -10, -8, 0, -14);
+    const g = gc.createRadialGradient(-3, -2, 2, 0, 0, 18);
+    g.addColorStop(0, '#ff785e');
+    g.addColorStop(0.6, '#e62419');
+    g.addColorStop(1, '#940f09');
+    gc.fillStyle = g;
+    gc.fill();
+    gc.beginPath();
+    gc.ellipse(-3, -2, 3, 7, -0.2, 0, TAU);
+    gc.fillStyle = '#ffb3a6aa';
+    gc.fill();
+    gc.beginPath();
+    gc.moveTo(0, -14);
+    gc.quadraticCurveTo(4, -20, 8, -22);
+    gc.strokeStyle = '#5a963b';
+    gc.lineWidth = 3;
+    gc.stroke();
+    clay(gc, 0, -14, 5, 3, '#7ab852', '#3e6c27', 0);
+    pepperVectorCache = surface;
+    return surface;
+}
+
 export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
@@ -382,7 +439,6 @@ export function drawBird(c, {
     if(!images.has('chaua-atlas'))return;
     return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing});
 }
-
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
 export function homePerchLayout(width, height) {
@@ -393,7 +449,29 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.transitionBackdrop=null; this.transitionRasterDisabled=false; this.transitionSlowReadbacks=0; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
+    constructor(canvas) {
+        this.quality = 'high';
+        this.resolution = 'high';
+        this.decoration = 'high';
+        this.canvas = canvas;
+        this.c = canvas.getContext('2d');
+        this.fruitImages = [];
+        this.fragmentedBackdrop = null;
+        this.transitionBackdrop = null;
+        this.transitionRasterDisabled = false;
+        this.transitionSlowReadbacks = 0;
+        // Diagnostic-only opt-out for paired A/B; production keeps bounded readbacks.
+        this.transitionSyncEnabled = true;
+        // The forest WebP is fully opaque; the sky behind an alpha=1 forest is invisible.
+        // Keep an A/B override to verify exact parity against the original composition.
+        this.opaqueForestSkyEnabled = true;
+        this.opaqueForestLightKeyEnabled = true;
+        this.cachedView = null;
+        this.ready = loadAssets().then(() => {
+            this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
+        });
+        this.resize();
+    }
     setQuality(level) {
         const next=level==='low'?'low':'high';
         this.quality=next;
@@ -412,9 +490,26 @@ export class Renderer {
         if(this.resolution===nextResolution)return;
         this.resolution=nextResolution;this.resize();
     }
+    getViewport() {
+        const s = this.safeInsets;
+        const cv = this.cachedView;
+        if (cv && cv.w === this.w && cv.h === this.h &&
+            cv.top === (s?.top || 0) && cv.right === (s?.right || 0) &&
+            cv.bottom === (s?.bottom || 0) && cv.left === (s?.left || 0)) {
+            return cv.view;
+        }
+        const view = flightViewport(this.w, this.h, s);
+        this.cachedView = {
+            w: this.w, h: this.h,
+            top: s?.top || 0, right: s?.right || 0, bottom: s?.bottom || 0, left: s?.left || 0,
+            view
+        };
+        return view;
+    }
     resize() {
         const r = this.canvas.getBoundingClientRect();
         this.w = r.width; this.h = r.height;
+        this.cachedView = null;
         const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.resolution);
         this.dpr=size.dpr;
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
@@ -431,7 +526,11 @@ export class Renderer {
             this.transitionBackdrop=null;
         }
     }
-    base() { this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.c.clearRect(0, 0, this.w, this.h); }
+    // Standalone draws require a clean frame; complete scenes immediately paint an opaque backdrop.
+    base(clear = true) {
+        this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        if (clear) this.c.clearRect(0, 0, this.w, this.h);
+    }
     paintSky(c,light){
         const w=this.w,h=this.h;
         const bg = c.createLinearGradient(0, 0, 0, h);
@@ -463,14 +562,8 @@ export class Renderer {
     }
 
     prepareFragmentedBackdrop(forest,light,drift,forestAlpha=.6) {
-        // All settled flight stages have a static sun/sky and one gently
-        // drifting WebP. Composite them into a single opaque backing texture.
-        // The original stage-2 alpha (.6) and all opaque stages (1) are kept.
-        // Quantize only the forest's subpixel drift, never the camera or actors.
         if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
         const width=this.canvas.width,height=this.canvas.height;
-        // Fully opaque stages use quarter-pixel wind steps to protect sharp
-        // leaf edges; keep the already-validated stage-2 half-pixel budget.
         const driftSteps=forestAlpha===1?4:2;
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         let cache=this.fragmentedBackdrop;
@@ -483,18 +576,26 @@ export class Renderer {
             if(!c)return null;
             cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,forestAlpha,sourceDrift:null};
         }
-        // Repaint into the same backing across seasons; do not allocate another
-        // multi-megapixel surface when light or forest opacity changes.
-        if(cache.light!==light||cache.forestAlpha!==forestAlpha){
-            cache.light=light;cache.forestAlpha=forestAlpha;cache.sourceDrift=null;
+        // The opaque source hides the sky palette entirely. A change to a
+        // hidden sky must not invalidate millions of cached pixels. Still
+        // invalidate for the visible opacity and for forest drift.
+        const skyHidden=forestAlpha===1&&this.opaqueForestSkyEnabled!==false&&
+            this.opaqueForestLightKeyEnabled!==false;
+        if((!skyHidden&&cache.light!==light)||cache.forestAlpha!==forestAlpha){
+            cache.forestAlpha=forestAlpha;cache.sourceDrift=null;
         }
+        cache.light=light;
         if(cache.sourceDrift!==sourceDrift){
             const c=cache.c;
             c.setTransform(this.dpr,0,0,this.dpr,0,0);
             c.globalAlpha=1;
-            this.paintSky(c,light);
-            const fw=forest.naturalWidth*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
-            const fh=forest.naturalHeight*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+            // Source forest.webp has 2,073,600 opaque pixels, and the scaled
+            // image covers the entire viewport. The hidden sky is redundant
+            // when drawing that source at full opacity.
+            if(forestAlpha!==1||this.opaqueForestSkyEnabled===false)
+                this.paintSky(c,light);
+            const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+            const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
             c.globalAlpha=forestAlpha;
             c.drawImage(forest,(this.w-fw)/2+sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
             c.globalAlpha=1;
@@ -503,8 +604,6 @@ export class Renderer {
         return cache;
     }
     ensureTransitionBackdrop() {
-        // Only high-resolution canvases need a second backing buffer. The
-        // smaller canvas already repaints fast enough without extra memory.
         const width=this.canvas.width,height=this.canvas.height;
         if(this.transitionRasterDisabled||width*height<1_800_000||width*height>4_500_000)return null;
         let state=this.transitionBackdrop;
@@ -522,8 +621,6 @@ export class Renderer {
         const normal=this.fragmentedBackdrop;
         if(!normal||normal.width!==this.canvas.width||normal.height!==this.canvas.height||
             normal.dpr!==this.dpr||normal.forest!==forest){
-            // A first frame without a prepared cache is rare (asset reload).
-            // Preserve the correct picture before beginning incremental work.
             return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
         }
         const pending=this.ensureTransitionBackdrop();
@@ -532,16 +629,13 @@ export class Renderer {
         const driftSteps=forestAlpha===1?4:2;
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         if(!pending.target){
-            if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
-                // Opaque settled stages already have an efficient native cache.
-                // Stop the incremental painter once the final transition frame
-                // is complete. Keep staging active for translucent stage 2,
-                // where direct re-rasterization is still demonstrably costly.
+            const skyHidden=forestAlpha===1&&this.opaqueForestSkyEnabled!==false&&
+                this.opaqueForestLightKeyEnabled!==false;
+            if((skyHidden||normal.light===light)&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
+                normal.light=light;
                 if(settled&&forestAlpha===1)pending.active=false;
                 return normal;
             }
-            // Freeze one destination snapshot until all eight stripes are
-            // painted. The fully rendered previous surface is always visible.
             pending.target={light,forestAlpha,sourceDrift};
             pending.rowsDone=0;
         }
@@ -554,34 +648,43 @@ export class Renderer {
         c.beginPath();c.rect(0,y0,pending.width,y1-y0);c.clip();
         c.setTransform(this.dpr,0,0,this.dpr,0,0);
         c.globalAlpha=1;
-        this.paintSky(c,pending.target.light);
+        if(pending.target.forestAlpha!==1||this.opaqueForestSkyEnabled===false)
+            this.paintSky(c,pending.target.light);
         const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
         const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
         c.globalAlpha=pending.target.forestAlpha;
         c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
         c.restore();
-        // A tile boundary is only a scheduling boundary if deferred Canvas
-        // raster work is actually completed here. A single-pixel readback
-        // flushes this offscreen stripe before it is ever published.
-        // Profile hardware GPU readback separately before approving.
-        const syncStart=performance.now();
-        let syncOk=true;
-        try{c.getImageData(0,y0,1,1);}
-        catch{syncOk=false;}
-        // Synchronous GPU readback can be much slower on a physical device
-        // than in headless SwiftShader. Repeatedly slow/unsupported readbacks
-        // must fall back to the already-proven direct cache path.
-        this.transitionSlowReadbacks=syncOk&&performance.now()-syncStart<=18?
-            0:this.transitionSlowReadbacks+1;
-        if(this.transitionSlowReadbacks>=2){
-            this.transitionRasterDisabled=true;
-            pending.surface.width=0;pending.surface.height=0;
-            this.transitionBackdrop=null;
-            return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+
+        // Canvas 2D can defer the eight clipped raster passes until the
+        // completed buffer is presented. Flushing one pixel after each pass
+        // distributes that work across frames without altering output pixels.
+        // On GPUs where readback itself is costly or unsupported, abandon
+        // incremental staging rather than making repeated slow frames.
+        if(this.transitionSyncEnabled){
+            let readMs;
+            try {
+                const start=performance.now();
+                c.getImageData(0,y0,1,1);
+                readMs=performance.now()-start;
+            } catch {
+                this.transitionRasterDisabled=true;
+            }
+            if(readMs!==undefined){
+                this.transitionSlowReadbacks=readMs>18?
+                    this.transitionSlowReadbacks+1:0;
+                if(this.transitionSlowReadbacks>=2)
+                    this.transitionRasterDisabled=true;
+            }
+            if(this.transitionRasterDisabled){
+                pending.surface.width=0;
+                pending.surface.height=0;
+                this.transitionBackdrop=null;
+                return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+            }
         }
+
         if(pending.rowsDone===8){
-            // Publish only a complete RGBA frame: never show a partially
-            // repainted stripe, even during a camera shake or phase change.
             const previousSurface=normal.surface,previousContext=normal.c;
             normal.surface=pending.surface;normal.c=pending.c;
             normal.light=pending.target.light;
@@ -589,9 +692,6 @@ export class Renderer {
             normal.sourceDrift=pending.target.sourceDrift;
             pending.surface=previousSurface;pending.c=previousContext;
             pending.rowsDone=0;pending.target=null;
-            // Stage 1 and 3 are opaque. Return to the simpler settled-stage
-            // compositor only after publishing a complete final image.
-            // Translucent stage 2 retains incremental painting after settling.
             if(settled&&forestAlpha===1&&normal.light===light&&normal.forestAlpha===forestAlpha)
                 pending.active=false;
         }
@@ -602,11 +702,6 @@ export class Renderer {
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
-        // Reuse the same native-resolution sky + forest composite while a
-        // season transitions. Light and forest opacity change gradually; sample
-        // only the backdrop blend at 1/64 steps instead of rescaling a 4 MP WebP
-        // on every frame. The tint, parallax, fog, sunbeams, characters and
-        // game timing below remain continuous and unchanged.
         const forest=images.get('forest');
         const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
@@ -640,7 +735,6 @@ export class Renderer {
             const drift=reduced?0:Math.sin(time*.035)*Math.min(24,(fw-w)/2);
             c.save();c.globalAlpha=stage===2?1-.4*stageMix:stage===3?.6+.4*stageMix:1;
             c.drawImage(forest,(w-fw)/2+drift,(h-fh)/2,fw,fh);c.restore();
-
         }
         if(this.decoration!=='low') {
             c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
@@ -664,18 +758,29 @@ export class Renderer {
             c.restore();
         }
         const transition=stageMix;
-        const tint=['#bdcf8c','#e4c16b','#507b63','#92bf74'];
-        c.save();c.globalAlpha=.10;c.fillStyle=mixColor(tint[Math.max(0,stage-1)],tint[stage],transition);c.fillRect(0,0,w,h);c.restore();
+        c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
         // Sunlight and shade breathe slowly with the same wind as leaves and vines.
         c.fillStyle = '#ffffcb10';
         c.save();c.translate(reduced?0:Math.sin(time*.22)*18,0);
-        for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(w * .65 + i * 95, 0); c.lineTo(w * .65 + 45 + i * 95, 0); c.lineTo(w * .13 + i * 110, h); c.lineTo(w * .13 - 120 + i * 110, h); c.fill(); }
+        c.beginPath();
+        for (let i = 0; i < 3; i++) {
+            c.moveTo(w * .65 + i * 95, 0);
+            c.lineTo(w * .65 + 45 + i * 95, 0);
+            c.lineTo(w * .13 + i * 110, h);
+            c.lineTo(w * .13 - 120 + i * 110, h);
+        }
+        c.fill();
         c.restore();
-        for (let i = 0; i < (this.decoration==='low'?8:23); i++) {
+        c.fillStyle = '#ffedb275';
+        c.beginPath();
+        const dustCount = this.decoration==='low'?8:23;
+        for (let i = 0; i < dustCount; i++) {
             const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
             const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
-            oval(c, x, y, 1.6, 1.6, '#ffedb275');
+            c.moveTo(x + 1.6, y);
+            c.arc(x, y, 1.6, 0, TAU);
         }
+        c.fill();
         if (home) {
             const wash = c.createLinearGradient(0, 0, w * .7, 0);
             wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');
@@ -684,7 +789,7 @@ export class Renderer {
     }
 
     home(time, reduced) {
-        this.base();
+        this.base(false);
         const c = this.c, mobile = this.w <= 700;
         this.background(time, 0, 0, !mobile, reduced);
         if (mobile) {
@@ -705,9 +810,7 @@ export class Renderer {
     }
 
     game(game, reduced, visualTime = 0) {
-        this.base();
-        // Allocate the two persistent backings while the flight is in its
-        // countdown, not in the first active frame or at a season boundary.
+        this.base(false);
         if(game.state==='countdown'){
             this.prepareSky(BACKGROUND_PALETTE[2]);
             const forest=images.get('forest');
@@ -719,7 +822,7 @@ export class Renderer {
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4));
-        const view = flightViewport(this.w, this.h, this.safeInsets);
+        const view = this.getViewport();
         const s = view.scale;
         // Tiny, muted butterflies stay in the distant layer; no pickup glow or collision.
         c.save();c.globalAlpha=.32;
@@ -759,14 +862,14 @@ export class Renderer {
                 }
                 c.strokeStyle = '#ffecd166';
                 c.lineWidth = 1.8;
+                c.beginPath();
                 for (let i = 0; i < 4; i++) {
                     const lx = ((game.elapsed * 800 + i * 220) % (view.w + 200)) - 100;
                     const ly = 80 + (i * 135) % (HEIGHT - 160);
-                    c.beginPath();
                     c.moveTo(lx, ly);
                     c.lineTo(lx - 60 - i * 20, ly);
-                    c.stroke();
                 }
+                c.stroke();
             }
             c.restore();
         }
@@ -794,21 +897,18 @@ export class Renderer {
         // Collection trails suggest optional trajectories, never solid obstacles.
         const routes=new Map();
         for(const e of game.entities) if(e.kind==='fruit' && e.route!==undefined && !e.collected) {
-            if(!routes.has(e.route))routes.set(e.route,[]);
-            routes.get(e.route).push(e);
+            let list=routes.get(e.route);
+            if(!list){list=[];routes.set(e.route,list);}
+            list.push(e);
         }
         for(const fruit of routes.values()) if(fruit.length>1) {
             fruit.sort((a,b)=>a.x-b.x);c.save();c.strokeStyle=fruit[0].optional?'#f4d77caa':'#e9f3cf99';
             c.lineWidth=2;c.setLineDash([4,8]);c.beginPath();c.moveTo(fruit[0].x,fruit[0].y);
-            for(const f of fruit.slice(1))c.lineTo(f.x,f.y);c.stroke();c.restore();
+            for(let i=1;i<fruit.length;i++)c.lineTo(fruit[i].x,fruit[i].y);
+            c.stroke();c.restore();
         }
-        // Rendering-only conservative culling: sprites far beyond the camera
-        // cannot affect a displayed pixel. Keep physics, entities, collected
-        // routes and offscreen warning indicators untouched.
         const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
         for (const e of game.entities) {
-            // Tree crowns extend beyond their trunk core and striking snakes
-            // can reach away from their anchor; allow generous world margins.
             const margin=e.kind==='wood'?320:e.kind==='hawk'?180:100;
             const drawSprite=this.drawOffscreenEntitiesForTest===true||
                 !Number.isFinite(e.x)||(e.x>=visibleLeft-margin&&e.x<=visibleRight+margin);
@@ -837,8 +937,9 @@ export class Renderer {
             const shieldImg = images.get('shield');
             if (game.shield) {
                 const count = 8;
+                const baseAngle = reduced ? 0 : game.elapsed * 1.2;
                 for (let i = 0; i < count; i++) {
-                    const a = i * TAU / count + (reduced ? 0 : game.elapsed * 1.2);
+                    const a = i * TAU / count + baseAngle;
                     const fx = game.x + Math.cos(a) * r;
                     const fy = game.y + Math.sin(a) * r;
                     c.save();
@@ -874,12 +975,17 @@ export class Renderer {
             defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
             stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won
         });
-        if (!reduced) for (const p of (this.decoration==='low'?game.particles.slice(0,32):game.particles)) {
-            c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
-            if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
-            else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
-            else if(p.spark) oval(c,p.x,p.y,2,2,p.color);
-            else leaf(c,p.x,p.y,3,p.life*5,p.color,p.color);
+        if (!reduced) {
+            const pList = this.decoration==='low'?game.particles:game.particles;
+            const pLimit = this.decoration==='low'?Math.min(32,pList.length):pList.length;
+            for (let i = 0; i < pLimit; i++) {
+                const p = pList[i];
+                c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
+                if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
+                else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
+                else if(p.spark) oval(c,p.x,p.y,2,2,p.color);
+                else leaf(c,p.x,p.y,3,p.life*5,p.color,p.color);
+            }
         }
         c.globalAlpha = 1;
         for(const p of game.popups) {
@@ -895,13 +1001,15 @@ export class Renderer {
         }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
             notices.push({x:view.x+(e.x-view.worldLeft)*s-30,y:view.y+(e.bottom-155)*s,w:136,h:26,type:'snake',entity:e});
         }
-        for(const box of placeWarnings(notices,view)){
-            c.save();c.fillStyle='#fff4dbee';c.strokeStyle='#70513d';c.lineWidth=1.2;
-            c.beginPath();c.roundRect(box.x,box.y,box.w,box.h,8);c.fill();c.stroke();
-            c.fillStyle='#49372c';c.textAlign='center';c.font='800 12px Nunito';
-            if(box.type==='snake')c.fillText(box.entity.snake.phase==='striking'?'Bote!':box.entity.snake.phase==='windup'?'Cobra vai atacar':'Cobra à frente',box.x+box.w/2,box.y+18);
-            else {const e=box.entity;c.fillText(e.dive?'↙ MERGULHO':'← TRAVESSIA',box.x+box.w/2,box.y+15);c.font='700 11px Nunito';c.fillText(e.warning>0?`Gavião · ${Math.max(1,Math.ceil(e.warning))}s`:'Em aproximação',box.x+box.w/2,box.y+30);}
-            c.restore();
+        if(notices.length){
+            for(const box of placeWarnings(notices,view)){
+                c.save();c.fillStyle='#fff4dbee';c.strokeStyle='#70513d';c.lineWidth=1.2;
+                c.beginPath();c.roundRect(box.x,box.y,box.w,box.h,8);c.fill();c.stroke();
+                c.fillStyle='#49372c';c.textAlign='center';c.font='800 12px Nunito';
+                if(box.type==='snake')c.fillText(box.entity.snake.phase==='striking'?'Bote!':box.entity.snake.phase==='windup'?'Cobra vai atacar':'Cobra à frente',box.x+box.w/2,box.y+18);
+                else {const e=box.entity;c.fillText(e.dive?'↙ MERGULHO':'← TRAVESSIA',box.x+box.w/2,box.y+15);c.font='700 11px Nunito';c.fillText(e.warning>0?`Gavião · ${Math.max(1,Math.ceil(e.warning))}s`:'Em aproximação',box.x+box.w/2,box.y+30);}
+                c.restore();
+            }
         }
         if (game.state === 'ended' && game.won) {
             for (let i = 0; i < (this.decoration==='low'?12:32); i++) {
@@ -916,7 +1024,6 @@ export class Renderer {
         const c=this.c,time=reduced?0:(game.sceneTime??game.elapsed),variant=(e.id??0)%3,cx=e.x+29;
         if(!e.broken||e.brokenSide!=='top')this.trunk(`trunk-${variant}`,null,cx,e.top,true,time,variant);
         if(!e.broken||e.brokenSide!=='bottom'){
-
             this.trunk(`trunk-${variant}`,null,cx,e.bottom,false,time,e.variant==='branch'?3:variant);
             if(e.snake)this.snake(e,reduced);
         }
@@ -972,52 +1079,71 @@ export class Renderer {
         const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 2;
         c.save(); c.translate(e.x, e.y);
         if (e.kind === 'fruit') {
-            const glow = c.createRadialGradient(0, float, 4, 0, float, 28);
-            glow.addColorStop(0, '#ffffffaa'); glow.addColorStop(0.5, '#f4d87c44'); glow.addColorStop(1, '#ffffff00');
-            oval(c, 0, float, 28, 28, glow);
+            const glowSurface = getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
+            if (glowSurface) c.drawImage(glowSurface, -28, float - 28, 56, 56);
+            else {
+                const glow = c.createRadialGradient(0, float, 4, 0, float, 28);
+                glow.addColorStop(0, '#ffffffaa'); glow.addColorStop(0.5, '#f4d87c44'); glow.addColorStop(1, '#ffffff00');
+                oval(c, 0, float, 28, 28, glow);
+            }
             const image = this.fruitImages[e.variety];
             if (image?.complete && image.naturalWidth) {
                 const scale = 50 / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * scale / 2, float - image.naturalHeight * scale / 2, image.naturalWidth * scale, image.naturalHeight * scale);
             } else clay(c, 0, float, 18, 20, '#edbb66', '#cb7c42');
         } else if (e.kind === 'pepper') {
-            const glow = c.createRadialGradient(0, 0, 4, 0, 0, 36);
-            glow.addColorStop(0, '#ff5233bb'); glow.addColorStop(0.6, '#ff803355'); glow.addColorStop(1, '#ffffff00');
-            oval(c, 0, 0, 36, 36, glow);
+            const glowSurface = getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
+            if (glowSurface) c.drawImage(glowSurface, -36, -36, 72, 72);
+            else {
+                const glow = c.createRadialGradient(0, 0, 4, 0, 0, 36);
+                glow.addColorStop(0, '#ff5233bb'); glow.addColorStop(0.6, '#ff803355'); glow.addColorStop(1, '#ffffff00');
+                oval(c, 0, 0, 36, 36, glow);
+            }
             c.save();
             c.translate(0, float);
             c.rotate(reduced ? 0 : Math.sin(time * 3 + e.id) * 0.15);
-            c.beginPath();
-            c.moveTo(0, -14);
-            c.bezierCurveTo(14, -10, 16, 6, 4, 16);
-            c.bezierCurveTo(0, 20, -4, 18, -3, 15);
-            c.bezierCurveTo(-10, 6, -10, -8, 0, -14);
-            const g = c.createRadialGradient(-3, -2, 2, 0, 0, 18);
-            g.addColorStop(0, '#ff785e');
-            g.addColorStop(0.6, '#e62419');
-            g.addColorStop(1, '#940f09');
-            c.fillStyle = g;
-            c.fill();
-            c.beginPath();
-            c.ellipse(-3, -2, 3, 7, -0.2, 0, Math.PI * 2);
-            c.fillStyle = '#ffb3a6aa';
-            c.fill();
-            c.beginPath();
-            c.moveTo(0, -14);
-            c.quadraticCurveTo(4, -20, 8, -22);
-            c.strokeStyle = '#5a963b';
-            c.lineWidth = 3;
-            c.stroke();
-            clay(c, 0, -14, 5, 3, '#7ab852', '#3e6c27', 0);
+            const pepSprite = getPepperSprite();
+            if (pepSprite) {
+                c.drawImage(pepSprite, -24, -28, 48, 56);
+            } else {
+                c.beginPath();
+                c.moveTo(0, -14);
+                c.bezierCurveTo(14, -10, 16, 6, 4, 16);
+                c.bezierCurveTo(0, 20, -4, 18, -3, 15);
+                c.bezierCurveTo(-10, 6, -10, -8, 0, -14);
+                const g = c.createRadialGradient(-3, -2, 2, 0, 0, 18);
+                g.addColorStop(0, '#ff785e');
+                g.addColorStop(0.6, '#e62419');
+                g.addColorStop(1, '#940f09');
+                c.fillStyle = g;
+                c.fill();
+                c.beginPath();
+                c.ellipse(-3, -2, 3, 7, -0.2, 0, Math.PI * 2);
+                c.fillStyle = '#ffb3a6aa';
+                c.fill();
+                c.beginPath();
+                c.moveTo(0, -14);
+                c.quadraticCurveTo(4, -20, 8, -22);
+                c.strokeStyle = '#5a963b';
+                c.lineWidth = 3;
+                c.stroke();
+                clay(c, 0, -14, 5, 3, '#7ab852', '#3e6c27', 0);
+            }
             c.restore();
             c.fillStyle = '#ffe9b6'; c.font = '900 10px Nunito'; c.textAlign = 'center'; c.fillText('TURBO', 0, 32);
         } else {
             const gold = e.kind === 'feather';
-            const glow = c.createRadialGradient(0, 0, 6, 0, 0, 42);
-            glow.addColorStop(0, gold ? '#ffe399dd' : '#a8f5d0dd');
-            glow.addColorStop(0.6, gold ? '#ffd55e66' : '#46e49e66');
-            glow.addColorStop(1, '#ffffff00');
-            oval(c, 0, 0, 42, 42, glow);
+            const glowSurface = gold ?
+                getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]) :
+                getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
+            if (glowSurface) c.drawImage(glowSurface, -42, -42, 84, 84);
+            else {
+                const glow = c.createRadialGradient(0, 0, 6, 0, 0, 42);
+                glow.addColorStop(0, gold ? '#ffe399dd' : '#a8f5d0dd');
+                glow.addColorStop(0.6, gold ? '#ffd55e66' : '#46e49e66');
+                glow.addColorStop(1, '#ffffff00');
+                oval(c, 0, 0, 42, 42, glow);
+            }
             const image = images.get(e.kind);
             if (image) {
                 const targetSize = gold ? 64 : 58;

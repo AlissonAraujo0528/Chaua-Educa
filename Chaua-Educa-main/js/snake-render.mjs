@@ -11,8 +11,10 @@ function triangle(c,image,src,dst){
  c.save();c.beginPath();c.moveTo(edge[0].x,edge[0].y);c.lineTo(edge[1].x,edge[1].y);c.lineTo(edge[2].x,edge[2].y);c.closePath();c.clip();
  c.transform(A,B,C,D,p.x-A*a.x-C*a.y,p.y-B*a.x-D*a.y);c.drawImage(image,0,0,384,384,0,0,384,384);c.restore();
 }
-function drawMesh(c,image,s,factor){
- const data=SPRITES.snake,pose=snakeMotion(s,false);
+function drawMesh(c,image,s,factor,pose){
+ // Preserve the original affine triangles and their antialiased overlap exactly.
+ // Merging rigid regions into drawImage introduced visible edge-pixel changes.
+ const data=SPRITES.snake;
  const project=({x,y})=>{const p=deformSnakePoint(x,y,pose);return {x:(p.x-192)*factor,y:(p.y-328)*factor};};
  const rows=[0,180,190,200,210,220,230,240,250,260,270,280,384];
  for(let i=0;i<rows.length-1;i++){
@@ -27,13 +29,35 @@ function drawMesh(c,image,s,factor){
  }
 }
 
-let surface;
+
+let surface,surfaceCtx,cachedImage=null,cachedFactor=0,cachedX=NaN,cachedY=NaN,cachedAngle=NaN,cachedMouth=NaN;
+
 export function drawContinuousSnake(c,image,s,factor,reduced=false){
  if(!image)return;
- if(reduced){c.drawImage(image,...SPRITES.snake.frames[0].rect,-192*factor,-328*factor,384*factor,384*factor);return;}
+ if(reduced){
+  c.drawImage(image,...SPRITES.snake.frames[0].rect,-192*factor,-328*factor,384*factor,384*factor);
+  return;
+ }
+ const pose=snakeMotion(s,false);
  if(!surface&&typeof OffscreenCanvas!=='undefined')surface=new OffscreenCanvas(512,512);
  if(!surface&&typeof document!=='undefined'){surface=document.createElement('canvas');surface.width=surface.height=512;}
- if(!surface){drawMesh(c,image,s,factor);return;}
- const layer=surface.getContext('2d');layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,512,512);layer.setTransform(2,0,0,2,256,256);layer.globalAlpha=1;layer.globalCompositeOperation='source-over';
- drawMesh(layer,image,s,factor);c.drawImage(surface,-128,-128,256,256);
+ if(!surface){drawMesh(c,image,s,factor,pose);return;}
+ if(!surfaceCtx)surfaceCtx=surface.getContext('2d');
+
+ const dirty=cachedImage!==image||cachedFactor!==factor||
+  Math.abs(pose.x-cachedX)>1e-4||Math.abs(pose.y-cachedY)>1e-4||
+  Math.abs(pose.angle-cachedAngle)>1e-4||Math.abs(pose.mouth-cachedMouth)>1e-4;
+
+ if(dirty){
+  cachedImage=image;cachedFactor=factor;
+  cachedX=pose.x;cachedY=pose.y;cachedAngle=pose.angle;cachedMouth=pose.mouth;
+  const layer=surfaceCtx;
+  layer.setTransform(1,0,0,1,0,0);
+  layer.clearRect(0,0,512,512);
+  layer.setTransform(2,0,0,2,256,256);
+  layer.globalAlpha=1;
+  layer.globalCompositeOperation='source-over';
+  drawMesh(layer,image,s,factor,pose);
+ }
+ c.drawImage(surface,-128,-128,256,256);
 }
