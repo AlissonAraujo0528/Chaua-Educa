@@ -31,6 +31,7 @@ jobs:
           npm run test:browser
           npm run test:journey
           npm run test:background
+          node tests/browser-transition-fallback.cjs
           npm run test:hud
           PERF_SECONDS=6 npm run benchmark:hotspots
       - name: Save automatic graphics visual comparisons
