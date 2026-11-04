@@ -22,6 +22,7 @@ jobs:
           pid=$!
           trap 'kill "$pid" 2>/dev/null' EXIT
           node scripts/benchmark-transition-composite.cjs
+          node tests/browser-transition-fallback.cjs
           node scripts/benchmark-transition-tiles.cjs
       - name: Preserve same-scene comparison images and measurements
         if: always()
