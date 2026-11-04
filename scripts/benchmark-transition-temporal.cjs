@@ -19,7 +19,6 @@ fs.mkdirSync(path,{recursive:true});
     const {Renderer}=await import('/js/render.mjs');
     const {images}=await import('/js/assets.mjs');
     const colors=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
-    const forest=images.get('forest');if(!forest)throw Error('forest missing');
     const create=async()=>{
      const canvas=document.createElement('canvas');
      canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh';
@@ -29,6 +28,10 @@ fs.mkdirSync(path,{recursive:true});
      return {renderer,sample:sample.getContext('2d',{willReadFrequently:true})};
     };
     const original=await create(),optimized=await create();
+    // Renderer.ready waits for the full atlas/WebP set. Accessing images
+    // before it resolves was the cause of the false "forest missing" failure.
+    const forest=images.get('forest');
+    if(!forest||!forest.complete||!forest.naturalWidth)throw Error('forest asset not ready after Renderer.ready');
     original.renderer.prepareStagedBackdrop=()=>null;
     const records=[];
     for(const stage of [2,3]){
