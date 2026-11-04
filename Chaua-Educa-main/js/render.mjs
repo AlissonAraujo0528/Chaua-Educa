@@ -393,7 +393,7 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
+    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.transitionBackdrop=null; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
     setQuality(level) {
         const next=level==='low'?'low':'high';
         this.quality=next;
@@ -425,6 +425,10 @@ export class Renderer {
         if(this.fragmentedBackdrop&&(this.fragmentedBackdrop.width!==size.width||this.fragmentedBackdrop.height!==size.height||this.fragmentedBackdrop.dpr!==this.dpr)){
             this.fragmentedBackdrop.surface.width=0;this.fragmentedBackdrop.surface.height=0;
             this.fragmentedBackdrop=null;
+        }
+        if(this.transitionBackdrop&&(this.transitionBackdrop.width!==size.width||this.transitionBackdrop.height!==size.height||this.transitionBackdrop.dpr!==this.dpr)){
+            this.transitionBackdrop.surface.width=0;this.transitionBackdrop.surface.height=0;
+            this.transitionBackdrop=null;
         }
     }
     base() { this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); this.c.clearRect(0, 0, this.w, this.h); }
@@ -498,6 +502,74 @@ export class Renderer {
         }
         return cache;
     }
+    ensureTransitionBackdrop() {
+        // Only high-resolution canvases need a second backing buffer. The
+        // smaller canvas already repaints fast enough without extra memory.
+        const width=this.canvas.width,height=this.canvas.height;
+        if(width*height<1_800_000||width*height>4_500_000)return null;
+        let state=this.transitionBackdrop;
+        if(state&&state.width===width&&state.height===height&&state.dpr===this.dpr)return state;
+        if(state){state.surface.width=0;state.surface.height=0;}
+        const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):
+            typeof document!=='undefined'?document.createElement('canvas'):null;
+        if(!surface)return null;
+        surface.width=width;surface.height=height;
+        const c=surface.getContext('2d',{alpha:false});
+        if(!c)return null;
+        return this.transitionBackdrop={surface,c,width,height,dpr:this.dpr,target:null,rowsDone:0,active:false};
+    }
+    prepareStagedBackdrop(forest,light,drift,forestAlpha,settled=false) {
+        const normal=this.fragmentedBackdrop;
+        if(!normal||normal.width!==this.canvas.width||normal.height!==this.canvas.height||
+            normal.dpr!==this.dpr||normal.forest!==forest){
+            // A first frame without a prepared cache is rare (asset reload).
+            // Preserve the correct picture before beginning incremental work.
+            return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+        }
+        const pending=this.ensureTransitionBackdrop();
+        if(!pending)return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+        pending.active=true;
+        const driftSteps=forestAlpha===1?4:2;
+        const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
+        if(!pending.target){
+            if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
+                if(settled)pending.active=false;
+                return normal;
+            }
+            // Freeze one destination snapshot until all four stripes are
+            // painted. The fully rendered previous surface is always visible.
+            pending.target={light,forestAlpha,sourceDrift};
+            pending.rowsDone=0;
+        }
+        const stripe=pending.rowsDone++;
+        const y0=Math.floor(pending.height*stripe/4);
+        const y1=stripe===3?pending.height:Math.floor(pending.height*(stripe+1)/4);
+        const c=pending.c;
+        c.save();
+        c.setTransform(1,0,0,1,0,0);
+        c.beginPath();c.rect(0,y0,pending.width,y1-y0);c.clip();
+        c.setTransform(this.dpr,0,0,this.dpr,0,0);
+        c.globalAlpha=1;
+        this.paintSky(c,pending.target.light);
+        const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+        const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
+        c.globalAlpha=pending.target.forestAlpha;
+        c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
+        c.restore();
+        if(pending.rowsDone===4){
+            // Publish only a complete RGBA frame: never show a partially
+            // repainted stripe, even during a camera shake or phase change.
+            const previousSurface=normal.surface,previousContext=normal.c;
+            normal.surface=pending.surface;normal.c=pending.c;
+            normal.light=pending.target.light;
+            normal.forestAlpha=pending.target.forestAlpha;
+            normal.sourceDrift=pending.target.sourceDrift;
+            pending.surface=previousSurface;pending.c=previousContext;
+            pending.rowsDone=0;pending.target=null;
+            if(settled&&normal.light===light&&normal.forestAlpha===forestAlpha)pending.active=false;
+        }
+        return normal;
+    }
     background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
         if (reduced) offset = 0;
         const c = this.c, w = this.w, h = this.h;
@@ -513,9 +585,13 @@ export class Renderer {
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
         const backdropAlpha=stage===2?1-.4*backdropMix:stage===3?.6+.4*backdropMix:1;
         const cachedBackdrop=!home&&!reduced&&forest?
-            this.prepareFragmentedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
-                (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
-                backdropAlpha):null;
+            (stageMix<1||this.transitionBackdrop?.active?
+                this.prepareStagedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
+                    (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
+                    backdropAlpha,stageMix===1):
+                this.prepareFragmentedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
+                    (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
+                    backdropAlpha)):null;
         if(cachedBackdrop){
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
@@ -608,7 +684,10 @@ export class Renderer {
         if(game.state==='countdown'){
             this.prepareSky(BACKGROUND_PALETTE[2]);
             const forest=images.get('forest');
-            if(forest)this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
+            if(forest){
+                this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
+                this.ensureTransitionBackdrop();
+            }
         }
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
