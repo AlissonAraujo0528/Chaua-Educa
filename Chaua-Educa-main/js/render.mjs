@@ -470,7 +470,7 @@ export class Renderer {
         const driftSteps=forestAlpha===1?4:2;
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         let cache=this.fragmentedBackdrop;
-        if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.light!==light||cache.forest!==forest||cache.forestAlpha!==forestAlpha){
+        if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.forest!==forest){
             if(cache){cache.surface.width=0;cache.surface.height=0;}
             const surface=typeof OffscreenCanvas!=='undefined'?
                 new OffscreenCanvas(width,height):document.createElement('canvas');
@@ -478,6 +478,11 @@ export class Renderer {
             const c=surface.getContext('2d',{alpha:false});
             if(!c)return null;
             cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,forestAlpha,sourceDrift:null};
+        }
+        // Repaint into the same backing across seasons; do not allocate another
+        // multi-megapixel surface when light or forest opacity changes.
+        if(cache.light!==light||cache.forestAlpha!==forestAlpha){
+            cache.light=light;cache.forestAlpha=forestAlpha;cache.sourceDrift=null;
         }
         if(cache.sourceDrift!==sourceDrift){
             const c=cache.c;
@@ -592,8 +597,13 @@ export class Renderer {
 
     game(game, reduced, visualTime = 0) {
         this.base();
-        // Prepare before active flight, rather than allocate on entering the fog.
-        if(game.state==='countdown')this.prepareSky(BACKGROUND_PALETTE[2]);
+        // Allocate the two persistent backings while the flight is in its
+        // countdown, not in the first active frame or at a season boundary.
+        if(game.state==='countdown'){
+            this.prepareSky(BACKGROUND_PALETTE[2]);
+            const forest=images.get('forest');
+            if(forest)this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
+        }
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4));
