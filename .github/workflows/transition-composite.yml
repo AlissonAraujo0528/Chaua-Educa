@@ -24,6 +24,7 @@ jobs:
           node scripts/benchmark-transition-composite.cjs
           node tests/browser-transition-fallback.cjs
           node scripts/benchmark-transition-tiles.cjs
+          node scripts/benchmark-transition-temporal.cjs
       - name: Preserve same-scene comparison images and measurements
         if: always()
         uses: actions/upload-artifact@v6
