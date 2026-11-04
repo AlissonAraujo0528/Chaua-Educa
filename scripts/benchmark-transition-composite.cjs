@@ -146,8 +146,18 @@ const summarize=a=>{
       scenes.push({stage,original:sortStat(samples.original),candidate:sortStat(samples.candidate),cacheRepaints:repaints-beforeRepaints,cachePublications:publications-beforePublications,motionSamples});
      }
     }
+    const stableCacheStates=[];
+    if(innerWidth>=1200){
+     for(const stage of [1,2,3]){
+      candidate.base();candidate.background(47,16000,stage,false,false,.75);
+      for(let i=0;i<17;i++){
+       candidate.base();candidate.background(47,16000,stage,false,false,1);
+      }
+      stableCacheStates.push({stage,stagedActive:!!candidate.transitionBackdrop?.active});
+     }
+    }
     const changed=qualityCases.filter(c=>!c.fallback&&c.mix<1),controls=qualityCases.filter(c=>c.fallback||c.mix===1);
-    return {backing:[candidate.canvas.width,candidate.canvas.height],visual:{
+    return {backing:[candidate.canvas.width,candidate.canvas.height],stableCacheStates,visual:{
       count:qualityCases.length,
       worstMae:Math.max(...changed.map(c=>c.mae)),
       worstMaxDelta:Math.max(...changed.map(c=>c.maxDelta)),
@@ -165,6 +175,9 @@ const summarize=a=>{
    assert.ok(report.visual.worstMaxDelta<=40,'One channel changed excessively: '+report.visual.worstMaxDelta);
    assert.ok(report.visual.worstOver5Fraction<.03,'Too many channels visibly changed: '+report.visual.worstOver5Fraction);
    if(viewport.width>=1200){
+    assert.deepEqual(report.stableCacheStates,
+      [{stage:1,stagedActive:false},{stage:2,stagedActive:true},{stage:3,stagedActive:false}],
+      'Opaque stages must leave incremental mode; the translucent forest retains it');
     for(const row of report.scenes){
      assert.ok(row.cachePublications<75,'Transition recomposed too often: '+JSON.stringify(row));
      if(row.stage>=2)for(const sample of row.motionSamples)assert.ok(
