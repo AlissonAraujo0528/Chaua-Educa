@@ -71,6 +71,16 @@ const summarize=a=>{
        }
        const item={quality,stage,mix,maxDelta:max,mae:sum/left.length,
         over5Fraction:over5/left.length,changedFraction:diff/left.length};
+       if(mix===1)item.cacheState={
+        oldLight:old.fragmentedBackdrop?.light,
+        oldAlpha:old.fragmentedBackdrop?.forestAlpha,
+        oldDrift:old.fragmentedBackdrop?.sourceDrift,
+        nextLight:candidate.fragmentedBackdrop?.light,
+        nextAlpha:candidate.fragmentedBackdrop?.forestAlpha,
+        nextDrift:candidate.fragmentedBackdrop?.sourceDrift,
+        pendingTarget:candidate.transitionBackdrop?.target,
+        pendingRows:candidate.transitionBackdrop?.rowsDone
+       };
        qualityCases.push(item);
        if(stage===2&&quality==='high'&&mix===.499){
         snapshots.original=old.canvas.toDataURL('image/png').split(',')[1];
