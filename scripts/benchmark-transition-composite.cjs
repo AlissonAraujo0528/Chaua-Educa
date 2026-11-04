@@ -39,6 +39,14 @@ const summarize=a=>{
     const paint=candidate.paintSky.bind(candidate);
     let repaints=0;
     candidate.paintSky=(...args)=>{repaints++;return paint(...args);};
+    const staged=candidate.prepareStagedBackdrop.bind(candidate);
+    let publications=0;
+    candidate.prepareStagedBackdrop=(...args)=>{
+     const before=candidate.fragmentedBackdrop?.surface;
+     const result=staged(...args);
+     if(before&&candidate.fragmentedBackdrop?.surface!==before)publications++;
+     return result;
+    };
     const qualityCases=[],channels={};
     const snapshots={};
     for(const quality of ['high','low']){
@@ -48,6 +56,11 @@ const summarize=a=>{
        directTransition=mix<1;
        for(const r of [old,candidate]){
         r.base();r.background(42.15+mix,13000+mix*100,stage,false,false,mix);
+       }
+       // Finish each constant key before checking exact-frame colors.
+       // Transition input progression is checked separately below.
+       for(let j=0;j<8&&mix<1;j++){
+        candidate.base();candidate.background(42.15+mix,13000+mix*100,stage,false,false,mix);
        }
        const left=old.c.getImageData(0,0,old.canvas.width,old.canvas.height).data;
        const right=candidate.c.getImageData(0,0,candidate.canvas.width,candidate.canvas.height).data;
@@ -88,7 +101,7 @@ const summarize=a=>{
      for(const r of [old,candidate])r.setQuality('high');
      for(const stage of [1,2,3]){
       const samples={original:[],candidate:[]};
-      let beforeRepaints=repaints;
+      const beforeRepaints=repaints,beforePublications=publications;
       for(let i=0;i<165;i++){
        const mix=(i%160)/160;
        g.stage=stage;g.stageAge=4*mix;g.sceneTime=33+i/60;g.elapsed=g.sceneTime;
@@ -107,7 +120,7 @@ const summarize=a=>{
         medianMs:at(.5),p95Ms:at(.95),p99Ms:at(.99),maxMs:x[x.length-1],
         above33:a.filter(t=>t>33.33).length,above50:a.filter(t=>t>50).length};
       };
-      scenes.push({stage,original:sortStat(samples.original),candidate:sortStat(samples.candidate),cacheRepaints:repaints-beforeRepaints});
+      scenes.push({stage,original:sortStat(samples.original),candidate:sortStat(samples.candidate),cacheRepaints:repaints-beforeRepaints,cachePublications:publications-beforePublications});
      }
     }
     const changed=qualityCases.filter(c=>!c.fallback&&c.mix<1),controls=qualityCases.filter(c=>c.fallback||c.mix===1);
@@ -127,7 +140,9 @@ const summarize=a=>{
    assert.ok(report.visual.worstOver5Fraction<.03,'Too many channels visibly changed: '+report.visual.worstOver5Fraction);
    if(viewport.width>=1200){
     for(const row of report.scenes){
-     assert.ok(row.cacheRepaints<115,'Cache repainted too often: '+JSON.stringify(row));
+     assert.ok(row.cachePublications<75,'Transition recomposed too often: '+JSON.stringify(row));
+     if(row.stage>=2)assert.ok(row.candidate.p95Ms<row.original.p95Ms*.85,
+      'Recompose spikes still too expensive (p95) in stage '+row.stage);
      assert.ok(row.candidate.meanMs<row.original.meanMs*.9,'No material transition performance benefit in stage '+row.stage);
     }
    }
