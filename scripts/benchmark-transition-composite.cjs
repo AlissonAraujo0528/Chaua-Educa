@@ -130,11 +130,12 @@ const summarize=a=>{
       worstMaxDelta:Math.max(...changed.map(c=>c.maxDelta)),
       worstOver5Fraction:Math.max(...changed.map(c=>c.over5Fraction)),
       worstCases:[...changed].sort((a,b)=>b.mae-a.mae).slice(0,5),
-      controlDifferences:controls.filter(c=>c.fallback?c.changed>0:c.maxDelta!==0).length
+      controlDifferences:controls.filter(c=>c.fallback?c.changed>0:c.maxDelta!==0).length,
+      failedControls:controls.filter(c=>c.fallback?c.changed>0:c.maxDelta!==0).slice(0,8)
     },scenes,snapshots};
    });
    assert.deepEqual(errors,[],'no JavaScript exceptions');
-   assert.equal(report.visual.controlDifferences,0,'Stable and reduced-motion/home controls must be exactly unchanged');
+   assert.equal(report.visual.controlDifferences,0,'Stable and reduced-motion/home controls must be exactly unchanged: '+JSON.stringify(report.visual.failedControls));
    assert.ok(report.visual.worstMae<1.1,'Visual mean delta too high: '+report.visual.worstMae);
    assert.ok(report.visual.worstMaxDelta<=40,'One channel changed excessively: '+report.visual.worstMaxDelta);
    assert.ok(report.visual.worstOver5Fraction<.03,'Too many channels visibly changed: '+report.visual.worstOver5Fraction);
