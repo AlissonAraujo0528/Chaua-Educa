@@ -8,6 +8,7 @@ const path=require('node:path');
 const out=process.env.LONG_OUTPUT||'test-results/long-flight';
 const requestedMode=['auto','high','low'].includes(process.env.LONG_MODE)?process.env.LONG_MODE:'auto';
 const requestedDpr=Number(process.env.LONG_DPR)||null;
+const disableStaging=process.env.LONG_DISABLE_STAGING==='1';
 fs.mkdirSync(out,{recursive:true});
 const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);return ys[Math.floor((ys.length-1)*p)];};
 (async()=>{
@@ -23,7 +24,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    window.longFrames=[];window.longStageFrames=[];
    window.requestAnimationFrame=callback=>native.call(window,now=>{
     if(callback.name==='frame'&&window.longCapture){
-     if(previous){const dt=now-previous;window.longFrames.push(dt);window.longStageFrames.push({dt,stage:window.__longGame?.stage??-1,quality:window.__longRenderer?.quality??'unknown',decoration:window.__longRenderer?.decoration??'unknown',elapsed:window.__longGame?.elapsed??0,wall:now-(window.longStart||now)});}
+     if(previous){const dt=now-previous;window.longFrames.push(dt);window.longStageFrames.push({dt,stage:window.__longGame?.stage??-1,stageAge:window.__longGame?.stageAge??0,quality:window.__longRenderer?.quality??'unknown',decoration:window.__longRenderer?.decoration??'unknown',elapsed:window.__longGame?.elapsed??0,wall:now-(window.longStart||now)});}
      previous=now;
     }
     callback(now);
@@ -35,10 +36,14 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
   await page.locator('#btnStart:not([disabled])').click();
   await page.bringToFront();
   const seconds=Math.max(30,Math.min(140,Number(process.env.LONG_SECONDS)||90));
-  await page.evaluate(async ({seconds,requestedMode})=>{
+  await page.evaluate(async ({seconds,requestedMode,disableStaging})=>{
    const {game:g}=await import('/js/script.js');
    const {flightViewport}=await import('/js/viewport.mjs');
    const {Renderer}=await import('/js/render.mjs');
+   // Benchmark-only A/B: keep the deployed game/assets identical and switch
+   // only the incremental transition path. The old direct path remains
+   // available as the production fallback whenever staging is disabled.
+   if(disableStaging)Renderer.prototype.prepareStagedBackdrop=()=>null;
    const qualityChanges=[];
    for(const method of ['setQuality','setAutomaticQuality']){
     const change=Renderer.prototype[method];
@@ -62,7 +67,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
     clearInterval(pilot);clearTimeout(deadline);
     const elapsed=(performance.now()-window.longStart)/1000;
     window.longResult={
-     requestedMode,elapsedWallSeconds:elapsed,gameSeconds:g.elapsed,state:g.state,reason:g.reason,
+     requestedMode,disableStaging,elapsedWallSeconds:elapsed,gameSeconds:g.elapsed,state:g.state,reason:g.reason,
      won:g.won,stages:[...stages],encounters:[...encounters],pickups:[...pickups],
      questions,failures,decisions,qualityChanges,
      canvasWidth:document.querySelector('#forest').width,
@@ -113,7 +118,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    },16);
    const deadline=setTimeout(finish,seconds*1000);
    window.longDone=false;
-  },{seconds,requestedMode});
+  },{seconds,requestedMode,disableStaging});
   await page.waitForFunction(()=>window.longDone,null,{timeout:(seconds+20)*1000,polling:250});
   const captured=await page.evaluate(()=>window.longResult);
   const {frameIntervals:frames,stageFrames,...details}=captured;
@@ -128,7 +133,18 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
    frames:dt.length,fps:1000*dt.length/dt.reduce((a,b)=>a+b,0),
    p95Ms:pct(dt,.95),p99Ms:pct(dt,.99),over33:dt.filter(t=>t>33.33).length,over50:dt.filter(t=>t>50).length
   }]));
-  const stats={...details,requestedDpr,segments,frames:frames.length,
+  const transitionGroups={};
+  for(const sample of stageFrames){
+   const phase=sample.stageAge<4?'transition':'settled';
+   const key='stage-'+sample.stage+'-'+phase+'-'+sample.quality;
+   (transitionGroups[key]??=[]).push(sample.dt);
+  }
+  const phaseSegments=Object.fromEntries(Object.entries(transitionGroups).map(([key,dt])=>[key,{
+   frames:dt.length,fps:1000*dt.length/dt.reduce((a,b)=>a+b,0),
+   p95Ms:pct(dt,.95),p99Ms:pct(dt,.99),over33:dt.filter(t=>t>33.33).length,
+   over50:dt.filter(t=>t>50).length,over100:dt.filter(t=>t>100).length
+  }]));
+  const stats={...details,requestedDpr,segments,phaseSegments,frames:frames.length,
     fps:1000*frames.length/frames.reduce((a,b)=>a+b,0),
     frameP50Ms:pct(frames,.50),frameP95Ms:pct(frames,.95),
     frameP99Ms:pct(frames,.99),maxMs:Math.max(...frames),
