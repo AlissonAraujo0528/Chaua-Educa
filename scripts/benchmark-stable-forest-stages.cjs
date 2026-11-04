@@ -20,6 +20,11 @@ const summarize=values=>{
    await page.route('**/js/script.js',r=>r.fulfill({contentType:'text/javascript',body:''}));
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
    const x=await page.evaluate(async()=>{
+    const summarize=values=>{
+     const a=[...values].sort((x,y)=>x-y);
+     return {frames:values.length,meanMs:values.reduce((sum,v)=>sum+v,0)/values.length,
+      p50Ms:a[Math.floor((a.length-1)*.5)],p95Ms:a[Math.floor((a.length-1)*.95)],maxMs:a[a.length-1]};
+    };
     const {Renderer}=await import('/js/render.mjs');
     const {Game}=await import('/js/engine.mjs');
     const {advanceSnake}=await import('/js/animals.mjs');
