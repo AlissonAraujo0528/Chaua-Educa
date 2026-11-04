@@ -36,6 +36,9 @@ const summarize=a=>{
     const original=old.prepareFragmentedBackdrop.bind(old);
     let directTransition=false;
     old.prepareFragmentedBackdrop=(...args)=>directTransition?null:original(...args);
+    // Stage 2/3 use a different incremental method. Disable it on the
+    // control renderer as well, or we'd compare two buffered candidates.
+    old.prepareStagedBackdrop=()=>null;
     const paint=candidate.paintSky.bind(candidate);
     let repaints=0;
     candidate.paintSky=(...args)=>{repaints++;return paint(...args);};
