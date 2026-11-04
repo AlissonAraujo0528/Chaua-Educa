@@ -503,13 +503,19 @@ export class Renderer {
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
-        // Settled stages reuse one composed backing; transitions, home and
-        // reduced-motion retain the unchanged original drawing path.
+        // Reuse the same native-resolution sky + forest composite while a
+        // season transitions. Light and forest opacity change gradually; sample
+        // only the backdrop blend at 1/64 steps instead of rescaling a 4 MP WebP
+        // on every frame. The tint, parallax, fog, sunbeams, characters and
+        // game timing below remain continuous and unchanged.
         const forest=images.get('forest');
-        const cachedBackdrop=stageMix===1&&!home&&!reduced&&forest?
-            this.prepareFragmentedBackdrop(forest,light,Math.sin(time*.035)*Math.min(24,
+        const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;
+        const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
+        const backdropAlpha=stage===2?1-.4*backdropMix:stage===3?.6+.4*backdropMix:1;
+        const cachedBackdrop=!home&&!reduced&&forest?
+            this.prepareFragmentedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
                 (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
-                stage===2?.6:1):null;
+                backdropAlpha):null;
         if(cachedBackdrop){
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
