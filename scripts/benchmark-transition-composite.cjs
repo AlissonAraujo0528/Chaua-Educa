@@ -147,6 +147,8 @@ const summarize=a=>{
       failedControls:controls.filter(c=>c.fallback?c.changed>0:c.maxDelta!==0).slice(0,8)
     },scenes,snapshots};
    });
+   console.log('TRANSITION_AB_PRECHECK '+JSON.stringify({viewport,visual:report.visual,
+    scenes:report.scenes.map(x=>({stage:x.stage,old:x.original,new:x.candidate,published:x.cachePublications}))}));
    assert.deepEqual(errors,[],'no JavaScript exceptions');
    assert.equal(report.visual.controlDifferences,0,'Stable and reduced-motion/home controls must be exactly unchanged: '+JSON.stringify(report.visual.failedControls));
    assert.ok(report.visual.worstMae<1.1,'Visual mean delta too high: '+report.visual.worstMae);
@@ -156,7 +158,7 @@ const summarize=a=>{
     for(const row of report.scenes){
      assert.ok(row.cachePublications<75,'Transition recomposed too often: '+JSON.stringify(row));
      if(row.stage>=2)assert.ok(row.candidate.p95Ms<row.original.p95Ms*.85,
-      'Recompose spikes still too expensive (p95) in stage '+row.stage);
+      'Recompose spikes still too expensive (p95) in stage '+row.stage+': '+JSON.stringify(row));
      assert.ok(row.candidate.meanMs<row.original.meanMs*.9,'No material transition performance benefit in stage '+row.stage);
     }
    }
