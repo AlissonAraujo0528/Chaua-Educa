@@ -520,7 +520,11 @@ export class Renderer {
             this.transitionBackdrop=null;
         }
     }
-    base() { this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); }
+    // Standalone draws require a clean frame; complete scenes immediately paint an opaque backdrop.
+    base(clear = true) {
+        this.c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        if (clear) this.c.clearRect(0, 0, this.w, this.h);
+    }
     paintSky(c,light){
         const w=this.w,h=this.h;
         const bg = c.createLinearGradient(0, 0, 0, h);
@@ -737,7 +741,7 @@ export class Renderer {
     }
 
     home(time, reduced) {
-        this.base();
+        this.base(false);
         const c = this.c, mobile = this.w <= 700;
         this.background(time, 0, 0, !mobile, reduced);
         if (mobile) {
@@ -758,7 +762,7 @@ export class Renderer {
     }
 
     game(game, reduced, visualTime = 0) {
-        this.base();
+        this.base(false);
         if(game.state==='countdown'){
             this.prepareSky(BACKGROUND_PALETTE[2]);
             const forest=images.get('forest');
