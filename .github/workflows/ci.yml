@@ -25,6 +25,8 @@ jobs:
           npm run test:perf-probe
           npm run test:snake-continuity
           npm run test:snake
+          npm run test:snake-raster-parity
+          npm run benchmark:snake-mesh
           npm run test:reference-art
           npm run test:visual
           npm run test:immersion
@@ -34,6 +36,7 @@ jobs:
           node tests/browser-transition-fallback.cjs
           npm run test:hud
           PERF_SECONDS=6 npm run benchmark:hotspots
+          npm run benchmark:render-parts
       - name: Save automatic graphics visual comparisons
         if: always()
         uses: actions/upload-artifact@v6
