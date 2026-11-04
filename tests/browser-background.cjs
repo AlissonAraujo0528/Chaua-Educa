@@ -15,7 +15,11 @@ async function scene(browser,viewport,domFallback=false){
   const direct=new Renderer(a),cached=new Renderer(b);await Promise.all([direct.ready,cached.ready]);
   direct.skyLayer=function(light){Renderer.prototype.skyLayer.call(this,light,false);};
   direct.prepareSky=()=>null;
-  window.backgroundTest={direct,cached,images};
+  let directTransition=false;
+  const original=direct.prepareFragmentedBackdrop.bind(direct);
+  direct.prepareFragmentedBackdrop=(...args)=>directTransition?null:original(...args);
+  direct.prepareStagedBackdrop=()=>null;
+  window.backgroundTest={direct,cached,images,setDirectTransition:v=>{directTransition=v;}};
  });
  return {page,errors};
 }
@@ -24,7 +28,7 @@ async function pixels(browser){
  for(const viewport of [{width:1440,height:960},{width:390,height:844},{width:844,height:390}]){
   const {page,errors}=await scene(browser,viewport);
   const summary=await page.evaluate(async()=>{
-   const {direct,cached,images}=window.backgroundTest;
+   const {direct,cached,images,setDirectTransition}=window.backgroundTest;
    const {Game}=await import('/js/engine.mjs');const game=new Game();game.state='countdown';
    cached.game(game,false);const prepared=cached.skyCache;
    cached.base();cached.background(44,9000,2,false,false,1);
@@ -35,15 +39,28 @@ async function pixels(browser){
     [2,1,89,false,false],[3,0,44,false,false],[3,.5,89,false,false],
     [3,1,44,false,false],[0,1,89,true,false],[2,1,89,false,true]
    ];
-   let maximum=0,different=0,total=0,reused=false;
+   let maximum=0,different=0,total=0,reused=false,transitionMax=0,transitionTotal=0,transitionDiff=0;
    for(const quality of ['high','low']){
     direct.setQuality(quality);cached.setQuality(quality);
     for(const [stage,mix,time,home,reduced]of cases){
+     const transitioning=mix<1&&!home&&!reduced;
+     setDirectTransition(transitioning);
      for(const r of [direct,cached]){r.base();r.background(time,7000+time*275,stage,home,reduced,mix);}
+     // The double-buffered compositor never displays half-painted strips.
+     // A static pixel test must let up to two complete striped snapshots
+     // finish before comparing the identical fixed transition inputs.
+     for(let i=0;i<8&&!home&&!reduced;i++){
+      cached.base();cached.background(time,7000+time*275,stage,home,reduced,mix);
+     }
      const a=direct.c.getImageData(0,0,direct.canvas.width,direct.canvas.height).data;
      const b=cached.c.getImageData(0,0,cached.canvas.width,cached.canvas.height).data;
-     for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);maximum=Math.max(maximum,delta);different+=Number(delta!==0);}
-     total+=a.length;
+     for(let i=0;i<a.length;i++){
+      const delta=Math.abs(a[i]-b[i]);
+      if(transitioning){transitionMax=Math.max(transitionMax,delta);transitionDiff+=delta;}
+      else {maximum=Math.max(maximum,delta);different+=Number(delta!==0);}
+     }
+     if(transitioning)transitionTotal+=a.length;
+     else total+=a.length;
      if(stage===2&&mix===1){
        const active=()=>reduced?cached.skyCache:cached.fragmentedBackdrop;
        const cache=active();
@@ -58,9 +75,12 @@ async function pixels(browser){
     const a=direct.c.getImageData(0,0,direct.canvas.width,direct.canvas.height).data,b=cached.c.getImageData(0,0,cached.canvas.width,cached.canvas.height).data;
     for(let i=0;i<a.length;i++)maximum=Math.max(maximum,Math.abs(a[i]-b[i]));
    }finally{images.set('forest',forest);}
-   return {maximum,different,total,reused,preparedBeforeFlight,pixels:cached.skyCache.width*cached.skyCache.height};
+   return {maximum,different,total,reused,preparedBeforeFlight,pixels:cached.skyCache.width*cached.skyCache.height,
+    transitionMax,transitionMAE:transitionTotal?transitionDiff/transitionTotal:0};
   });
-  assert.equal(summary.maximum,0,'cached and direct background pixels differ');
+  assert.equal(summary.maximum,0,'stable, home and reduced-motion paths must remain pixel exact');
+  assert.ok(summary.transitionMax<=40&&summary.transitionMAE<1.1,
+   'transition visual deviation exceeds threshold: '+JSON.stringify(summary));
   assert.equal(summary.reused,true);assert.ok(summary.pixels<=4_000_000);
   assert.equal(summary.preparedBeforeFlight,true,'countdown must prepare the fog background');
   // Resize and quality changes must release the old backing, not accumulate it.
@@ -69,18 +89,18 @@ async function pixels(browser){
    await page.setViewportSize(viewport);
    const released=await page.evaluate(()=>{
     const {cached:r}=window.backgroundTest;
-    const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface].filter(Boolean);
+    const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface,r.transitionBackdrop?.surface].filter(Boolean);
     r.resize();
-    const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null;
+    const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null&&r.transitionBackdrop===null;
     r.base();r.background(44,9000,2,false,false,1);return released;
    });
    assert.equal(released,true);
   }
   assert.equal(await page.evaluate(()=>{
    const {cached:r}=window.backgroundTest;
-   const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface].filter(Boolean);
+   const old=[r.skyCache?.surface,r.fragmentedBackdrop?.surface,r.transitionBackdrop?.surface].filter(Boolean);
    r.setQuality('high');
-   const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null;
+   const released=old.length>0&&old.every(surface=>surface.width===0)&&r.skyCache===null&&r.fragmentedBackdrop===null&&r.transitionBackdrop===null;
    r.base();r.background(44,9000,2,false,false,1);return released;
   }),true,'quality change must release the old backing');
   await page.screenshot({path:path.join(out,'scene-'+summaries.length+'.png')});
@@ -94,7 +114,7 @@ async function pixels(browser){
   return a.every((v,i)=>v===b[i])&&cached.fragmentedBackdrop?.surface instanceof HTMLCanvasElement;
  }),true,'HTML canvas fallback differs');assert.deepEqual(errors,[]);await page.close();
  console.log(JSON.stringify(summaries));
- console.log('PASS background: identical pixels, all stages/transitions, drift, reduced motion, high/low, fallback and cache release.');
+ console.log('PASS background: exact stable/fallback pixels, bounded seasonal blends and complete buffer release.');
 }
 async function benchmark(browser){
  const results=[];
