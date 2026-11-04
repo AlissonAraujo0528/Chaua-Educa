@@ -458,23 +458,23 @@ export class Renderer {
         this.c.save();this.c.setTransform(1,0,0,1,0,0);this.c.drawImage(cache.surface,0,0);this.c.restore();
     }
 
-    prepareFragmentedBackdrop(forest,light,drift) {
-        // The settled fragmented forest has a static sun/sky plus one slowly
-        // drifting semi-transparent WebP. Composite them into one opaque layer.
-        // The tiny half-device-pixel motion step prevents a full 4Mpx resample
-        // for every ~0.02px drift while retaining smooth wind displacement.
+    prepareFragmentedBackdrop(forest,light,drift,forestAlpha=.6) {
+        // All settled flight stages have a static sun/sky and one gently
+        // drifting WebP. Composite them into a single opaque backing texture.
+        // The original stage-2 alpha (.6) and all opaque stages (1) are kept.
+        // Quantize only the forest's subpixel drift, never the camera or actors.
         if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
         const width=this.canvas.width,height=this.canvas.height;
         const sourceDrift=Math.round(drift*this.dpr*2)/2;
         let cache=this.fragmentedBackdrop;
-        if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.light!==light||cache.forest!==forest){
+        if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.light!==light||cache.forest!==forest||cache.forestAlpha!==forestAlpha){
             if(cache){cache.surface.width=0;cache.surface.height=0;}
             const surface=typeof OffscreenCanvas!=='undefined'?
                 new OffscreenCanvas(width,height):document.createElement('canvas');
             surface.width=width;surface.height=height;
             const c=surface.getContext('2d',{alpha:false});
             if(!c)return null;
-            cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,sourceDrift:null};
+            cache=this.fragmentedBackdrop={surface,c,width,height,dpr:this.dpr,light,forest,forestAlpha,sourceDrift:null};
         }
         if(cache.sourceDrift!==sourceDrift){
             const c=cache.c;
@@ -483,7 +483,7 @@ export class Renderer {
             this.paintSky(c,light);
             const fw=forest.naturalWidth*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
             const fh=forest.naturalHeight*Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
-            c.globalAlpha=.6;
+            c.globalAlpha=forestAlpha;
             c.drawImage(forest,(this.w-fw)/2+sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
             c.globalAlpha=1;
             cache.sourceDrift=sourceDrift;
@@ -495,12 +495,13 @@ export class Renderer {
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
-        // Composite the settled translucent sky/forest as one reusable layer.
-        // Transitions and other stages keep their original exact draw path.
+        // Settled stages reuse one composed backing; transitions, home and
+        // reduced-motion retain the unchanged original drawing path.
         const forest=images.get('forest');
-        const cachedBackdrop=stage===2&&stageMix===1&&!home&&!reduced&&forest?
+        const cachedBackdrop=stageMix===1&&!home&&!reduced&&forest?
             this.prepareFragmentedBackdrop(forest,light,Math.sin(time*.035)*Math.min(24,
-                (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2)):null;
+                (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
+                stage===2?.6:1):null;
         if(cachedBackdrop){
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
