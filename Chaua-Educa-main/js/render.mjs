@@ -533,7 +533,6 @@ export class Renderer {
         const sourceDrift=Math.round(drift*this.dpr*driftSteps)/driftSteps;
         if(!pending.target){
             if(normal.light===light&&normal.forestAlpha===forestAlpha&&normal.sourceDrift===sourceDrift){
-                if(settled)pending.active=false;
                 return normal;
             }
             // Freeze one destination snapshot until all four stripes are
@@ -566,7 +565,8 @@ export class Renderer {
             normal.sourceDrift=pending.target.sourceDrift;
             pending.surface=previousSurface;pending.c=previousContext;
             pending.rowsDone=0;pending.target=null;
-            if(settled&&normal.light===light&&normal.forestAlpha===forestAlpha)pending.active=false;
+            // Keep the tile buffer available for later wind-driven refreshes.
+            // This also flattens raster spikes after the transition has ended.
         }
         return normal;
     }
@@ -585,7 +585,7 @@ export class Renderer {
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
         const backdropAlpha=stage===2?1-.4*backdropMix:stage===3?.6+.4*backdropMix:1;
         const cachedBackdrop=!home&&!reduced&&forest?
-            (stageMix<1||this.transitionBackdrop?.active?
+            ((stage===2||stage===3)&&(stageMix<1||this.transitionBackdrop?.active)?
                 this.prepareStagedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
                     (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
                     backdropAlpha,stageMix===1):
