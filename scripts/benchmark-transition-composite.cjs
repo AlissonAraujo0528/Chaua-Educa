@@ -113,10 +113,10 @@ const summarize=a=>{
       {id:3,kind:'fruit',x:780,y:325,variety:0,collected:false}];
      for(const r of [old,candidate])r.setQuality('high');
      for(const stage of [1,2,3]){
-      const samples={original:[],candidate:[]};
+      const samples={original:[],candidate:[]},motionSamples=[];
       const beforeRepaints=repaints,beforePublications=publications;
       for(let i=0;i<165;i++){
-       const mix=(i%160)/160;
+       const mix=Math.min(1,i/160);
        g.stage=stage;g.stageAge=4*mix;g.sceneTime=33+i/60;g.elapsed=g.sceneTime;
        directTransition=mix<1;
        for(const label of i%2?['candidate','original']:['original','candidate']){
@@ -126,6 +126,16 @@ const summarize=a=>{
         r.c.getImageData(0,0,1,1);
         if(i>=12)samples[label].push(performance.now()-start);
        }
+       if(stage>=2&&i>0&&i<=160&&i%20===0){
+        // Sample the ACTUAL displayed frame during a pending tile update.
+        const a=old.c.getImageData(0,0,old.canvas.width,old.canvas.height).data;
+        const b=candidate.c.getImageData(0,0,candidate.canvas.width,candidate.canvas.height).data;
+        let sum=0,max=0,over5=0;
+        for(let k=0;k<a.length;k++){
+         const d=Math.abs(a[k]-b[k]);sum+=d;max=Math.max(max,d);if(d>5)over5++;
+        }
+        motionSamples.push({mix,mae:sum/a.length,maxDelta:max,over5Fraction:over5/a.length});
+       }
       }
       const sortStat=a=>{
        const x=[...a].sort((p,q)=>p-q),at=p=>x[Math.floor((x.length-1)*p)];
@@ -133,7 +143,7 @@ const summarize=a=>{
         medianMs:at(.5),p95Ms:at(.95),p99Ms:at(.99),maxMs:x[x.length-1],
         above33:a.filter(t=>t>33.33).length,above50:a.filter(t=>t>50).length};
       };
-      scenes.push({stage,original:sortStat(samples.original),candidate:sortStat(samples.candidate),cacheRepaints:repaints-beforeRepaints,cachePublications:publications-beforePublications});
+      scenes.push({stage,original:sortStat(samples.original),candidate:sortStat(samples.candidate),cacheRepaints:repaints-beforeRepaints,cachePublications:publications-beforePublications,motionSamples});
      }
     }
     const changed=qualityCases.filter(c=>!c.fallback&&c.mix<1),controls=qualityCases.filter(c=>c.fallback||c.mix===1);
@@ -157,6 +167,9 @@ const summarize=a=>{
    if(viewport.width>=1200){
     for(const row of report.scenes){
      assert.ok(row.cachePublications<75,'Transition recomposed too often: '+JSON.stringify(row));
+     if(row.stage>=2)for(const sample of row.motionSamples)assert.ok(
+      sample.mae<1.4&&sample.maxDelta<=55&&sample.over5Fraction<.035,
+      'Transition motion diverged: '+JSON.stringify({stage:row.stage,...sample}));
      if(row.stage>=2)assert.ok(row.candidate.p95Ms<row.original.p95Ms*.85,
       'Recompose spikes still too expensive (p95) in stage '+row.stage+': '+JSON.stringify(row));
      assert.ok(row.candidate.meanMs<row.original.meanMs*.9,'No material transition performance benefit in stage '+row.stage);
