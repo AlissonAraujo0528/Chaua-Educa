@@ -88,18 +88,25 @@ const summarize=values=>{
      performanceResults.push({stage,baseline:summarize(samples.old),optimized:summarize(samples.next),
       ratio:summarize(samples.next).meanMs/summarize(samples.old).meanMs});
     }
-    // Test resizing releases the shared backing and old cache is not retained.
+    // Each season repaints the same backing; no repeated 4 MP allocation.
     const surface=next.fragmentedBackdrop?.surface;
+    let reusedAcrossStages=!!surface;
+    for(const stage of [0,1,2,3]){
+     next.base();next.background(40,17000,stage,false,false,1);
+     reusedAcrossStages &&= next.fragmentedBackdrop?.surface===surface;
+    }
+    // Test resizing releases the shared backing and old cache is not retained.
     const originalSize=[next.canvas.width,next.canvas.height];
     const originalResolution=next.resolution;
     next.setQuality('low');
     const released=!!surface&&surface.width===0&&next.fragmentedBackdrop===null;
     next.setQuality(originalResolution);
     const preserved=next.canvas.width===originalSize[0]&&next.canvas.height===originalSize[1];
-    return {canvas:originalSize,visual:results,performance:performanceResults,cacheReleased:released,resolutionRestored:preserved};
+    return {canvas:originalSize,visual:results,performance:performanceResults,cacheReleased:released,resolutionRestored:preserved,reusedAcrossStages};
    });
    assert.deepEqual(errors,[]);
    assert.ok(x.cacheReleased&&x.resolutionRestored,'canvas resizing failed to release cache');
+   assert.ok(x.reusedAcrossStages,'stage change allocated an additional backing surface');
    // New settled stages may have subpixel rounding, but the artistic colors
    // and the old stage-2 image must remain equivalent.
    const changed=x.visual.filter(c=>c.changedStage);
