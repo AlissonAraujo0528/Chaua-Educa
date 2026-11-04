@@ -172,6 +172,9 @@ const summarize=a=>{
       'Transition motion diverged: '+JSON.stringify({stage:row.stage,...sample}));
      if(row.stage>=2)assert.ok(row.candidate.p95Ms<row.original.p95Ms*.85,
       'Recompose spikes still too expensive (p95) in stage '+row.stage+': '+JSON.stringify(row));
+     if(row.stage===1)assert.ok(
+      row.candidate.p95Ms<=16.7&&row.candidate.p95Ms<row.original.p95Ms*.95,
+      'First-stage transition still exceeds the 60 FPS draw budget: '+JSON.stringify(row));
      assert.ok(row.candidate.meanMs<row.original.meanMs*.9,'No material transition performance benefit in stage '+row.stage);
     }
    }
