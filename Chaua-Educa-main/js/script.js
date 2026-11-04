@@ -10,7 +10,6 @@ import { FRUITS } from './fruits.mjs';
 import DB from './database.js';
 import { Game, FlightClock, HEIGHT, STAGES } from './engine.mjs';
 import { Renderer, drawBird } from './render.mjs';
-import { flightViewport } from './viewport.mjs';
 
 const $ = selector => document.querySelector(selector);
 const app = $('#app');
@@ -77,15 +76,15 @@ const clock = new FlightClock(game);
 const flightInput = new FlightInput(game, held => $('#flap-button').classList.toggle('is-held', held));
 
 function resize() {
-    renderer.resize();
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
+    renderer.resize();
     const orientation=renderer.w>renderer.h?'landscape':'portrait';
     if(lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         clearInputs(); game.pause(); clock.reset(); syncUI();
     }
     lastOrientation=orientation;
-    const view = flightViewport(renderer.w, renderer.h, renderer.safeInsets);
+    const view = renderer.getViewport();
     game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
     game.viewLeft = Math.floor(view.worldLeft);
 }
@@ -334,7 +333,7 @@ function frame(time) {
     if(document.hidden){requestAnimationFrame(frame);return;}
     if (game.state === 'menu') renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
     else {
-        const view = flightViewport(renderer.w, renderer.h, renderer.safeInsets);
+        const view = renderer.getViewport();
         game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
         game.viewLeft = Math.floor(view.worldLeft);
         renderer.game(game.visual(clock.accumulator / (1 / 120)), reducedMotion.matches, time / 1000);
