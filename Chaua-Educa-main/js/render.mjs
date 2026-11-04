@@ -393,7 +393,7 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.transitionBackdrop=null; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
+    constructor(canvas) { this.quality = 'high'; this.resolution = 'high'; this.decoration = 'high'; this.canvas = canvas; this.c = canvas.getContext('2d'); this.fruitImages = []; this.fragmentedBackdrop=null; this.transitionBackdrop=null; this.transitionRasterDisabled=false; this.transitionSlowReadbacks=0; this.ready = loadAssets().then(()=>{this.fruitImages=FRUITS.map(f=>images.get(`fruit-${f.id}`));}); this.resize(); }
     setQuality(level) {
         const next=level==='low'?'low':'high';
         this.quality=next;
@@ -506,7 +506,7 @@ export class Renderer {
         // Only high-resolution canvases need a second backing buffer. The
         // smaller canvas already repaints fast enough without extra memory.
         const width=this.canvas.width,height=this.canvas.height;
-        if(width*height<1_800_000||width*height>4_500_000)return null;
+        if(this.transitionRasterDisabled||width*height<1_800_000||width*height>4_500_000)return null;
         let state=this.transitionBackdrop;
         if(state&&state.width===width&&state.height===height&&state.dpr===this.dpr)return state;
         if(state){state.surface.width=0;state.surface.height=0;}
@@ -559,7 +559,21 @@ export class Renderer {
         // raster work is actually completed here. A single-pixel readback
         // flushes this offscreen stripe before it is ever published.
         // Profile hardware GPU readback separately before approving.
-        c.getImageData(0,y0,1,1);
+        const syncStart=performance.now();
+        let syncOk=true;
+        try{c.getImageData(0,y0,1,1);}
+        catch{syncOk=false;}
+        // Synchronous GPU readback can be much slower on a physical device
+        // than in headless SwiftShader. Repeatedly slow/unsupported readbacks
+        // must fall back to the already-proven direct cache path.
+        this.transitionSlowReadbacks=syncOk&&performance.now()-syncStart<=18?
+            0:this.transitionSlowReadbacks+1;
+        if(this.transitionSlowReadbacks>=2){
+            this.transitionRasterDisabled=true;
+            pending.surface.width=0;pending.surface.height=0;
+            this.transitionBackdrop=null;
+            return this.prepareFragmentedBackdrop(forest,light,drift,forestAlpha);
+        }
         if(pending.rowsDone===8){
             // Publish only a complete RGBA frame: never show a partially
             // repainted stripe, even during a camera shake or phase change.
