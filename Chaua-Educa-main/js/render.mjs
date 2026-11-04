@@ -802,16 +802,25 @@ export class Renderer {
             c.lineWidth=2;c.setLineDash([4,8]);c.beginPath();c.moveTo(fruit[0].x,fruit[0].y);
             for(const f of fruit.slice(1))c.lineTo(f.x,f.y);c.stroke();c.restore();
         }
+        // Rendering-only conservative culling: sprites far beyond the camera
+        // cannot affect a displayed pixel. Keep physics, entities, collected
+        // routes and offscreen warning indicators untouched.
+        const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
         for (const e of game.entities) {
+            // Tree crowns extend beyond their trunk core and striking snakes
+            // can reach away from their anchor; allow generous world margins.
+            const margin=e.kind==='wood'?320:e.kind==='hawk'?180:100;
+            const drawSprite=this.drawOffscreenEntitiesForTest===true||
+                !Number.isFinite(e.x)||(e.x>=visibleLeft-margin&&e.x<=visibleRight+margin);
             if (e.kind === 'wood') {
-                this.obstacle(e, game, reduced);
+                if(drawSprite)this.obstacle(e, game, reduced);
             } else if (e.kind === 'hawk') {
                 if (e.warning > 0 || (!e.harmless && e.x>game.x+180)) {
                     c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
                     c.beginPath(); c.moveTo(e.targetX, e.targetY); c.lineTo(e.startX, e.startY); c.stroke(); c.restore();
                 }
-                if(e.warning<=0)this.hawk(e, reduced ? 0 : sceneTime, reduced);
-            } else if (!e.collected) this.pickup(e, game.elapsed, reduced);
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced);
+            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced);
         }
         if (game.shield || game.invincible > 0) {
             const r = 68;
