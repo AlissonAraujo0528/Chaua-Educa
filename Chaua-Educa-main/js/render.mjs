@@ -456,6 +456,7 @@ export class Renderer {
         this.canvas = canvas;
         this.c = canvas.getContext('2d');
         this.fruitImages = [];
+        this.forestCache = null;
         this.fragmentedBackdrop = null;
         this.transitionBackdrop = null;
         this.transitionRasterDisabled = false;
@@ -466,10 +467,13 @@ export class Renderer {
         // Keep an A/B override to verify exact parity against the original composition.
         this.opaqueForestSkyEnabled = true;
         this.opaqueForestLightKeyEnabled = true;
+        // Pre-scales the 4MP forest texture once per viewport resize with breeze margins
+        // so wind drift and 8-stripe transitions blit 1:1 without bilinear rescaling.
+        this.scaledForestCacheEnabled = true;
         this.cachedView = null;
         this.ready = loadAssets().then(() => {
             this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
-            // Prepare static pickup glows before the first encounter.
+            // Warm up pickup radial caches during asset load so first spawn never stalls.
             getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
             getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
             getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
@@ -523,6 +527,10 @@ export class Renderer {
         if(this.skyCache&&(this.skyCache.width!==size.width||this.skyCache.height!==size.height||this.skyCache.dpr!==this.dpr)){
             this.skyCache.surface.width=0;this.skyCache=null;
         }
+        if(this.forestCache&&(this.forestCache.viewW!==size.width||this.forestCache.viewH!==size.height||this.forestCache.dpr!==this.dpr)){
+            this.forestCache.surface.width=0;this.forestCache.surface.height=0;
+            this.forestCache=null;
+        }
         if(this.fragmentedBackdrop&&(this.fragmentedBackdrop.width!==size.width||this.fragmentedBackdrop.height!==size.height||this.fragmentedBackdrop.dpr!==this.dpr)){
             this.fragmentedBackdrop.surface.width=0;this.fragmentedBackdrop.surface.height=0;
             this.fragmentedBackdrop=null;
@@ -567,6 +575,47 @@ export class Renderer {
         this.c.save();this.c.setTransform(1,0,0,1,0,0);this.c.drawImage(cache.surface,0,0);this.c.restore();
     }
 
+    // Pre-renders forest.webp at exact scaled backing dimensions (including the 1.08 breeze margin)
+    // so subsequent wind shifts perform fast 1:1 blits instead of 4MP bilinear rescaling.
+    prepareScaledForest(forest) {
+        if(!this.scaledForestCacheEnabled)return null;
+        if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
+        const viewW=this.canvas.width,viewH=this.canvas.height;
+        const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+        const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
+        const pixelW=Math.max(1,Math.ceil(fw*this.dpr)),pixelH=Math.max(1,Math.ceil(fh*this.dpr));
+        // Cap the secondary image, especially when landscape art fills portrait screens.
+        if(pixelW*pixelH>6_000_000||pixelW*pixelH>viewW*viewH*1.6)return null;
+        let cache=this.forestCache;
+        if(!cache||cache.viewW!==viewW||cache.viewH!==viewH||cache.dpr!==this.dpr||cache.forest!==forest||cache.pixelW!==pixelW||cache.pixelH!==pixelH){
+            if(cache){cache.surface.width=0;cache.surface.height=0;}
+            const surface=typeof OffscreenCanvas!=='undefined'?
+                new OffscreenCanvas(pixelW,pixelH):document.createElement('canvas');
+            surface.width=pixelW;surface.height=pixelH;
+            const c=surface.getContext('2d',{alpha:false});
+            if(!c)return null;
+            c.setTransform(this.dpr,0,0,this.dpr,0,0);
+            c.drawImage(forest,0,0,fw,fh);
+            cache=this.forestCache={surface,viewW,viewH,dpr:this.dpr,forest,fw,fh,pixelW,pixelH};
+        }
+        return cache;
+    }
+
+    drawForestSource(c,forest,sourceDrift){
+        const scaled=this.prepareScaledForest(forest);
+        if(scaled){
+            const dx=(this.w-scaled.fw)/2+sourceDrift/this.dpr,dy=(this.h-scaled.fh)/2;
+            c.save();
+            c.setTransform(1,0,0,1,0,0);
+            c.drawImage(scaled.surface,dx*this.dpr,dy*this.dpr);
+            c.restore();
+            return;
+        }
+        const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
+        const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
+        c.drawImage(forest,(this.w-fw)/2+sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
+    }
+
     prepareFragmentedBackdrop(forest,light,drift,forestAlpha=.6) {
         if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
         const width=this.canvas.width,height=this.canvas.height;
@@ -600,10 +649,8 @@ export class Renderer {
             // when drawing that source at full opacity.
             if(forestAlpha!==1||this.opaqueForestSkyEnabled===false)
                 this.paintSky(c,light);
-            const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
-            const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
             c.globalAlpha=forestAlpha;
-            c.drawImage(forest,(this.w-fw)/2+sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
+            this.drawForestSource(c,forest,sourceDrift);
             c.globalAlpha=1;
             cache.sourceDrift=sourceDrift;
         }
@@ -656,12 +703,9 @@ export class Renderer {
         c.globalAlpha=1;
         if(pending.target.forestAlpha!==1||this.opaqueForestSkyEnabled===false)
             this.paintSky(c,pending.target.light);
-        const scale=Math.max(this.w/forest.naturalWidth,this.h/forest.naturalHeight)*1.08;
-        const fw=forest.naturalWidth*scale,fh=forest.naturalHeight*scale;
         c.globalAlpha=pending.target.forestAlpha;
-        c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
+        this.drawForestSource(c,forest,pending.target.sourceDrift);
         c.restore();
-
         // Canvas 2D can defer the eight clipped raster passes until the
         // completed buffer is presented. Flushing one pixel after each pass
         // distributes that work across frames without altering output pixels.
@@ -740,7 +784,8 @@ export class Renderer {
             const fw=forest.naturalWidth*scale, fh=forest.naturalHeight*scale;
             const drift=reduced?0:Math.sin(time*.035)*Math.min(24,(fw-w)/2);
             c.save();c.globalAlpha=stage===2?1-.4*stageMix:stage===3?.6+.4*stageMix:1;
-            c.drawImage(forest,(w-fw)/2+drift,(h-fh)/2,fw,fh);c.restore();
+            this.drawForestSource(c,forest,drift*this.dpr);
+            c.restore();
         }
         if(this.decoration!=='low') {
             c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
@@ -821,6 +866,7 @@ export class Renderer {
             this.prepareSky(BACKGROUND_PALETTE[2]);
             const forest=images.get('forest');
             if(forest){
+                this.prepareScaledForest(forest);
                 this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
                 this.ensureTransitionBackdrop();
             }
