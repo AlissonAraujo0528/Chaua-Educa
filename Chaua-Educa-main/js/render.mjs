@@ -555,6 +555,11 @@ export class Renderer {
         c.globalAlpha=pending.target.forestAlpha;
         c.drawImage(forest,(this.w-fw)/2+pending.target.sourceDrift/this.dpr,(this.h-fh)/2,fw,fh);
         c.restore();
+        // A tile boundary is only a scheduling boundary if deferred Canvas
+        // raster work is actually completed here. A single-pixel readback
+        // flushes this offscreen stripe before it is ever published.
+        // Profile hardware GPU readback separately before approving.
+        c.getImageData(0,y0,1,1);
         if(pending.rowsDone===8){
             // Publish only a complete RGBA frame: never show a partially
             // repainted stripe, even during a camera shake or phase change.
