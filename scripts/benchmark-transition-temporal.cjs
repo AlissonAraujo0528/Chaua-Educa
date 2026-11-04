@@ -18,7 +18,6 @@ fs.mkdirSync(path,{recursive:true});
    const measurements=await page.evaluate(async()=>{
     const {Renderer}=await import('/js/render.mjs');
     const {images}=await import('/js/assets.mjs');
-    const colors=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
     const create=async()=>{
      const canvas=document.createElement('canvas');
      canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh';
@@ -35,11 +34,19 @@ fs.mkdirSync(path,{recursive:true});
     original.renderer.prepareStagedBackdrop=()=>null;
     const records=[];
     for(const stage of [2,3]){
-     // Reset to the exact prior season, including the prior forest opacity.
+     // Prime the exact displayed last frame of the PREVIOUS stage, including
+     // its real-time wind displacement. A drift=0 prewarm would falsely mark
+     // the first 8 frames as a visual jump, even though gameplay never starts
+     // the transition with a reset wind clock.
      for(const object of [original,optimized]){
       const r=object.renderer;
-      r.prepareFragmentedBackdrop(forest,colors[stage-1],0,stage===3?.6:1);
-      if(r.transitionBackdrop){r.transitionBackdrop.target=null;r.transitionBackdrop.rowsDone=0;}
+      if(r.transitionBackdrop){
+       r.transitionBackdrop.target=null;
+       r.transitionBackdrop.rowsDone=0;
+       r.transitionBackdrop.active=false;
+      }
+      r.base();
+      r.background(35,15500,stage-1,false,false,1);
      }
      const timeseries=[],n=160;
      for(let i=0;i<=n;i++){
