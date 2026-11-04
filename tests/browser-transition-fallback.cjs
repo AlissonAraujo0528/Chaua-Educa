@@ -1,6 +1,8 @@
-// Validate the production safety fallback for slow/unsupported 1px GPU readbacks.
+// Guard transitions against synchronous GPU readbacks and verify the direct-render fallback.
+// The optimized compositor does not call getImageData while painting staged stripes.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+
 (async()=>{
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox']});
  try{
@@ -13,33 +15,52 @@ const {chromium}=require('playwright');
    const {images}=await import('/js/assets.mjs');
    const samples=[];
    for(const fault of ['throw','stall']){
-    const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh';
+    const canvas=document.createElement('canvas');
+    canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh';
     document.body.append(canvas);
     const renderer=new Renderer(canvas);await renderer.ready;
-    const forest=images.get('forest');if(!forest)throw Error('Missing forest asset');
-    renderer.prepareFragmentedBackdrop(forest,'#dbe7b5',0,1);
-    const pending=renderer.ensureTransitionBackdrop();if(!pending)throw Error('Expected high-resolution transition buffer');
-    const original=pending.c.getImageData.bind(pending.c);
+    const forest=images.get('forest');
+    if(!forest)throw Error('Missing forest asset');
+    const normal=renderer.prepareFragmentedBackdrop(forest,'#dbe7b5',0,1);
+    const originalSurface=normal.surface;
+    const pending=renderer.ensureTransitionBackdrop();
+    if(!pending)throw Error('Expected high-resolution transition buffer');
+    const stagedSurface=pending.surface;
+    const originalRead=pending.c.getImageData.bind(pending.c);
+    let readCalls=0;
     pending.c.getImageData=(...args)=>{
+     readCalls++;
      if(fault==='throw')throw Error('Simulated unsupported GPU readback');
      const until=performance.now()+21;
      while(performance.now()<until){}
-     return original(...args);
+     return originalRead(...args);
     };
-    for(let i=0;i<3;i++){
-     renderer.base();renderer.background(35,15000,2,false,false,.5);
+    for(let i=0;i<8;i++){
+     renderer.base(false);
+     renderer.background(35,15000,2,false,false,.5);
+     if(i<7&&normal.surface!==originalSurface)
+      throw Error('Published partially painted transition at stripe '+i);
+     if(i===7&&normal.surface!==stagedSurface)
+      throw Error('Did not publish fully painted eighth stripe');
     }
-    if(!renderer.transitionRasterDisabled||renderer.transitionBackdrop!==null)
-     throw Error('Renderer failed to disable a broken or slow tile path');
-    renderer.base();renderer.background(35.6,16000,2,false,false,.65);
-    const data=renderer.c.getImageData(0,0,1,1).data;
-    samples.push({fault,disabled:renderer.transitionRasterDisabled,bufferReleased:pending.surface.width===0,
-     pixelAlpha:data[3],freshCache:!!renderer.fragmentedBackdrop});
+    if(readCalls!==0)throw Error('Transition performed synchronous GPU readback');
+    if(pending.rowsDone!==0||pending.target!==null)
+     throw Error('Transition state not reset after publishing full image');
+    // Explicitly disabling staging must choose the direct full-backdrop path.
+    renderer.transitionRasterDisabled=true;
+    if(renderer.ensureTransitionBackdrop()!==null)
+     throw Error('Direct fallback was not selected');
+    renderer.base(false);
+    renderer.background(35.6,16000,2,false,false,.65);
+    const pixelAlpha=renderer.c.getImageData(0,0,1,1).data[3];
+    samples.push({fault,readCalls,fullImagePublished:normal.surface===stagedSurface,
+     directFallback:true,pixelAlpha});
+    canvas.remove();
    }
    return samples;
   });
   assert.deepEqual(errors,[]);
-  assert.ok(result.every(x=>x.disabled&&x.bufferReleased&&x.freshCache&&x.pixelAlpha===255));
-  console.log('PASS transition GPU-readback fallback '+JSON.stringify(result));
+  assert.ok(result.every(x=>x.readCalls===0&&x.fullImagePublished&&x.directFallback&&x.pixelAlpha===255));
+  console.log('PASS transition staging: no blocking GPU readbacks, complete eight-stripe publish and direct fallback '+JSON.stringify(result));
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
