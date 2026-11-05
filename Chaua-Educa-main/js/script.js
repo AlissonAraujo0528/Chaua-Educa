@@ -26,10 +26,10 @@ const dialogs = [...document.querySelectorAll('dialog')];
 let player = '', selectedMode = 'aventura', previousState = '', board = 'aventura';
 let returnToMissionsResult = false;
 let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0;
-let resultAnimation = null, soundOn = false;
+let resultAnimation = null, soundOn = true;
 let assetsReady = false, lastOrientation = null;
 let flightMissionIds = [];
-try { soundOn = localStorage.getItem('chaua-sound') === 'true'; } catch { /* Optional preference. */ }
+try { const saved = localStorage.getItem('chaua-sound'); soundOn = saved === null ? true : saved === 'true'; } catch { soundOn = true; }
 
 const forestAudio=new ForestAudio();
 forestAudio.setEnabled(soundOn);
@@ -177,8 +177,30 @@ function updateSoundButton() {
     button.setAttribute('aria-label', soundOn ? 'Silenciar sons' : 'Ativar sons');
     $('.sound-slash').hidden = soundOn;
 }
-$('.sound-toggle').addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('chaua-sound', String(soundOn)); } catch { /* Optional. */ } updateSoundButton(); sound('fruit'); });
+$('.sound-toggle').addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('chaua-sound', String(soundOn)); } catch { /* Optional. */ } updateSoundButton();
+
+const unlockAudio = () => {
+    if (soundOn) {
+        forestAudio.ensure();
+        if (forestAudio.context && forestAudio.context.state === 'suspended') {
+            forestAudio.context.resume().catch(() => {});
+        }
+    }
+};
+['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true, once: true }));
+ sound('fruit'); });
 updateSoundButton();
+
+const unlockAudio = () => {
+    if (soundOn) {
+        forestAudio.ensure();
+        if (forestAudio.context && forestAudio.context.state === 'suspended') {
+            forestAudio.context.resume().catch(() => {});
+        }
+    }
+};
+['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true, once: true }));
+
 
 function answer(value) {
     if(game.state!=='quiz' || game.answerResult!==null)return;

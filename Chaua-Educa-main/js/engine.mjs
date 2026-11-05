@@ -53,10 +53,23 @@ export class Game {
     }
 
     snapshot() {
-        this.previous = { arrivalOffset:this.arrival?.offset||0, refugeX:this.refuge?.x, y: this.y, angle: this.angle,
-            distance:this.distance, elapsed:this.elapsed, sceneTime:this.sceneTime, stage:this.stage, stageAge:this.stageAge,
-            wing:this.wing, flapImpulse:this.flapImpulse,
-            entities:new Map(this.entities.map(e => [e.id, {x:e.x, y:e.y, tumbleAngle:e.tumbleAngle, retreatTime:e.snake?.retreatTime,snakeAge:e.snake?.age,snakePhase:e.snake?.phase,snakePhaseAge:e.snake?.phaseAge,snakeWarningAge:e.snake?.warningAge,hawkRetreatTime:e.retreatTime}])) };
+        if (!this._prevEntityMap) Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
+        else this._prevEntityMap.clear();
+        for (let i = 0; i < this.entities.length; i++) {
+            const e = this.entities[i];
+            this._prevEntityMap.set(e.id, {
+                x: e.x, y: e.y, tumbleAngle: e.tumbleAngle,
+                retreatTime: e.snake?.retreatTime, snakeAge: e.snake?.age,
+                snakePhase: e.snake?.phase, snakePhaseAge: e.snake?.phaseAge,
+                snakeWarningAge: e.snake?.warningAge, hawkRetreatTime: e.retreatTime
+            });
+        }
+        this.previous = {
+            arrivalOffset: this.arrival?.offset || 0, refugeX: this.refuge?.x, y: this.y, angle: this.angle,
+            distance: this.distance, elapsed: this.elapsed, sceneTime: this.sceneTime, stage: this.stage, stageAge: this.stageAge,
+            wing: this.wing, flapImpulse: this.flapImpulse,
+            entities: this._prevEntityMap
+        };
     }
 
     visual(alpha) {
@@ -106,8 +119,12 @@ export class Game {
     }
 
     get x() { return 220 + (this.arrival?.offset || 0); }
-    get body() { return { x: this.x - 18, y: this.y - 18, w: 36, h: 36 }; }
-    get speed() { return (FLIGHT[this.mode].speed + Math.min(FLIGHT[this.mode].speedGain, this.elapsed * .45)) * (this.pepper > 0 ? 1.35 : 1); }
+    get body() { return { x: this.x - 20, y: this.y - 20, w: 40, h: 40 }; }
+    get speed() {
+        const p = FLIGHT[this.mode];
+        const gain = this.mode === 'aventura' ? Math.min(185, this.elapsed * 0.45 + Math.max(0, this.elapsed - 40) * 0.35) : Math.min(p.speedGain, this.elapsed * 0.45);
+        return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1);
+    }
     start(mode = 'aventura', reviewIds = [], seed = Math.floor(Math.random()*4294967296)) { this.seed=seed>>>0; this.reset(mode); this.reviewIds = [...reviewIds]; this.state = 'countdown'; }
 
     startTutorial() {
