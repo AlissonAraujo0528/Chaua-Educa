@@ -17,7 +17,7 @@ const validTime=t=>Number.isFinite(t)?Math.max(0,t):0;
 
 export function snakeA2Pose(s={},reduced=false){
  if(s.retreat){
-  if(!s.dazed)return null;
+  if(!s.dazed)return {key:'idle',frame:7,state:'retreat'};
   return {key:'stunned',frame:reduced?3:frame(validTime(s.retreatTime)/.85,8),state:'shield-stunned'};
  }
  if(reduced)return {key:'idle',frame:0,state:'idle'};

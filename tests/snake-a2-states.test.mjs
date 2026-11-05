@@ -27,7 +27,7 @@ test('shield daze alone uses reaction art and reduced motion is static',()=>{
  assert.equal(snakeA2Pose({retreat:true,dazed:true,retreatTime:0}).frame,0);
  assert.equal(snakeA2Pose({retreat:true,dazed:true,retreatTime:.84}).frame,7);
  assert.equal(snakeA2Pose({retreat:true,dazed:true,retreatTime:.3},true).frame,3);
- assert.equal(snakeA2Pose({retreat:true,dazed:false}),null);
+ assert.deepEqual(snakeA2Pose({retreat:true,dazed:false}),{key:'idle',frame:7,state:'retreat'});
  assert.equal(snakeA2Pose({phase:'striking'},true).key,'idle');
 });
 test('without optional binary art, production fallback remains functional',async()=>{
