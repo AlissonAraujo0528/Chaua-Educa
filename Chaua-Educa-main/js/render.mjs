@@ -1,4 +1,5 @@
 import {drawContinuousSnake} from './snake-render.mjs';
+import {drawSnakeA2,preloadSnakeA2} from './snake-a2.mjs';
 import {SNAKE_WRAP} from './snake-wrap-data.mjs';
 import {drawLivingTrunk,drawRefugeTree} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
@@ -477,7 +478,7 @@ export class Renderer {
         // so wind drift and 8-stripe transitions blit 1:1 without bilinear rescaling.
         this.scaledForestCacheEnabled = true;
         this.cachedView = null;
-        this.ready = loadAssets().then(() => {
+        this.ready = Promise.all([loadAssets(),preloadSnakeA2()]).then(() => {
             this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
             // Warm up pickup radial caches during asset load so first spawn never stalls.
             getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
@@ -1096,9 +1097,12 @@ export class Renderer {
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
         if(s.retreat)c.globalAlpha=Math.max(0,1-smoothstep(((s.retreatTime||0)-.95)/.35));
-        const wrap=images.get('snake-wrap');
-        if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
-        drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);c.restore();
+        if(!drawSnakeA2(c,s,place.factor,reduced)){
+            const wrap=images.get('snake-wrap');
+            if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
+            drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);
+        }
+        c.restore();
     }
     flightBorders(view) {}
     hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false) {
