@@ -1,0 +1,54 @@
+name: V2 audit source and real action sprite tests
+on:
+  push:
+    branches:
+      - audit/chaua-otimizado-v2-premerge-20261106
+  workflow_dispatch:
+jobs:
+  validate-art:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check image atlas integrity
+        run: node scripts/verify-all-9-spritesheets.cjs
+      - name: Test deterministic animation states
+        run: node --test tests/action-states.test.mjs tests/snake-a2-states.test.mjs
+      - name: Install browser for real sprite QA
+        run: npx playwright install --with-deps chromium
+      - name: Test nine actual WebP sheets and fallback in Chromium
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main >/tmp/v2-audit-http.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null' EXIT
+          node tests/browser-real-action-sprites.cjs
+          node tests/browser-action-sprites.cjs
+      - name: Export exact V2 audit source
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: chaua-v2-premerge-audit-source
+          path: |
+            Chaua-Educa-main
+            tests
+            scripts
+            docs
+            package.json
+            package-lock.json
+            README.md
+          compression-level: 1
+          if-no-files-found: error
+      - name: Export real art test captures
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: chaua-v2-premerge-art-QA
+          path: |
+            test-results/
+          compression-level: 5
+          if-no-files-found: ignore
