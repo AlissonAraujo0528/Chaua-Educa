@@ -767,9 +767,129 @@ export class Renderer {
         }
         return normal;
     }
+    drawAtmosphere(c, w, h, stage, stageMix, time, reduced, lowDetail) {
+        if (!w || !h || !Number.isFinite(w) || !Number.isFinite(h)) return;
+        c.save();
+        const wind = reduced ? 0 : Math.sin(time * 0.22);
+        // Stage 0: Golden Morning God Rays & Pollen
+        if (stage === 0 || (stage === 1 && stageMix < 1)) {
+            const alpha = stage === 0 ? 1 : 1 - stageMix;
+            c.save();
+            c.globalAlpha = alpha;
+            const rayGrad = c.createLinearGradient(0, 0, 0, h);
+            rayGrad.addColorStop(0, '#fff7c640');
+            rayGrad.addColorStop(0.5, '#ffe59620');
+            rayGrad.addColorStop(1, '#ffe59600');
+            c.fillStyle = rayGrad;
+            c.save();
+            c.translate(wind * 20, 0);
+            c.beginPath();
+            const rayCount = lowDetail ? 3 : 5;
+            for (let i = 0; i < rayCount; i++) {
+                const topX = w * (0.35 + i * 0.14);
+                const botX = w * (0.05 + i * 0.16);
+                c.moveTo(topX, 0); c.lineTo(topX + 55, 0);
+                c.lineTo(botX + 130, h); c.lineTo(botX, h);
+            }
+            c.fill();
+            c.restore();
+            c.fillStyle = '#ffefa390';
+            c.beginPath();
+            const sporeCount = lowDetail ? 14 : 32;
+            for (let i = 0; i < sporeCount; i++) {
+                const px = ((i * 127.3 + (reduced ? 0 : Math.sin(time * 0.3 + i * 2) * 26 + time * 14)) % w + w) % w;
+                const py = ((i * 83.1 - (reduced ? 0 : time * 18)) % h + h) % h;
+                const r = 1.2 + (i % 3) * 0.7;
+                c.moveTo(px + r, py); c.arc(px, py, r, 0, TAU);
+            }
+            c.fill();
+            c.restore();
+        }
+        // Stage 1: Deep Rainforest Canopy Mist Banks & Dew
+        if (stage === 1 || (stage === 0 && stageMix > 0) || (stage === 2 && stageMix < 1)) {
+            const alpha = stage === 1 ? (stageMix < 1 ? stageMix : 1) : (stage === 0 ? stageMix : 1 - stageMix);
+            c.save();
+            c.globalAlpha = alpha;
+            if (!lowDetail) {
+                c.fillStyle = '#cce8d618';
+                for (let i = 0; i < 3; i++) {
+                    const drift = reduced ? 0 : Math.sin(time * 0.15 + i * 2.2) * 40 + time * 8;
+                    const mx = ((w * (0.2 + i * 0.35) + drift) % (w + 200)) - 100;
+                    const my = h * (0.42 + i * 0.18);
+                    c.beginPath(); c.ellipse(mx, my, w * 0.45, h * 0.08, 0, 0, TAU); c.fill();
+                }
+            }
+            c.fillStyle = '#d5edd870';
+            c.beginPath();
+            const dewCount = lowDetail ? 12 : 24;
+            for (let i = 0; i < dewCount; i++) {
+                const px = ((i * 143.7 + (reduced ? 0 : Math.sin(time * 0.25 + i) * 18)) % w + w) % w;
+                const py = ((i * 91.3 + (reduced ? 0 : time * 32)) % h + h) % h;
+                c.moveTo(px + 1.4, py); c.arc(px, py, 1.4, 0, TAU);
+            }
+            c.fill();
+            c.restore();
+        }
+        // Stage 2: Fragmented Forest Wind Streaks & Swirling Leaves
+        if (stage === 2 || (stage === 1 && stageMix > 0) || (stage === 3 && stageMix < 1)) {
+            const alpha = stage === 2 ? (stageMix < 1 ? stageMix : 1) : (stage === 1 ? stageMix : 1 - stageMix);
+            c.save();
+            c.globalAlpha = alpha;
+            if (!reduced) {
+                c.strokeStyle = '#ffffff28';
+                c.lineWidth = 1.8;
+                c.setLineDash([18, 28]);
+                const streakSpeed = time * 260;
+                for (let i = 0; i < (lowDetail ? 3 : 5); i++) {
+                    const sy = h * (0.25 + i * 0.14);
+                    const sx = w - ((streakSpeed + i * 240) % (w + 400));
+                    c.beginPath(); c.moveTo(sx, sy);
+                    c.bezierCurveTo(sx + 100, sy - 15, sx + 220, sy + 20, sx + 340, sy - 8);
+                    c.stroke();
+                }
+                c.setLineDash([]);
+                for (let i = 0; i < (lowDetail ? 2 : 5); i++) {
+                    const lx = w - (((time * 160 + i * 190) % (w + 100)));
+                    const ly = h * (0.2 + (i * 0.17)) + Math.sin(time * 2.5 + i) * 22;
+                    leaf(c, lx, ly, 5.5, time * 3.5 + i * 1.5, i % 2 ? '#d2964e' : '#a86532', '#693e1e');
+                }
+            }
+            c.restore();
+        }
+        // Stage 3: Refuge Twilight Sunset Glow & Fireflies
+        if (stage === 3 || (stage === 2 && stageMix > 0)) {
+            const alpha = stage === 3 ? (stageMix < 1 ? stageMix : 1) : stageMix;
+            c.save();
+            c.globalAlpha = alpha;
+            const twilight = c.createLinearGradient(0, 0, 0, h);
+            twilight.addColorStop(0, '#ffa85922');
+            twilight.addColorStop(0.5, '#ff8c6918');
+            twilight.addColorStop(1, '#ffc07800');
+            c.fillStyle = twilight;
+            c.fillRect(0, 0, w, h);
+            const fireflyCount = lowDetail ? 8 : 18;
+            for (let i = 0; i < fireflyCount; i++) {
+                const pulse = reduced ? 0.6 : 0.4 + Math.sin(time * 3.8 + i * 2.1) * 0.35;
+                const fx = ((i * 157.9 + (reduced ? 0 : Math.sin(time * 0.4 + i) * 35 + time * 12)) % w + w) % w;
+                const fy = ((i * 88.4 + (reduced ? 0 : Math.cos(time * 0.3 + i * 1.7) * 25 - time * 10)) % h + h) % h;
+                c.save();
+                c.globalAlpha = alpha * pulse;
+                const fGlow = c.createRadialGradient(fx, fy, 1, fx, fy, 9);
+                fGlow.addColorStop(0, '#fff49e');
+                fGlow.addColorStop(0.4, '#ffd24766');
+                fGlow.addColorStop(1, '#ffaa0000');
+                oval(c, fx, fy, 9, 9, fGlow);
+                oval(c, fx, fy, 2, 2, '#ffffff');
+                c.restore();
+            }
+            c.restore();
+        }
+        c.restore();
+    }
+
     background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
         if (reduced) offset = 0;
-        const c = this.c, w = this.w, h = this.h;
+        const c = this.c, w = this.w || this.canvas.width || 800, h = this.h || this.canvas.height || 600;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
         const forest=images.get('forest');
@@ -830,28 +950,19 @@ export class Renderer {
         }
         const transition=stageMix;
         c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
-        // Sunlight and shade breathe slowly with the same wind as leaves and vines.
-        c.fillStyle = '#ffffcb10';
-        c.save();c.translate(reduced?0:Math.sin(time*.22)*18,0);
-        c.beginPath();
-        for (let i = 0; i < 3; i++) {
-            c.moveTo(w * .65 + i * 95, 0);
-            c.lineTo(w * .65 + 45 + i * 95, 0);
-            c.lineTo(w * .13 + i * 110, h);
-            c.lineTo(w * .13 - 120 + i * 110, h);
+        if (!home) {
+            this.drawAtmosphere(c, w, h, stage, stageMix, time, reduced, this.decoration === 'low');
+        } else {
+            c.fillStyle = '#ffedb275';
+            c.beginPath();
+            for (let i = 0; i < 12; i++) {
+                const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
+                const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
+                c.moveTo(x + 1.6, y);
+                c.arc(x, y, 1.6, 0, TAU);
+            }
+            c.fill();
         }
-        c.fill();
-        c.restore();
-        c.fillStyle = '#ffedb275';
-        c.beginPath();
-        const dustCount = this.decoration==='low'?8:23;
-        for (let i = 0; i < dustCount; i++) {
-            const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
-            const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
-            c.moveTo(x + 1.6, y);
-            c.arc(x, y, 1.6, 0, TAU);
-        }
-        c.fill();
         if (home) {
             const wash = c.createLinearGradient(0, 0, w * .7, 0);
             wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');
@@ -1063,7 +1174,11 @@ export class Renderer {
                 c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
                 if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
                 else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
-                else if(p.spark) oval(c,p.x,p.y,2,2,p.color);
+                else if(p.puff) {
+                    const scale = 1 + (1 - p.life / (p.maxLife ?? .28)) * 1.6;
+                    oval(c, p.x, p.y, (p.size || 4) * scale, (p.size || 4) * scale * 0.7, p.color);
+                }
+                else if(p.spark) oval(c,p.x,p.y,p.size||2,p.size||2,p.color);
                 else leaf(c,p.x,p.y,3,p.life*5,p.color,p.color);
             }
         }
@@ -1108,6 +1223,19 @@ export class Renderer {
         if(!e.broken||e.brokenSide!=='top')this.trunk(`trunk-${variant}`,null,cx,e.top,true,time,variant);
         if(!e.broken||e.brokenSide!=='bottom'){
             this.trunk(`trunk-${variant}`,null,cx,e.bottom,false,time,e.variant==='branch'?3:variant);
+            if(e.variant === 'branch' && !reduced && this.decoration !== 'low') {
+                const sway = Math.sin(time * 2.8 + (e.id ?? 0)) * 0.12;
+                c.save();
+                c.translate(cx - 38, e.bottom - 4);
+                c.rotate(-0.35 + sway);
+                leaf(c, 0, 0, 16, sway * 0.8, '#8ab85d', '#497c38');
+                c.restore();
+                c.save();
+                c.translate(cx - 52, e.bottom + 8);
+                c.rotate(-0.6 + sway * 1.2);
+                leaf(c, 0, 0, 13, sway, '#9ec86e', '#558742');
+                c.restore();
+            }
             if(e.snake)this.snake(e,reduced);
         }
     }
@@ -1172,8 +1300,10 @@ export class Renderer {
     }
 
     pickup(e, time, reduced) {
-        const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 2;
+        const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 3;
+        const pulse = reduced ? 1 : 1 + Math.sin(time * 3.2 + e.id) * 0.07;
         c.save(); c.translate(e.x, e.y);
+        c.scale(pulse, pulse);
         if (e.kind === 'fruit') {
             const glowSurface = getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
             if (glowSurface) c.drawImage(glowSurface, -28, float - 28, 56, 56);
@@ -1187,6 +1317,10 @@ export class Renderer {
                 const scale = 50 / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * scale / 2, float - image.naturalHeight * scale / 2, image.naturalWidth * scale, image.naturalHeight * scale);
             } else clay(c, 0, float, 18, 20, '#edbb66', '#cb7c42');
+            if (!reduced && this.decoration !== 'low') {
+                const sa = time * 2.5 + e.id * 1.5;
+                drawMiniSparkle(c, Math.cos(sa) * 22, Math.sin(sa) * 16 + float, 3, time * 5);
+            }
         } else if (e.kind === 'pepper') {
             const glowSurface = getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
             if (glowSurface) c.drawImage(glowSurface, -36, -36, 72, 72);
@@ -1245,6 +1379,11 @@ export class Renderer {
                 const targetSize = gold ? 64 : 58;
                 const factor = targetSize / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * factor / 2, float - image.naturalHeight * factor / 2, image.naturalWidth * factor, image.naturalHeight * factor);
+            }
+            if (!reduced && this.decoration !== 'low') {
+                const sa = time * 2.8 + e.id * 2;
+                drawMiniSparkle(c, Math.cos(sa) * 28, Math.sin(sa) * 20 + float, gold ? 4.5 : 3.5, time * 6);
+                drawMiniSparkle(c, Math.cos(sa + Math.PI) * 24, Math.sin(sa + Math.PI) * 18 + float, 3, time * 5 + 1);
             }
             if (gold) {
                 c.fillStyle = '#fff4c2'; c.font = '900 12px Nunito'; c.textAlign = 'center';

@@ -88,8 +88,12 @@ export function snakeA2HitsPlayer(wood,playerPolygons,reduced=false){
 // 56 logical pixels includes the fruit halo, its bobbing motion and
 // a visible air gap around the snake.
 export function snakeA2FruitHasClearance(wood,x,y,radius=56){
- if(!isSnakeA2Ready())return true;
  const place=snakePlacement(wood);
+ if(!isSnakeA2Ready()){
+  const dx=Math.abs(x-place.x),dy=place.y-y;
+  if(dx<95&&dy>0&&dy<210)return false;
+  return true;
+ }
  const [colStart,colEnd]=candidateRange(x,radius,place.x,SNAKE_A2_GRID.anchorX,place.factor);
  const [rowStart,rowEnd]=candidateRange(y,radius,place.y,SNAKE_A2_GRID.anchorY,place.factor);
  const r2=radius*radius;

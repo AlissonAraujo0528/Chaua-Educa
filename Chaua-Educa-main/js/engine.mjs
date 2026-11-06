@@ -154,6 +154,21 @@ export class Game {
         this.pendingTap = 0;
         this.wing = 1;
         this.flapImpulse = 1.0;
+        if (!this.reducedMotion && this.state === 'playing') {
+            for(let i=0;i<3;i++) {
+                const angle = Math.PI * 0.65 + (i - 1) * 0.25;
+                this.particle({
+                    x: this.x - 12 + (i - 1) * 8,
+                    y: this.y + 16,
+                    vx: -Math.cos(angle) * (50 + i * 20),
+                    vy: Math.sin(angle) * (60 + i * 15),
+                    life: .28, maxLife: .28,
+                    color: '#e4f4d270',
+                    puff: true,
+                    size: 3 + i * 1.5
+                });
+            }
+        }
         this.onEvent({type:'flap'});
     }
 
@@ -312,7 +327,7 @@ export class Game {
         }
         this.onEvent({ type: 'fruit', fruit: FRUITS[entity.variety ?? 0].id });
         this.collectPulse=.26;
-        this.burst(entity.x, entity.y, multiplier>=2?'#ffe39a':'#bce77f', 12);
+        this.fruitBurst(entity.x, entity.y, entity.variety ?? 0, multiplier);
         this.quizPending = true; // One pending discovery, regardless of fruit count.
     }
 
@@ -339,6 +354,45 @@ export class Game {
         this.cancelInput();
         this.nextSpawn = Math.max(this.nextSpawn, 1.5);
         return true;
+    }
+
+    fruitBurst(x, y, variety, multiplier = 1) {
+        const PALETTES = [
+            ['#e0536c', '#f58ea1', '#85bb57', '#ffe894'],
+            ['#d4a366', '#a16e38', '#ffe596', '#7bb850'],
+            ['#ffb03a', '#ff7824', '#ffdc69', '#66bb46'],
+            ['#ff7b2b', '#ffa245', '#332219', '#ffe27d'],
+            ['#6ea644', '#99cf64', '#557d38', '#ffd875'],
+            ['#ffdf40', '#ffe875', '#c8ae32', '#6fb846'],
+            ['#ffcc22', '#ffe666', '#7ec850', '#ffffff']
+        ];
+        const colors = PALETTES[(variety ?? 0) % PALETTES.length];
+        const count = 12;
+        for (let i = 0; i < count; i++) {
+            const a = i * Math.PI * 2 / count;
+            const speed = 65 + (i * 31) % 85;
+            this.particle({
+                x, y,
+                vx: Math.cos(a) * speed,
+                vy: Math.sin(a) * speed - 30,
+                life: .55, maxLife: .55,
+                color: multiplier >= 2 ? '#ffe39a' : colors[i % colors.length],
+                spark: true,
+                size: 2.2 + (i % 3) * 1.2
+            });
+        }
+        for (let j = 0; j < 3; j++) {
+            const angle = -Math.PI * 0.5 + (j - 1) * 0.7;
+            this.particle({
+                x: x + (j - 1) * 8, y: y - 5,
+                vx: Math.cos(angle) * 35,
+                vy: Math.sin(angle) * 45 - 20,
+                life: .65, maxLife: .65,
+                color: '#fff9cf',
+                spark: true,
+                size: 3
+            });
+        }
     }
 
     burst(x, y, color, count) {
@@ -460,7 +514,7 @@ export class Game {
             this.entities.push(wood);
         }
         const fruits=hawkAlone?[{x:15,y:center}]:plan.fruits;
-        const nearbySnakes = isSnakeA2Ready() ? this.entities.filter(entity => entity.kind === 'wood' && entity.snake) : [];
+        const nearbySnakes = this.entities.filter(entity => entity.kind === 'wood' && entity.snake);
         const placedFruits=[];
         const corridorTop = center - encounterGap / 2 + 55;
         const corridorBottom = center + encounterGap / 2 - (hasSnake ? 200 : 55);
@@ -471,6 +525,13 @@ export class Game {
                 const corridorCenter = (corridorTop + corridorBottom) / 2;
                 fy = corridorCenter + (point.y - center) * 0.35;
                 fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
+            }
+            for (const s of nearbySnakes) {
+                if (Math.abs(fx - (s.x + 29)) < 110) {
+                    const safeLimit = Math.min(corridorBottom, s.bottom - 200);
+                    if (fy > safeLimit) fy = safeLimit;
+                    fy = Math.max(corridorTop, fy);
+                }
             }
             if (nearbySnakes.some(wood => !snakeA2FruitHasClearance(wood,fx,fy))) {
                 const placed = placeA2Fruit(nearbySnakes,fx,fy,corridorTop,corridorBottom,placedFruits);
@@ -595,6 +656,12 @@ export class Game {
                 }
                 // Broad-phase horizontal check: livingWoodRects span at most [e.x - 73, e.x + 108]
                 if (e.x + 115 >= px - 28 && e.x - 80 <= px + 28) {
+                    if (!e.grazed && !this.reducedMotion && this.state === 'playing') {
+                        if (Math.abs(this.y - e.top) < 60 || Math.abs(this.y - e.bottom) < 60) {
+                            e.grazed = true;
+                            this.leafBurst(this.x, this.y > (e.top + e.bottom)/2 ? e.bottom : e.top, 3);
+                        }
+                    }
                     const pBody = getPlayerBody();
                     const woodHit = this.woodRects(e).find(rect => shapesHitRect(pBody,rect));
                     if (woodHit) { e.hitRect=woodHit; e.hitPart = woodHit.part; e.hitSide = woodHit.y >= e.bottom ? 'bottom' : 'top'; this.collide(e); }
