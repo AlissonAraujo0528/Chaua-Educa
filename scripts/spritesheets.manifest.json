@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "spritesheets": [
+    {
+      "path": "Chaua-Educa-main/public/hawk/animations/stunned.webp",
+      "bytes": 132268,
+      "sha256": "3ae1b5a8fe18e8f88663c61015f2cea5c1e21a617f7b983c0366bef63bacf201",
+      "width": 960,
+      "height": 640
+    },
+    {
+      "path": "Chaua-Educa-main/public/hawk/fly/flight.webp",
+      "bytes": 114656,
+      "sha256": "3bddfd278dbe6377e57fc18d36f593b0178737f08ed6b37f447e4df444c32d9b",
+      "width": 1280,
+      "height": 640
+    },
+    {
+      "path": "Chaua-Educa-main/public/parrot/animations/impact.webp",
+      "bytes": 56852,
+      "sha256": "11fd0c99325e943f388289da94819e9703b3ddbc5af99deccc88a93c59da4ec3",
+      "width": 768,
+      "height": 512
+    },
+    {
+      "path": "Chaua-Educa-main/public/parrot/fly/flight.webp",
+      "bytes": 57604,
+      "sha256": "a0aae8104778dd8891863b808adbff35ed5a9fb7e4091dd17345e2710b85b064",
+      "width": 1024,
+      "height": 512
+    },
+    {
+      "path": "Chaua-Educa-main/public/snake/animations/strike.webp",
+      "bytes": 50342,
+      "sha256": "4a72ed14efbfe0a0ad76c8b4ed7a37bfbdd1d7ac232ade43a21926b017ba8727",
+      "width": 960,
+      "height": 640
+    },
+    {
+      "path": "Chaua-Educa-main/public/snake/animations/stunned.webp",
+      "bytes": 60560,
+      "sha256": "e29a47526ae1b9ea98d940649565cc6e58bb7fa58cbc3526de119f51ce3693b7",
+      "width": 960,
+      "height": 640
+    },
+    {
+      "path": "Chaua-Educa-main/public/snake/attack/attack.webp",
+      "bytes": 164888,
+      "sha256": "9981f76b27ab67845b2683a06b402e85c4386593fbad6b0bd45662c6e12d1b4e",
+      "width": 1536,
+      "height": 768
+    },
+    {
+      "path": "Chaua-Educa-main/public/snake/base/idle.webp",
+      "bytes": 154728,
+      "sha256": "91c1a3e253f3935fe86923c642eb918509033949f67a1cdcb1c011951b127311",
+      "width": 1536,
+      "height": 768
+    },
+    {
+      "path": "Chaua-Educa-main/public/snake/reactions/stunned.webp",
+      "bytes": 184108,
+      "sha256": "d0f12f60db0bd509a74b41008a88c205d72169ac6b219524bd220763dad5a493",
+      "width": 1536,
+      "height": 768
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import {drawContinuousSnake} from './snake-render.mjs';
 import {drawSnakeA2,preloadSnakeA2} from './snake-a2.mjs';
-import {parrotAction,hawkAction,snakeAction} from './action-states.mjs';
+import {parrotAction,hawkAction} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
 import {SNAKE_WRAP} from './snake-wrap-data.mjs';
 import {drawLivingTrunk,drawRefugeTree} from './tree-art.mjs';
@@ -449,10 +449,11 @@ function getPepperSprite() {
 export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
-    defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null
+    defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
+    shieldHitAge = null
 }) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing});
+    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge});
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
@@ -1108,17 +1109,12 @@ export class Renderer {
         if(!drawSnakeA2(c,s,place.factor,reduced)){
             const wrap=images.get('snake-wrap');
             if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
-            const action=snakeAction(s,reduced);
-            let newSnake=false;
-            if(action){
-                c.save();
-                c.scale(-1,1);
-                newSnake=drawActionSheet(c,action.sheet,action.frame,-113,-147,170,240);
-                c.restore();
-            }
-            if(!newSnake)drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);
+            // Rejected legacy snake sheet includes a duplicate coil and must
+            // never be rendered over the historical snake-wrap. A2 is the
+            // only full-body replacement; otherwise draw original art.
+            drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced,wood.id);
         }
-        if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,wood.time||0);
+        if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
         c.restore();
     }
     flightBorders(view) {}
