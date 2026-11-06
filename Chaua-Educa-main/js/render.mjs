@@ -9,7 +9,7 @@ import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,snakePlacement,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import { canvasResolution } from './quality.mjs';
-import { flightViewport, warningPosition, snakeWarningPosition } from './viewport.mjs';
+import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { FRUITS } from './fruits.mjs';
@@ -894,7 +894,14 @@ export class Renderer {
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4));
-        const view = this.getViewport();
+        const baseView = this.getViewport();
+        // Follow the player only on screens that cannot fit the full world at
+        // the improved sprite scale. The camera does not touch gameplay math.
+        const resetCamera=!Number.isFinite(this.cameraTime)||sceneTime<this.cameraTime;
+        this.cameraTop=advanceFlightCamera(baseView,game.y,
+            resetCamera?undefined:this.cameraTop,sceneTime-(this.cameraTime??sceneTime),reduced);
+        this.cameraTime=sceneTime;
+        const view={...baseView,worldTop:this.cameraTop};
         const s = view.scale;
         // Tiny, muted butterflies stay in the distant layer; no pickup glow or collision.
         c.save();c.globalAlpha=.32;
@@ -914,9 +921,9 @@ export class Renderer {
             shakeX = Math.sin(game.shakeTime * 65) * mag;
             shakeY = Math.cos(game.shakeTime * 80) * mag;
         }
-        c.save(); c.beginPath(); c.rect(view.x, 0, view.w, this.h); c.clip();
-        c.translate(view.x - view.worldLeft * s + shakeX, view.y + shakeY); c.scale(s, s);
-        c.beginPath(); c.rect(view.worldLeft - 120, -600, Math.max(WIDTH, view.worldWidth) + 240, HEIGHT + 1200); c.clip();
+        c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
+        c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY); c.scale(s, s);
+        c.beginPath(); c.rect(view.worldLeft - 120, view.worldTop - 600, Math.max(WIDTH, view.worldWidth) + 240, view.worldHeight + 1200); c.clip();
         if (game.pepper > 0) {
             c.save();
             const remaining = Math.min(1, game.pepper / 2);
