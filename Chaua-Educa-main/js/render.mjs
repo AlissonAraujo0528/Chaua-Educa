@@ -1105,12 +1105,18 @@ export class Renderer {
     snake(wood,reduced){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
-        if(s.retreat)c.globalAlpha=Math.max(0,1-smoothstep(((s.retreatTime||0)-.95)/.35));
+        if(s.retreat)c.globalAlpha=Math.max(0,1-smoothstep(((s.retreatTime||0)-1.8)/.45));
         if(!drawSnakeA2(c,s,place.factor,reduced)){
             const wrap=images.get('snake-wrap');
             if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
             const action=snakeAction(s,reduced);
-            const newSnake=!!action&&drawActionSheet(c,action.sheet,action.frame,-113,-147,170,240);
+            let newSnake=false;
+            if(action){
+                c.save();
+                c.scale(-1,1);
+                newSnake=drawActionSheet(c,action.sheet,action.frame,-113,-147,170,240);
+                c.restore();
+            }
             if(!newSnake)drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);
         }
         c.restore();

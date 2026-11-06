@@ -18,7 +18,17 @@ const validTime=t=>Number.isFinite(t)?Math.max(0,t):0;
 export function snakeA2Pose(s={},reduced=false){
  if(s.retreat){
   if(!s.dazed)return {key:'idle',frame:7,state:'retreat'};
-  return {key:'stunned',frame:reduced?3:frame(validTime(s.retreatTime)/.85,8),state:'shield-stunned'};
+  const t=validTime(s.retreatTime);
+  // Initial recoil/impact frames for the first 0.85s, then continuous dazed wobble
+  let f;
+  if(t<0.85){
+    f=frame(t/.85,8);
+  } else {
+    // Loop the dazed wobble expression (frames 4, 5, 6, 7) so the stunned snake stays visibly dazed
+    const loop=[4,5,6,7,6,5];
+    f=loop[Math.floor((t-0.85)*5)%loop.length];
+  }
+  return {key:'stunned',frame:reduced?3:f,state:'shield-stunned'};
  }
  if(reduced)return {key:'idle',frame:0,state:'idle'};
  switch(s.phase){
@@ -58,7 +68,10 @@ export function drawSnakeA2(c,s,factor,reduced=false){
  if(!image)return false;
  const {columns,cell,anchorX,anchorY}=SNAKE_A2_GRID;
  const sx=pose.frame%columns*cell,sy=Math.floor(pose.frame/columns)*cell;
- // No historical wrap, second head, Canvas-painted teeth or tongue.
+ // The authored sheet faces right; flip horizontally so the snake faces left towards the incoming parrot.
+ c.save();
+ c.scale(-1, 1);
  c.drawImage(image,sx,sy,cell,cell,-anchorX*factor,-anchorY*factor,cell*factor,cell*factor);
+ c.restore();
  return true;
 }
