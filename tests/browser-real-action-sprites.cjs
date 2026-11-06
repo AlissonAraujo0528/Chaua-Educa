@@ -26,7 +26,7 @@ const cases=[
    const page=await browser.newPage({viewport:vp,deviceScaleFactor:1});
    const errs=[];
    page.on('pageerror',e=>errs.push(e.message));
-   await page.goto('http://127.0.0.1:5501/'+(mode==='new'?'?actionSprites=1':''),{waitUntil:'domcontentloaded'});
+   await page.goto('http://127.0.0.1:5501/'+(mode==='new'?'?snakeA2=0':'?actionSprites=0&snakeA2=0'),{waitUntil:'domcontentloaded'});
    await page.fill('#inputPlayer','Revisao visual');
    await page.waitForFunction(()=>!document.querySelector('#btnStart').disabled,{timeout:30000});
    await page.locator('#btnStart').evaluate(el=>el.click());

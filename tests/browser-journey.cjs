@@ -14,14 +14,15 @@ const {chromium}=require('playwright');
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
    await page.locator('#inputPlayer').fill('Voo completo');await page.locator(`input[value=${mode}]`).check();await page.locator('#btnStart:not([disabled])').click();
    const summary=await page.evaluate(async()=>{
-    const {game:g}=await import('/js/script.js');const {flightViewport}=await import('/js/viewport.mjs');
+    const {game:g}=await import('/js/script.js');const {isSnakeA2Ready}=await import('/js/snake-a2.mjs');
+    if(!isSnakeA2Ready())throw Error('A2 must load on the default game URL');const {flightViewport}=await import('/js/viewport.mjs');
     g.start(g.mode,[],104);let pending=null,nextDecision=0,hits=new Set(),stages=new Set();
     for(let frame=0;frame<7000;frame++){
      if(g.state==='playing'){
       const v=flightViewport(innerWidth,innerHeight),right=v.worldLeft+v.w/v.scale;
       const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x&&e.x<=right);
       const hawk=g.entities.find(e=>e.kind==='hawk'&&!e.harmless&&!e.retreat&&e.x+60>g.x);
-      let target=wood?(wood.top+wood.bottom)/2:320;
+      let target=wood?(wood.snake?(wood.top+55+wood.bottom-200)/2:(wood.top+wood.bottom)/2):320;
       if(!wood&&hawk){const t=Math.max(0,Math.min(1,(hawk.startX-g.x)/(hawk.startX-hawk.targetX)));const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;target=lane>=320?Math.max(145,lane-125):Math.min(495,lane+125);}
       if(g.elapsed>=nextDecision){nextDecision=g.elapsed+1/30;const predicted=g.y+g.vy*.12+450*.12**2;if(pending===null&&predicted>target+10&&g.vy>0)pending=g.elapsed+.12;}
       if(pending!==null&&g.elapsed>=pending){window.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));pending=null;}

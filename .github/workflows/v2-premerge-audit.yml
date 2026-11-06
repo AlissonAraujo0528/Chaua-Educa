@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - audit/chaua-otimizado-v2-premerge-20261106
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   validate-art:

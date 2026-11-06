@@ -43,6 +43,8 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
   await page.evaluate(async ({seconds,requestedMode,disableStaging,disableStripeSync,keepOpaqueSky,keepOpaqueLightKey,drawAllEntities})=>{
    const {game:g}=await import('/js/script.js');
    const {flightViewport}=await import('/js/viewport.mjs');
+   const {isSnakeA2Ready}=await import('/js/snake-a2.mjs');
+   const hasA2=isSnakeA2Ready();
    const {Renderer}=await import('/js/render.mjs');
    // Benchmark-only A/B: keep the deployed game/assets identical and switch
    // only the incremental transition path. The old direct path remains
@@ -115,7 +117,7 @@ const pct=(xs,p)=>{if(!xs.length)return null;const ys=[...xs].sort((a,b)=>a-b);r
     const right=v.worldLeft+v.w/v.scale;
     const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x&&e.x<=right);
     const hawk=g.entities.find(e=>e.kind==='hawk'&&!e.harmless&&!e.retreat&&e.x+60>g.x);
-    let target=wood?(wood.top+wood.bottom)/2:320;
+    let target=wood?(wood.snake&&hasA2?(wood.top+55+wood.bottom-200)/2:(wood.top+wood.bottom)/2):320;
     if(!wood&&hawk){
      const t=Math.max(0,Math.min(1,(hawk.startX-g.x)/(hawk.startX-hawk.targetX)));
      const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;

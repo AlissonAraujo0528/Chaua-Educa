@@ -1,8 +1,7 @@
 // Optional action atlases; all authored sources retain their existing fallback.
-// Enabled only for ?actionSprites=1, so the optimized production branch cannot
-// regress until the six prepared WebP files have been installed and reviewed.
+// Use the shipped atlases unless the player explicitly requests legacy art.
 export const ACTION_SPRITES_ENABLED =
- typeof location!=='undefined' && new URLSearchParams(location.search).get('actionSprites')==='1';
+ typeof location!=='undefined' && new URLSearchParams(location.search).get('actionSprites')!=='0';
 export const ACTION_SHEET_DEFS=Object.freeze({
  'parrot-flight': {path:'../public/parrot/fly/flight.webp',columns:4,rows:2,cell:256},
  'parrot-impact': {path:'../public/parrot/animations/impact.webp',columns:3,rows:2,cell:256},

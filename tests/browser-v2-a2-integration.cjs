@@ -11,7 +11,7 @@ fs.mkdirSync(OUT,{recursive:true});
  try{
   for(const viewport of [{width:1200,height:720},{width:390,height:844}]){
    const records=[];
-   for(const [mode,params] of [['legacy',''],['action','?actionSprites=1'],['a2','?actionSprites=1&snakeA2=1']]){
+   for(const [mode,params] of [['legacy','?actionSprites=0&snakeA2=0'],['action','?snakeA2=0'],['a2','']]){
     const page=await browser.newPage({viewport,deviceScaleFactor:1});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.route('**/js/script.js',route=>route.fulfill({contentType:'text/javascript',body:''}));

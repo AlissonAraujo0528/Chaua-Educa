@@ -30,7 +30,11 @@ async function begin(page, name = 'Guardião da mata') {
         const context = await browser.newContext({ viewport: { width:1440, height:960 } });
         const page = await context.newPage(); await inspect(page);
         // Weighted poses must preserve opaque bodies on a transparent canvas.
-        assert.equal(await page.evaluate(async()=>{
+        const legacy = await context.newPage();
+        const legacyURL = new URL(page.url());
+        legacyURL.searchParams.set('actionSprites','0');
+        await legacy.goto(legacyURL.href,{waitUntil:'networkidle'});
+        assert.equal(await legacy.evaluate(async()=>{
             const {drawBird}=await import('/js/render.mjs');
             const {images}=await import('/js/assets.mjs');
             const source=document.createElement('canvas');source.width=1536;source.height=1536;
@@ -44,6 +48,7 @@ async function begin(page, name = 'Guardião da mata') {
                 return context.getImageData(150,150,1,1).data[3];
             } finally {images.set('chaua-atlas',original);}
         }),255);
+        await legacy.close();
         // Optional practice works before entering a name and never records a ranked flight.
         await page.locator('#start-training:not([disabled])').click();
         await playing(page);

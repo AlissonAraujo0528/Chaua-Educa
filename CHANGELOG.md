@@ -1,6 +1,14 @@
 # Changelog
 
-## Não lançado
+## Versão jogável 1.0.0
+
+- Integra a V2 de renderização e áudio, os sprites de ação, a cobra A2 e a
+  separação de frutas e cobras por silhueta.
+- A entrada do Refúgio usa quatro faixas em canvases intermediários.
+- O acesso padrão carrega os novos sprites. O fallback preserva o jogo caso
+  os arquivos de arte não carreguem.
+- 1.0.0 é a identificação da versão jogável. A versão interna do pacote
+  continua em 2.5.0 para preservar a sequência de versões.
 
 ### Alterado
 

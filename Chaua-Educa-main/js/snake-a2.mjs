@@ -2,9 +2,9 @@ import {SNAKE_TIMING} from './animals.mjs';
 import {snakePlacement} from './animation.mjs';
 import {shapesHitRect} from './collision.mjs';
 
-// Experimental A2 artwork only: enabled explicitly via ?snakeA2=1.
+// Use A2 by default. The original snake remains available via ?snakeA2=0.
 export const SNAKE_A2_ENABLED =
- typeof location!=='undefined'&&new URLSearchParams(location.search).get('snakeA2')==='1';
+ typeof location!=='undefined'&&new URLSearchParams(location.search).get('snakeA2')!=='0';
 export const SNAKE_A2_GRID=Object.freeze({columns:4,rows:2,cell:384,anchorX:192,anchorY:352});
 const PATHS=Object.freeze({
  idle:'../public/snake/base/idle.webp',
