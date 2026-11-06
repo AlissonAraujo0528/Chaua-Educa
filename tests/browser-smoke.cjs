@@ -49,9 +49,28 @@ async function begin(page, name = 'Guardião da mata') {
             } finally {images.set('chaua-atlas',original);}
         }),255);
         await legacy.close();
+        for (const viewport of [{width:1366,height:638},{width:1280,height:600},{width:1024,height:600},{width:768,height:600}]) {
+            await page.setViewportSize(viewport);
+            const layout = await page.evaluate(() => {
+                const footer = document.querySelector('.home-footer').getBoundingClientRect();
+                const links = document.querySelector('.home-links').getBoundingClientRect();
+                const controls = ['#inputPlayer','#btnStart','#start-training','#open-settings','#open-credits'];
+                return {
+                    scrolls: document.scrollingElement.scrollHeight > innerHeight,
+                    overlapsFooter: links.bottom > footer.top,
+                    clipped: controls.filter(selector => {
+                        const {top,bottom,left,right} = document.querySelector(selector).getBoundingClientRect();
+                        return top < 0 || bottom > innerHeight || left < 0 || right > innerWidth;
+                    })
+                };
+            });
+            assert.deepEqual(layout,{scrolls:false,overlapsFooter:false,clipped:[]},`Compact menu at ${viewport.width}×${viewport.height}`);
+        }
+        await page.setViewportSize({width:1366,height:638});
         // Optional practice works before entering a name and never records a ranked flight.
         await page.locator('#start-training:not([disabled])').click();
         await playing(page);
+        assert.equal(await page.evaluate(()=>document.scrollingElement.scrollHeight<=innerHeight),true,'Notebook flight must fit the viewport');
         await page.keyboard.down('Space');
         await page.waitForFunction(()=>document.querySelector('#stage-name').textContent.startsWith('2 ·'));
         await page.keyboard.up('Space');
@@ -63,6 +82,7 @@ async function begin(page, name = 'Guardião da mata') {
         assert.equal(await model(page,g=>g.score),0);
         assert.equal(await page.evaluate(()=>localStorage.getItem('chaua-missions-v1')),null);
         await page.locator('#training-home').click();
+        await page.setViewportSize({width:1440,height:960});
         await page.locator('#home').waitFor({state:'visible'});
         assert.equal(await page.locator('#start-training').textContent(),'Repetir treino de voo');
         assert.equal(await page.locator('#inputPlayer').evaluate(el=>el===document.activeElement),true);
