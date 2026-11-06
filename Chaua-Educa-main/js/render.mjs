@@ -1,5 +1,5 @@
 import {drawContinuousSnake} from './snake-render.mjs';
-import {drawSnakeA2,preloadSnakeA2} from './snake-a2.mjs';
+import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready} from './snake-a2.mjs';
 import {parrotAction,hawkAction} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
 import {SNAKE_WRAP} from './snake-wrap-data.mjs';
@@ -9,7 +9,7 @@ import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,snakePlacement,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import { canvasResolution } from './quality.mjs';
-import { flightViewport, warningPosition } from './viewport.mjs';
+import { flightViewport, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { FRUITS } from './fruits.mjs';
@@ -1071,7 +1071,7 @@ export class Renderer {
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
             const p=warningPosition(view,e.startY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
         }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
-            notices.push({x:view.x+(e.x-view.worldLeft)*s-30,y:view.y+(e.bottom-155)*s,w:136,h:26,type:'snake',entity:e});
+            notices.push({...snakeWarningPosition(view,e,isSnakeA2Ready()),w:136,h:26,type:'snake',entity:e});
         }
         if(notices.length){
             for(const box of placeWarnings(notices,view)){

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {flightViewport,warningPosition} from '../Chaua-Educa-main/js/viewport.mjs';
+import {flightViewport,warningPosition,snakeWarningPosition} from '../Chaua-Educa-main/js/viewport.mjs';
 import {Game} from '../Chaua-Educa-main/js/engine.mjs';
 test('phone and desktop viewports reserve control bands and retain full vertical world',()=>{
  for(const [w,h] of [[320,568],[390,844],[768,1024],[844,390],[1440,960]]){
@@ -22,4 +22,18 @@ test('hawk labels retain 108px width within playing area at both trajectory extr
 test('viewport changes cannot mutate physics or encounter state',()=>{
  const g=new Game({random:()=>.5});g.spawn();const before=JSON.stringify(g);
  flightViewport(390,844);flightViewport(844,390);assert.equal(JSON.stringify(g),before);
+});
+
+test('A2 attack warnings stay above the raised snake head without shifting legacy labels',()=>{
+ const wood={x:360,bottom:442};
+ for(const [width,height] of [[1200,720],[390,844],[844,390]]){
+  const view=flightViewport(width,height);
+  const original=snakeWarningPosition(view,wood);
+  const a2=snakeWarningPosition(view,wood,true);
+  assert.equal(original.x,view.x+(wood.x-view.worldLeft)*view.scale-30);
+  assert.equal(original.y,view.y+(wood.bottom-155)*view.scale);
+  assert.equal(a2.x,original.x);
+  assert.ok(Math.abs((original.y-a2.y)-90*view.scale)<1e-9);
+  assert.ok(a2.y>=view.y+4,'warning stays in playfield before collision avoidance');
+ }
 });
