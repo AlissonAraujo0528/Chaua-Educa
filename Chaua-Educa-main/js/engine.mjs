@@ -466,7 +466,9 @@ export class Game {
             if (hasSnake) {
                 // Center the entire fruit route directly in the clear flight corridor above the snake
                 const corridorTop = center - encounterGap / 2 + 55;
-                const corridorBottom = center + encounterGap / 2 - 240;
+                // Keep a valid fruit lane at the minimum encounter gap.
+                // The former -240 clearance inverted this range at high difficulty.
+                const corridorBottom = center + encounterGap / 2 - 200;
                 const corridorCenter = (corridorTop + corridorBottom) / 2;
                 fy = corridorCenter + (point.y - center) * 0.35;
                 fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
