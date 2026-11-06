@@ -1028,14 +1028,14 @@ export class Renderer {
         }
 
         if(game.refuge) {
-            const support=320+birdFoot(.88);
+            const support=320+birdFoot(1.04);
             drawRefugeTree(c,game.refuge,support,reduced?0:sceneTime);
         }
         const isDefeated = (game.state === 'ended' && !game.won) || game.state === 'impact';
         const impactProg = game.state === 'impact' ? Math.max(0, 1 - (game.impactRemaining || 0) / 0.42) : (game.state === 'ended' && !game.won ? 1 : 0);
         const contact=woodContactPosition(game,impactProg,reduced);
         drawBird(c, {
-            x: contact.x, y: contact.y, scale: .88, perched: game.state === 'ended' && game.won,
+            x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
             angle: game.angle, wing: reduced ? .2 : game.wing, time: game.state==='ended'&&game.won?visualTime:sceneTime,
             landing: game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null,
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
@@ -1105,7 +1105,6 @@ export class Renderer {
     snake(wood,reduced){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
-        if(s.retreat)c.globalAlpha=Math.max(0,1-smoothstep(((s.retreatTime||0)-1.8)/.45));
         if(!drawSnakeA2(c,s,place.factor,reduced)){
             const wrap=images.get('snake-wrap');
             if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
@@ -1119,6 +1118,7 @@ export class Renderer {
             }
             if(!newSnake)drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);
         }
+        if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,wood.time||0);
         c.restore();
     }
     flightBorders(view) {}
@@ -1158,9 +1158,9 @@ export class Renderer {
         const action=hawkAction(entity,time,reduced);
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
-        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-73,-74,146,146);
-        if(!newHawk)atlasAnimation(c,'hawk',clip,.4);
-        if(retreat&&!reduced&&!newHawk)drawOrbitingStars(c,-24,-35,70,time);
+        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-86,-87,172,172);
+        if(!newHawk)atlasAnimation(c,'hawk',clip,.47);
+        if(retreat&&!reduced)drawOrbitingStars(c,-24,-40,80,time);
         c.restore();
     }
 

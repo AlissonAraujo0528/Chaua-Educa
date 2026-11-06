@@ -464,10 +464,12 @@ export class Game {
         for(const [index,point] of fruits.entries()) {
             let fy = point.y;
             if (hasSnake) {
-                // Ensure fruits stay safely in the clear flight path above the snake's head
-                const maxFruitY = center + encounterGap / 2 - 200;
-                const minFruitY = center - encounterGap / 2 + (profile.fruitMargin ?? 48);
-                fy = Math.max(minFruitY, Math.min(fy, maxFruitY));
+                // Center the entire fruit route directly in the clear flight corridor above the snake
+                const corridorTop = center - encounterGap / 2 + 55;
+                const corridorBottom = center + encounterGap / 2 - 240;
+                const corridorCenter = (corridorTop + corridorBottom) / 2;
+                fy = corridorCenter + (point.y - center) * 0.35;
+                fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
             }
             if (index === 0) firstFruitY = fy;
             this.entities.push({ id: this.nextId++, kind:'fruit', x:x+point.x, y:fy,
