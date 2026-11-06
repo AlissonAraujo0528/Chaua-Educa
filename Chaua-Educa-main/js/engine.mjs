@@ -2,6 +2,7 @@ import {snakeMotion} from './snake-motion.mjs';
 import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,roundedShape} from './collision.mjs';
 import { snakeHeadRect } from './geometry.mjs';
 import {spriteBodyRects} from './animation.mjs';
+import {isSnakeA2Ready,snakeA2HitsPlayer,placeA2Fruit} from './snake-a2.mjs';
 import {livingWoodRects} from './forest-geometry.mjs';
 import { createTutorial, advanceTutorial } from './tutorial.mjs';
 import { JOURNEY, JOURNEY_LENGTH, ARRIVAL_SECONDS, journeyStage } from './journey.mjs';
@@ -441,7 +442,7 @@ export class Game {
         this.encounterHistory.push({sequence:n,pattern:soloHawk?'hawk':plan.id,center,gap,elapsed:this.elapsed});
         if(this.encounterHistory.length>12)this.encounterHistory.shift();
         const hawkAlone = soloHawk;
-        let hasSnake = false, encounterGap = gap;
+        let hasSnake = false, encounterGap = gap, snakeWood = null;
         if (hawkAlone) {
             const dive = this.elapsed > profile.diveAt && n % 2 === 0;
             const lane=Math.max(160,Math.min(480,this.y+(this.encounterRandom()-.5)*70));
@@ -455,14 +456,15 @@ export class Game {
             encounterGap=gap+(hasSnake?(profile.snakeClearance??180):0);
             this.encounterHistory.at(-1).gap=encounterGap;
             const wood = { id: this.nextId++, kind: 'wood', x, y: 0, top: center - encounterGap / 2, bottom: center + encounterGap / 2, variant, scored: false, route:n, encounter:plan.id };
-            if (hasSnake) wood.snake = {kind:'snake',branch:variant==='branch',phase:'watching',retreat:false};
+            if (hasSnake) { wood.snake = {kind:'snake',branch:variant==='branch',phase:'watching',retreat:false}; snakeWood=wood; }
             this.entities.push(wood);
         }
         const fruits=hawkAlone?[{x:15,y:center}]:plan.fruits;
         if(fruits.length>1)this.routes.set(n,{total:fruits.length,collected:0,awarded:false,failed:false});
-        let firstFruitY = center;
+        let firstFruitY = center, firstFruitX = x + fruits[0].x;
+        const placedFruits=[];
         for(const [index,point] of fruits.entries()) {
-            let fy = point.y;
+            let fy = point.y, fx=x+point.x;
             if (hasSnake) {
                 // Center the entire fruit route directly in the clear flight corridor above the snake
                 const corridorTop = center - encounterGap / 2 + 55;
@@ -472,13 +474,18 @@ export class Game {
                 const corridorCenter = (corridorTop + corridorBottom) / 2;
                 fy = corridorCenter + (point.y - center) * 0.35;
                 fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
+                if(snakeWood&&isSnakeA2Ready()){
+                    const placed=placeA2Fruit(snakeWood,fx,fy,corridorTop,corridorBottom,placedFruits);
+                    fx=placed.x;fy=placed.y;
+                }
             }
-            if (index === 0) firstFruitY = fy;
-            this.entities.push({ id: this.nextId++, kind:'fruit', x:x+point.x, y:fy,
+            if (index === 0) { firstFruitY = fy; firstFruitX=fx; }
+            placedFruits.push({x:fx,y:fy});
+            this.entities.push({ id: this.nextId++, kind:'fruit', x:fx, y:fy,
                 variety:(n+index)%FRUITS.length, route:n, optional:!hawkAlone&&plan.optional });
         }
         const kind=hawkAlone?null:offerPower({elapsed:this.elapsed,shield:this.shield,feather:this.feather,pepper:this.pepper,entities:this.entities,schedule:this.powerSchedule,opportunity:fruits.length>1,random:this.powerRandom});
-        if(kind)this.entities.push({id:this.nextId++,kind,x:x+fruits[0].x-125,y:firstFruitY});
+        if(kind)this.entities.push({id:this.nextId++,kind,x:firstFruitX-125,y:firstFruitY});
         this.nextSpawn = plan.interval;
     }
 
@@ -582,7 +589,10 @@ export class Game {
             if (e.kind === 'wood') {
                 advanceSnake(e,dt,px);
                 if (e.snake && !e.snake.retreat && Math.abs(e.x-px)<230) {
-                    if (this.snakeRects(e).some(rect => rect.x<px+35&&rect.x+rect.w>px-35&&rect.y<this.y+35&&rect.y+rect.h>this.y-35&&shapesIntersect(getPlayerBody(),[roundedShape(rect)]))) this.collide(e.snake, true, e);
+                    const player=getPlayerBody();
+                    const hit=isSnakeA2Ready()?snakeA2HitsPlayer(e,player,this.reducedMotion)
+                        :this.snakeRects(e).some(rect => rect.x<px+35&&rect.x+rect.w>px-35&&rect.y<this.y+35&&rect.y+rect.h>this.y-35&&shapesIntersect(player,[roundedShape(rect)]));
+                    if(hit)this.collide(e.snake,true,e);
                 }
                 // Broad-phase horizontal check: livingWoodRects span at most [e.x - 73, e.x + 108]
                 if (e.x + 115 >= px - 28 && e.x - 80 <= px + 28) {

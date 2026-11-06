@@ -30,6 +30,7 @@ jobs:
           node tests/browser-action-sprites.cjs
           node tests/browser-v2-a2-integration.cjs
           node tests/browser-v2-a2-scenes.cjs
+          node tests/browser-a2-collision-fruits.cjs
       - name: Export exact V2 audit source
         if: always()
         uses: actions/upload-artifact@v6
