@@ -27,6 +27,7 @@ jobs:
           npm run test:snake-continuity
           npm run test:snake
           npm run test:snake-raster-parity
+          node tests/browser-v2-a2-integration.cjs
           npm run benchmark:snake-mesh
           npm run test:reference-art
           npm run test:visual

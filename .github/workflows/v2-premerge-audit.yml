@@ -28,6 +28,7 @@ jobs:
           trap 'kill "$pid" 2>/dev/null' EXIT
           node tests/browser-real-action-sprites.cjs
           node tests/browser-action-sprites.cjs
+          node tests/browser-v2-a2-integration.cjs
       - name: Export exact V2 audit source
         if: always()
         uses: actions/upload-artifact@v6
