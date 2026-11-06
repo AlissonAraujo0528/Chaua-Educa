@@ -27,31 +27,56 @@ function drawMesh(c,image,s,factor,pose){
   c.beginPath();c.ellipse(-16,23,40,23,0,0,Math.PI*2);c.clip();c.globalAlpha*=pose.mouth;
   c.drawImage(image,...open.rect,-o[0]*scale,-o[1]*scale,384*scale,384*scale);c.restore();
  }
+
 }
 
+const fallbackCache = {
+ surface: null, surfaceCtx: null, cachedImage: null, cachedFactor: 0,
+ cachedX: NaN, cachedY: NaN, cachedAngle: NaN, cachedMouth: NaN
+};
 
-let surface,surfaceCtx,cachedImage=null,cachedFactor=0,cachedX=NaN,cachedY=NaN,cachedAngle=NaN,cachedMouth=NaN;
-
-export function drawContinuousSnake(c,image,s,factor,reduced=false){
+const MAX_MESH_CACHES=6;
+const stableMeshCaches=new Map();
+function meshCacheFor(s,id){
+ if(Number.isSafeInteger(id)&&id>=0){
+  let cache=stableMeshCaches.get(id);
+  if(cache){
+   // LRU: active enemies stay cached; older enemies are discarded.
+   stableMeshCaches.delete(id);stableMeshCaches.set(id,cache);
+   return cache;
+  }
+  if(stableMeshCaches.size>=MAX_MESH_CACHES)stableMeshCaches.delete(stableMeshCaches.keys().next().value);
+  cache={surface:null,surfaceCtx:null,cachedImage:null,cachedFactor:0,
+   cachedX:NaN,cachedY:NaN,cachedAngle:NaN,cachedMouth:NaN};
+  stableMeshCaches.set(id,cache);return cache;
+ }
+ return (s&&typeof s==='object')?(s._meshCache||(s._meshCache={
+  surface:null,surfaceCtx:null,cachedImage:null,cachedFactor:0,
+  cachedX:NaN,cachedY:NaN,cachedAngle:NaN,cachedMouth:NaN
+ })):fallbackCache;
+}
+export function drawContinuousSnake(c,image,s,factor,reduced=false,stableId=null){
  if(!image)return;
  if(reduced){
   c.drawImage(image,...SPRITES.snake.frames[0].rect,-192*factor,-328*factor,384*factor,384*factor);
   return;
  }
  const pose=snakeMotion(s,false);
- if(!surface&&typeof OffscreenCanvas!=='undefined')surface=new OffscreenCanvas(512,512);
- if(!surface&&typeof document!=='undefined'){surface=document.createElement('canvas');surface.width=surface.height=512;}
- if(!surface){drawMesh(c,image,s,factor,pose);return;}
- if(!surfaceCtx)surfaceCtx=surface.getContext('2d');
+ const cache=meshCacheFor(s,stableId);
 
- const dirty=cachedImage!==image||cachedFactor!==factor||
-  Math.abs(pose.x-cachedX)>1e-4||Math.abs(pose.y-cachedY)>1e-4||
-  Math.abs(pose.angle-cachedAngle)>1e-4||Math.abs(pose.mouth-cachedMouth)>1e-4;
+ if(!cache.surface&&typeof OffscreenCanvas!=='undefined')cache.surface=new OffscreenCanvas(512,512);
+ if(!cache.surface&&typeof document!=='undefined'){cache.surface=document.createElement('canvas');cache.surface.width=cache.surface.height=512;}
+ if(!cache.surface){drawMesh(c,image,s,factor,pose);return;}
+ if(!cache.surfaceCtx)cache.surfaceCtx=cache.surface.getContext('2d');
+
+ const dirty=cache.cachedImage!==image||cache.cachedFactor!==factor||
+  Math.abs(pose.x-cache.cachedX)>1e-4||Math.abs(pose.y-cache.cachedY)>1e-4||
+  Math.abs(pose.angle-cache.cachedAngle)>1e-4||Math.abs(pose.mouth-cache.cachedMouth)>1e-4;
 
  if(dirty){
-  cachedImage=image;cachedFactor=factor;
-  cachedX=pose.x;cachedY=pose.y;cachedAngle=pose.angle;cachedMouth=pose.mouth;
-  const layer=surfaceCtx;
+  cache.cachedImage=image;cache.cachedFactor=factor;
+  cache.cachedX=pose.x;cache.cachedY=pose.y;cache.cachedAngle=pose.angle;cache.cachedMouth=pose.mouth;
+  const layer=cache.surfaceCtx;
   layer.setTransform(1,0,0,1,0,0);
   layer.clearRect(0,0,512,512);
   layer.setTransform(2,0,0,2,256,256);
@@ -59,5 +84,5 @@ export function drawContinuousSnake(c,image,s,factor,reduced=false){
   layer.globalCompositeOperation='source-over';
   drawMesh(layer,image,s,factor,pose);
  }
- c.drawImage(surface,-128,-128,256,256);
+ c.drawImage(cache.surface,-128,-128,256,256);
 }

@@ -10,6 +10,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/verify-all-9-spritesheets.cjs
       - run: npm test
       - run: npm run build
       - run: git diff --exit-code -- Chaua-Educa-main/css/style.css
@@ -26,6 +27,9 @@ jobs:
           npm run test:snake-continuity
           npm run test:snake
           npm run test:snake-raster-parity
+          node tests/browser-v2-a2-integration.cjs
+          node tests/browser-v2-a2-scenes.cjs
+          node tests/browser-a2-collision-fruits.cjs
           npm run benchmark:snake-mesh
           npm run test:reference-art
           npm run test:visual

@@ -1,4 +1,7 @@
 import {drawContinuousSnake} from './snake-render.mjs';
+import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready} from './snake-a2.mjs';
+import {parrotAction,hawkAction} from './action-states.mjs';
+import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
 import {SNAKE_WRAP} from './snake-wrap-data.mjs';
 import {drawLivingTrunk,drawRefugeTree} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
@@ -6,7 +9,7 @@ import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,snakePlacement,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import { canvasResolution } from './quality.mjs';
-import { flightViewport, warningPosition } from './viewport.mjs';
+import { flightViewport, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { FRUITS } from './fruits.mjs';
@@ -95,13 +98,25 @@ function animatedBird(c,p){
     const clip=birdAnimation({wing:p.wing,time,perched:perched&&!surprise,landing,defeated:defeated||surprise,impactProgress:surprise?1:impactProgress,reduced});
     const factor=27.7027*scale/SPRITES.chaua.landmarkWidth,size=125*scale;
     c.save();c.translate(x,y);
-    if(defeated&&!reduced){const hit=impactPose(impactProgress);c.translate(hit.x,hit.y);c.rotate(angle+hit.angle);}else c.rotate(angle);
+    if(defeated&&!reduced){const hit=impactPose(impactProgress);c.translate(hit.x,hit.y);c.rotate(angle+hit.angle);}
+    else {
+        const heave=(!reduced&&!perched&&p.flapImpulse>0)?p.flapImpulse*Math.sin(p.flapImpulse*Math.PI)*3.5:0;
+        const heaveAngle=(!reduced&&!perched&&p.flapImpulse>0)?-p.flapImpulse*0.04:0;
+        if(heave!==0)c.translate(0,-heave);
+        c.rotate(angle+heaveAngle);
+    }
     if(turbo&&!perched&&!reduced)drawTurboFlames(c,size,time);
-    if(perched&&!surprise&&!defeated&&landing===null)perchedSprite(c,clip,factor);
-    else atlasAnimation(c,'chaua',clip,factor);
+    const action=parrotAction({...p,time,wing:p.wing,reduced,perched,landing,defeated,surprise,impactProgress});
+    const newSprite=!!action&&drawActionSheet(c,action.sheet,action.frame,-77*scale,-77*scale,154*scale,154*scale);
+    if(!newSprite){
+        if(perched&&!surprise&&!defeated&&landing===null)perchedSprite(c,clip,factor);
+        else atlasAnimation(c,'chaua',clip,factor);
+    }
     const a=SPRITES.chaua.frames[clip.frame].eye,b=SPRITES.chaua.frames[clip.next].eye;
     const ex=(a[0]+(b[0]-a[0])*clip.blend-192)*factor,ey=(a[1]+(b[1]-a[1])*clip.blend-192)*factor;
-    if(defeated||surprise){drawSpiralEye(c,ex,ey,size*.027,reduced?0:time);if(!reduced)drawOrbitingStars(c,ex,ey-size*.35,size,time);}
+    if(defeated||surprise){
+        if(!newSprite){drawSpiralEye(c,ex,ey,size*.027,reduced?0:time);if(!reduced)drawOrbitingStars(c,ex,ey-size*.35,size,time);}
+    }
     else if(reaction>0&&!reduced)drawFruitSparkles(c,size*.44,-size*.08,reaction,time);
     else if(stamina<.28&&!reduced&&!perched)drawSweatDrops(c,ex,ey,size,time);
     if(turbo&&!perched&&!reduced)drawTurboWindLines(c,size,time);
@@ -434,10 +449,11 @@ function getPepperSprite() {
 export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
-    defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null
+    defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
+    shieldHitAge = null
 }) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing});
+    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge});
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
@@ -471,7 +487,7 @@ export class Renderer {
         // so wind drift and 8-stripe transitions blit 1:1 without bilinear rescaling.
         this.scaledForestCacheEnabled = true;
         this.cachedView = null;
-        this.ready = loadAssets().then(() => {
+        this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
             this.fruitImages = FRUITS.map(f => images.get(`fruit-${f.id}`));
             // Warm up pickup radial caches during asset load so first spawn never stalls.
             getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
@@ -1017,17 +1033,18 @@ export class Renderer {
         }
 
         if(game.refuge) {
-            const support=320+birdFoot(.74);
+            const support=320+birdFoot(1.04);
             drawRefugeTree(c,game.refuge,support,reduced?0:sceneTime);
         }
         const isDefeated = (game.state === 'ended' && !game.won) || game.state === 'impact';
         const impactProg = game.state === 'impact' ? Math.max(0, 1 - (game.impactRemaining || 0) / 0.42) : (game.state === 'ended' && !game.won ? 1 : 0);
         const contact=woodContactPosition(game,impactProg,reduced);
         drawBird(c, {
-            x: contact.x, y: contact.y, scale: .74, perched: game.state === 'ended' && game.won,
+            x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
             angle: game.angle, wing: reduced ? .2 : game.wing, time: game.state==='ended'&&game.won?visualTime:sceneTime,
             landing: game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null,
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
+            shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
             defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
             stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won
         });
@@ -1044,18 +1061,21 @@ export class Renderer {
             }
         }
         c.globalAlpha = 1;
-        for(const p of game.popups) {
-            c.save();c.globalAlpha=Math.min(1,p.life*3);c.font='800 18px Nunito';c.textAlign='center';
-            c.lineWidth=3;c.strokeStyle='#254a35';c.strokeText(p.text,p.x,p.y);
-            c.fillStyle=p.gold?'#ffe392':'#f1ffd4';c.fillText(p.text,p.x,p.y);c.restore();
+        if(game.popups.length) {
+            c.font='800 18px Nunito';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#254a35';
+            for(const p of game.popups) {
+                c.save();c.globalAlpha=Math.min(1,p.life*3);
+                c.strokeText(p.text,p.x,p.y);
+                c.fillStyle=p.gold?'#ffe392':'#f1ffd4';c.fillText(p.text,p.x,p.y);c.restore();
+            }
         }
         c.restore();
-        this.flightBorders(view);
+        // Natural viewport flight boundary
         const notices=[];
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
             const p=warningPosition(view,e.startY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
         }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
-            notices.push({x:view.x+(e.x-view.worldLeft)*s-30,y:view.y+(e.bottom-155)*s,w:136,h:26,type:'snake',entity:e});
+            notices.push({...snakeWarningPosition(view,e,isSnakeA2Ready()),w:136,h:26,type:'snake',entity:e});
         }
         if(notices.length){
             for(const box of placeWarnings(notices,view)){
@@ -1090,20 +1110,18 @@ export class Renderer {
     snake(wood,reduced){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
-        if(s.retreat)c.globalAlpha=Math.max(0,1-smoothstep(((s.retreatTime||0)-.95)/.35));
-        const wrap=images.get('snake-wrap');
-        if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
-        drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced);c.restore();
-    }
-    flightBorders(view){
-        const c=this.c;
-        for(const [y,label,upper]of [[20,'COPA',true],[615,'CHÃO',false]]){
-            const py=view.y+y*view.scale;
-            c.save();const shade=c.createLinearGradient(0,py-12,0,py+12);shade.addColorStop(0,upper?'#385d3940':'#385d3900');shade.addColorStop(1,upper?'#385d3900':'#385d3940');c.fillStyle=shade;c.fillRect(view.x,py-12,view.w,24);
-            c.strokeStyle='#dce6b5bb';c.lineWidth=1;c.setLineDash([3,6]);c.beginPath();c.moveTo(view.x,py);c.lineTo(view.x+view.w,py);c.stroke();c.setLineDash([]);
-            c.font='800 9px Nunito';c.fillStyle='#284c32';c.textAlign='right';c.fillText(label,view.x+view.w-8,py+(upper?12:-5));c.restore();
+        if(!drawSnakeA2(c,s,place.factor,reduced)){
+            const wrap=images.get('snake-wrap');
+            if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
+            // Rejected legacy snake sheet includes a duplicate coil and must
+            // never be rendered over the historical snake-wrap. A2 is the
+            // only full-body replacement; otherwise draw original art.
+            drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced,wood.id);
         }
+        if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
+        c.restore();
     }
+    flightBorders(view) {}
     hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false) {
         const c = this.c;
         let x, y, time, e = null;
@@ -1125,9 +1143,24 @@ export class Renderer {
         if(!images.has('hawk-atlas'))return;
         const entity=e??{x,y,warning:warning?1:0,retreat,dive:false};
         const clip=hawkAnimation(entity,time,reduced),cAngle=retreat?0:angle;
-        c.save();c.translate(x,y);c.rotate(cAngle);
-        atlasAnimation(c,'hawk',clip,.4);
-        if(retreat&&!reduced)drawOrbitingStars(c,-24,-35,70,time);
+        let dynamicY=0,dynamicAngle=0;
+        if(!reduced&&!warning&&!retreat){
+            if(entity.dive){
+                const span=(entity.startX||1)-(entity.targetX||0);
+                const p=span>0?Math.max(0,Math.min(1,((entity.startX||x)-x)/span)):.5;
+                dynamicY=Math.sin(p*Math.PI)*7;
+                dynamicAngle=(p-.5)*.16;
+            }else{
+                dynamicY=Math.sin(time*2.8+(entity.id||0)*1.5)*3.5;
+                dynamicAngle=Math.cos(time*2.8+(entity.id||0)*1.5)*.035;
+            }
+        }
+        const action=hawkAction(entity,time,reduced);
+        c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
+        c.rotate(cAngle+dynamicAngle+(action?.angle||0));
+        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-86,-87,172,172);
+        if(!newHawk)atlasAnimation(c,'hawk',clip,.47);
+        if(retreat&&!reduced)drawOrbitingStars(c,-24,-40,80,time);
         c.restore();
     }
 

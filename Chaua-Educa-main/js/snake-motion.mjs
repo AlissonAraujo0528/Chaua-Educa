@@ -10,8 +10,21 @@ export function snakeMotion(s={},reduced=false){
  switch(s.phase){
   case 'warning':p=mix(REST,ALERT,(s.warningAge||0)/T.warning);break;
   case 'windup':p=mix(ALERT,CURL,(s.phaseAge||0)/T.windup);break;
-  case 'striking':p=mix(CURL,STRIKE,(s.phaseAge||0)/T.strike);break;
-  case 'recovering':p=mix(STRIKE,REST,(s.phaseAge||0)/T.recovery);break;
+  case 'striking':{
+   const t=Math.max(0,Math.min(1,(s.phaseAge||0)/T.strike));
+   p=mix(CURL,STRIKE,t);
+   p.mouth=smooth(Math.max(0,(t-.2)/.8));
+   break;
+  }
+  case 'recovering':{
+   const t=Math.max(0,Math.min(1,(s.phaseAge||0)/T.recovery));
+   p=mix(STRIKE,REST,t);
+   p.mouth=1-smooth(Math.min(1,t*4.5));
+   const arch=Math.sin(t*Math.PI)*4;
+   p.y-=arch;
+   p.angle+=Math.sin(t*Math.PI)*.03;
+   break;
+  }
   default:p={...REST};
  }
  // One continuous breathing clock, including across phase boundaries.

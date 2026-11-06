@@ -13,3 +13,11 @@ export function flightViewport(width,height,safe={}) {
 export function warningPosition(view,worldY){
     return {x:view.x+view.w-112,y:Math.max(view.y+4,Math.min(view.y+view.h-40,view.y+worldY*view.scale-18))};
 }
+
+// The A2 snake rises farther above the perch than the legacy mesh. Keep the
+// warning outside its face while retaining the historical fallback layout.
+export function snakeWarningPosition(view,wood,a2Ready=false){
+    const clearance=a2Ready?245:155;
+    return {x:view.x+(wood.x-view.worldLeft)*view.scale-30,
+        y:view.y+(wood.bottom-clearance)*view.scale};
+}

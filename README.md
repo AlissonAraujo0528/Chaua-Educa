@@ -1,5 +1,9 @@
 # Chaua-Educa
 
+## Versão jogável 1.0.0
+
+Abra `Chaua-Educa-main/index.html` por um servidor HTTP. Para testar localmente, rode `npm start` na raiz e abra `http://127.0.0.1:5501/`. A cobra A2 e os sprites de ação são carregados por padrão. Os parâmetros `?actionSprites=0&snakeA2=0` selecionam a arte original.
+
 "Chauá-educa" is a compelling game with a noble purpose – raising awareness and making an effort to save an endangered species known as the Chauá parrot. In this engaging gaming experience, you step into the wings of a delightful parrot named Chauá. Your mission goes beyond entertainment; it's about making a difference.
 
 - **Creator:** [SilvAlisson](https://github.com/SilvAlisson)

@@ -18,7 +18,9 @@ export const CLIPS=Object.freeze({
  snake:{idle:[0,1,2,3],alert:[4,5,6,7],attack:[7,8,9,10,11,7],withdraw:[11,12,13,14,15],emerge:[15,0]},
 });
 export function birdAnimation({wing=0,time=0,perched=false,landing=null,defeated=false,impactProgress=0,reduced=false}={}){
- const flight=reduced?{frame:3,next:3,blend:0}:flightFrame(CLIPS.chaua.flight,wing>0?(1-wing):.42);
+ const glidePose=reduced?.42:.42+(time>0?Math.sin(time*2.4)*0.025:0);
+ const flapProgress=(.42+(1-wing))%1;
+ const flight=reduced?{frame:3,next:3,blend:0}:flightFrame(CLIPS.chaua.flight,wing>0?flapProgress:glidePose);
  if(landing!==null){
   if(!reduced&&landing<.15)return {frame:flight.frame,next:8,blend:ease(landing/.15)};
   return sequence(CLIPS.chaua.landing,reduced?1:(landing-.15)/.85);
@@ -31,9 +33,11 @@ export function birdAnimation({wing=0,time=0,perched=false,landing=null,defeated
 export function hawkAnimation(e,time=0,reduced=false){
  if(e.retreat||e.dazed)return sequence(CLIPS.hawk.recoil,reduced?1:(e.retreatTime||0)/.7);
  if(reduced||e.warning>0)return {frame:8,next:8,blend:0};
- if(e.phase==='leaving')return sequence(CLIPS.hawk.glide,time*.7,true);
- if(e.dive)return sequence(CLIPS.hawk.dive,(Math.sin(time*4)+1)/2);
- return flightFrame(CLIPS.hawk.flight,time*2.2+(e.id||0)*.13);
+ if(e.phase==='leaving')return flightFrame(CLIPS.hawk.glide,time*.7);
+ if(e.dive)return flightFrame(CLIPS.hawk.dive,(Math.sin(time*4)+1)/2);
+ const cycle=(time*1.6+(e.id||0)*.37)%2.6;
+ if(cycle>1.5)return flightFrame(CLIPS.hawk.glide,(cycle-1.5)*.5);
+ return flightFrame(CLIPS.hawk.flight,cycle/1.5*2.2);
 }
 // Source-pose inspector for atlas QA. Gameplay deforms one registered pose; it
 // never switches these full-body frames (see snake-motion and snake-render).

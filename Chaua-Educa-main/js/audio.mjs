@@ -61,9 +61,9 @@ export class ForestAudio {
         try {
             if(type==='flap') {
                 if(now-this.lastFlap<.15)return;
-                this.lastFlap=now;this.tone(210,now,.09,.02,'triangle',70);this.tone(140,now+.02,.07,.015,'sine',50);return;
+                this.lastFlap=now;this.tone(210,now,.09,.15,'triangle',70);this.tone(140,now+.02,.07,.12,'sine',50);return;
             }
-            notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['feather-end','pepper-end'].includes(type) ? .025 : .05,type==='shield-break'?'triangle':'sine'));
+            notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['feather-end','pepper-end'].includes(type) ? .08 : .18,type==='shield-break'?'triangle':'sine'));
         } catch { /* Audio failure never blocks the game. */ }
     }
     update(state,visible,time,stage) {
@@ -85,8 +85,8 @@ export class ForestAudio {
         }
         if(c.currentTime>=this.nextChirp) {
             this.nextChirp=c.currentTime+5+(Math.sin(time)*.5+.5)*5;
-            this.tone(1650,c.currentTime,.13,.012,'sine',2300);
-            this.tone(2100,c.currentTime+.18,.16,.009,'sine',1450);
+            this.tone(1650,c.currentTime,.13,.06,'sine',2300);
+            this.tone(2100,c.currentTime+.18,.16,.05,'sine',1450);
         }
         } catch { /* Device interruption must not stop the rendering loop. */ }
     }
