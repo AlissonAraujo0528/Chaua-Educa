@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {snakeA2Pose,preloadSnakeA2,isSnakeA2Ready,drawSnakeA2,SNAKE_A2_GRID} from '../Chaua-Educa-main/js/snake-a2.mjs';
+import {snakeA2Pose,preloadSnakeA2,isSnakeA2Ready,drawSnakeA2,SNAKE_A2_GRID,snakeA2NeedsMirror} from '../Chaua-Educa-main/js/snake-a2.mjs';
 import {SNAKE_TIMING} from '../Chaua-Educa-main/js/animals.mjs';
 const pose=(phase,phaseAge)=>snakeA2Pose({phase,phaseAge});
 test('A2 sprite sheet has eight 384x384 frames per atlas',()=>{
@@ -34,4 +34,12 @@ test('without optional binary art, production fallback remains functional',async
  assert.equal(await preloadSnakeA2(),false);
  assert.equal(isSnakeA2Ready(),false);
  assert.equal(drawSnakeA2(null,{phase:'striking'},.52),false);
+});
+
+test('A2 faces the incoming Chauá throughout alert, windup and strike',()=>{
+ for(const key of ['idle','attack'])for(let f=0;f<8;f++){
+  const expected=key==='attack'&&(f===4||f===5);
+  assert.equal(snakeA2NeedsMirror({key,frame:f}),expected,key+' frame '+f);
+ }
+ assert.equal(snakeA2NeedsMirror({key:'stunned',frame:3}),true);
 });

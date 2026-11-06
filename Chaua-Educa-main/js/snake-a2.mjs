@@ -60,6 +60,10 @@ export function preloadSnakeA2(){
  return loading;
 }
 export function isSnakeA2Ready(){return SNAKE_A2_ENABLED&&images.size===3;}
+export function snakeA2NeedsMirror(pose){
+ return pose?.key==='attack'&&(pose.frame===4||pose.frame===5)
+  ||pose?.key==='stunned'&&pose.frame===3;
+}
 export function drawSnakeA2(c,s,factor,reduced=false){
  if(!isSnakeA2Ready())return false;
  const pose=snakeA2Pose(s,reduced);
@@ -68,9 +72,13 @@ export function drawSnakeA2(c,s,factor,reduced=false){
  if(!image)return false;
  const {columns,cell,anchorX,anchorY}=SNAKE_A2_GRID;
  const sx=pose.frame%columns*cell,sy=Math.floor(pose.frame/columns)*cell;
- // The authored sheet faces right; flip horizontally so the snake faces left towards the incoming parrot.
+ // The generated A2 sheet mixes directions: idle and windup already
+ // face the incoming Chauá (left), whereas peak strike poses face right.
+ // Mirror ONLY the right-facing poses; a global flip made the snake turn
+ // away from the player during warning and snap back during the bite.
+ const flip=snakeA2NeedsMirror(pose);
  c.save();
- c.scale(-1, 1);
+ if(flip)c.scale(-1,1);
  c.drawImage(image,sx,sy,cell,cell,-anchorX*factor,-anchorY*factor,cell*factor,cell*factor);
  c.restore();
  return true;
