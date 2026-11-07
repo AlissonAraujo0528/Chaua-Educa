@@ -12,30 +12,48 @@ export function journeySeason(distance) {
 // Cache only the two visible frames at viewport resolution. Resizing or changing
 // quality releases the old surfaces; there is no per-frame atlas resampling.
 export class SeasonalBackdrop {
- constructor(){this.frames=new Map();this.key='';}
- draw(c,atlas,w,h,dpr,time,distance,reduced){
+ constructor(){this.frames=new Map();this.key='';this.pending=null;this.prewarmEnabled=true;}
+ prepare(atlas,w,h,dpr,distance){
   const state=journeySeason(distance), margin=26;
   const key=`${w}:${h}:${dpr}`;
   if(this.key!==key || this.atlas!==atlas){
    for(const surface of this.frames.values()){surface.width=0;surface.height=0;}
-   this.frames.clear();this.key=key;this.atlas=atlas;
+   if(this.pending){this.pending.surface.width=0;this.pending.surface.height=0;}
+   this.pending=null;this.frames.clear();this.key=key;this.atlas=atlas;
   }
   const needed=new Set(state.mix===1?[state.to]:[state.from,state.to]);
+  const upcoming=journeySeason(distance+900).to;
+  if(this.prewarmEnabled && state.mix===1)needed.add(upcoming);
   for(const [id,surface] of this.frames)if(!needed.has(id)){
    surface.width=0;surface.height=0;this.frames.delete(id);
   }
-  for(const id of needed)if(!this.frames.has(id)){
-   const pw=Math.ceil((w+margin*2)*dpr), ph=Math.ceil(h*dpr);
-   const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
-   surface.width=pw;surface.height=ph;
-   const ctx=surface.getContext('2d',{alpha:false});
-   const sw=atlas.naturalWidth/2, sh=Math.floor(atlas.naturalHeight/2);
-   const sy=id<2?0:atlas.naturalHeight-sh;
-   const scale=Math.max((w+margin*2)/sw,h/sh)*1.08;
-   ctx.setTransform(dpr,0,0,dpr,0,0);
-   ctx.drawImage(atlas,(id%2)*sw,sy,sw,sh,(w+margin*2-sw*scale)/2,(h-sh*scale)/2,sw*scale,sh*scale);
-   this.frames.set(id,surface);
+  if(this.pending&&!needed.has(this.pending.id)){
+   this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
   }
+  for(const id of needed)if(!this.frames.has(id)){
+   if(this.pending&&this.pending.id!==id){this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;}
+   if(!this.pending){
+    const pw=Math.ceil((w+margin*2)*dpr),ph=Math.ceil(h*dpr);
+    const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
+    surface.width=pw;surface.height=ph;
+    this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0};
+   }
+   const p=this.pending;
+   const visible=id===state.from&&state.mix<1 || id===state.to&&state.mix>0;
+   const end=visible?p.surface.height:Math.min(p.surface.height,p.row+96);
+   const sw=atlas.naturalWidth/2,sh=Math.floor(atlas.naturalHeight/2),sy=id<2?0:atlas.naturalHeight-sh;
+   const scale=Math.max((w+margin*2)/sw,h/sh)*1.08;
+   p.ctx.save();p.ctx.setTransform(1,0,0,1,0,0);
+   p.ctx.beginPath();p.ctx.rect(0,p.row,p.surface.width,end-p.row);p.ctx.clip();
+   p.ctx.setTransform(dpr,0,0,dpr,0,0);
+   p.ctx.drawImage(atlas,(id%2)*sw,sy,sw,sh,(w+margin*2-sw*scale)/2,(h-sh*scale)/2,sw*scale,sh*scale);
+   p.ctx.restore();p.row=end;
+   if(end===p.surface.height){this.frames.set(id,p.surface);this.pending=null;}
+  }
+  return state;
+ }
+ draw(c,atlas,w,h,dpr,time,distance,reduced){
+  const state=this.prepare(atlas,w,h,dpr,distance),margin=26;
   const drift=reduced?0:Math.sin(time*.035)*24;
   c.save();c.setTransform(1,0,0,1,0,0);
   c.globalAlpha=1;

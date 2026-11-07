@@ -136,9 +136,9 @@ test('desktop and portrait routes are flyable through the full progression', () 
             game.tick(STEP);
             sawSnake ||= game.entities.some(e=>e.snake);
             sawHawk ||= game.entities.some(e=>e.kind==='hawk');
-            if (game.state==='ended') break;
+            if (game.state==='ended'||game.distance>=28000) break;
         }
-        assert.equal(game.won,true,`width ${width}: ${game.reason}`);
+        assert.equal(game.distance,28000,`width ${width}: ${game.reason}`);
         assert.ok(sawSnake && sawHawk); // Extra collections can complete 200 points before the first dive.
         assert.ok(game.fruits>10 && game.correct>=2);
         assert.ok(game.correct<=Math.floor(game.elapsed/30));

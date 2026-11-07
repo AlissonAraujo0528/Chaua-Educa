@@ -271,7 +271,7 @@ export class Game {
                     entity.dryBranchBroken = true;
                     this.woodBurst(this.x, this.y);
                     this.leafBurst(this.x, host.bottom || this.y, 8);
-                } else {
+                } else if (!host.broken) {
                     this.burst(this.x, this.y, '#9aba67', 8);
                     this.leafBurst(this.x, entity.hitSide === 'top' ? host.top : host.bottom, 10);
                 }
@@ -283,7 +283,7 @@ export class Game {
             const reason = boundary ? (boundary === 'top' ? 'Você voou acima da copa. Solte para descer.' : 'Você chegou ao chão da floresta. Uma batida de asas ajuda!')
                 : animal ? (entity.kind === 'hawk' ? 'Um gavião cruzou seu caminho.' : 'Você encostou na cobra.') : 'Você esbarrou na madeira.';
             this.endCause=boundary || (animal ? (entity.kind==='hawk'?'hawk':'snake') : 'wood');
-            if(!animal&&!boundary){
+            if(!animal&&!boundary && (!host.broken || host.brokenSide!==host.hitSide)){
                 const solids=this.woodRects(host);
                 this.impactContact={...(host.hitRect??solids.reduce((a,b)=>Math.abs(b.y-this.y)<Math.abs(a.y-this.y)?b:a,solids[0]))};
             }
@@ -587,7 +587,7 @@ export class Game {
     }
 
     advanceJourney(dt) {
-        if(this.distance<JOURNEY_LENGTH)return;
+        if(this.score<VICTORY_SCORE)return;
         const danger=this.entities.some(e=>(e.kind==='wood'&&e.x+85>this.x-36)||(e.kind==='hawk'&&!e.harmless&&e.x+30>this.x-36));
         if(danger || (this.quizDue&&!this.refuge))return;
         if(!this.refuge){this.refuge={x:Math.max(this.width,this.viewWidth||this.width)+220,y:320};this.onEvent({type:'refuge'});}
@@ -661,7 +661,7 @@ export class Game {
             if (this.state !== 'playing') return;
         }
         this.nextSpawn -= dt;
-        if (this.nextSpawn <= 0 && !this.quizDue && this.distance<JOURNEY_LENGTH) this.spawn();
+        if (this.nextSpawn <= 0 && !this.quizDue && this.score<VICTORY_SCORE) this.spawn();
 
         // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
         let cachedPlayerBody = null;
@@ -680,7 +680,7 @@ export class Game {
             const px = this.x;
             if (e.kind === 'hawk') {
                 advanceHawk(e,dt,speed,px);
-                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 80 && Math.abs(e.y - this.y) < 60 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 140 && Math.abs(e.y - this.y) < 110 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
                 continue;
             }
             e.x -= speed * dt;

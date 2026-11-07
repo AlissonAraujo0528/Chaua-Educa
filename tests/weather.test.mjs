@@ -37,3 +37,9 @@ test('a fragile trunk breaks only on the struck side and respects shield rules',
         assert.equal(game.shield, false);
     }
 });
+
+test('fatal fragile-tree impact does not retain contact against destroyed wood',()=>{
+ const g=new Game();g.state='playing';
+ const e={id:1,kind:'wood',x:g.x+10,top:160,bottom:440,fragileSide:'bottom',fragileKind:'hollow',hitSide:'bottom',hitRect:{x:g.x-16,y:440,w:110,h:200}};
+ g.entities=[e];g.collide(e);assert.equal(e.brokenSide,'bottom');assert.equal(g.impactContact,null);
+});

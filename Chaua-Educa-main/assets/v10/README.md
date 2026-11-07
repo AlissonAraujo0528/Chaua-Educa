@@ -25,3 +25,5 @@ Partículas: atlas transparente 2×2, um objeto centralizado por célula com mar
 
 `tests/seasons.test.mjs`: transições, movimento reduzido, reutilização e limite de superfícies.
 `tests/browser-weather-trees.cjs`: cenas sazonais no desktop e celular, transição intermediária, pausa determinística, continuidade de árvores e erros JavaScript. As capturas são anexadas pelo CI.
+
+Preparação antecipada: a próxima arte começa a ser rasterizada 900 unidades antes da troca, em faixas de 96 pixels. Superfícies incompletas nunca são exibidas. A comparação com a renderização direta verifica todas as transições no desktop e celular.

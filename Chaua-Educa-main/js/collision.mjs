@@ -1,3 +1,4 @@
+import {hawkBodyParts} from './hawk-geometry.mjs';
 // Convex body shapes exclude decorative feathers, beaks and feet.
 // Twenty vertices keep ellipse error below a fraction of a logical pixel.
 function ellipse(x,y,rx,ry,angle=0){
@@ -9,7 +10,7 @@ function bodyPart(x,y,dx,dy,rx,ry,angle){
 }
 export function playerShapes(x,y,angle=0){return [bodyPart(x,y,-3,2,16,14,angle),bodyPart(x,y,15,-7,9,10,angle)];}
 export function hawkAngle(e){return e.dive?-Math.atan2(e.targetY-e.startY,e.startX-e.targetX):0;}
-export function hawkShapes(e){const a=hawkAngle(e);return [bodyPart(e.x,e.y,-3,9,18,14,a),bodyPart(e.x,e.y,-29,-7,10,10,a)];}
+export function hawkShapes(e){const a=hawkAngle(e);return hawkBodyParts(e).map(([dx,dy,rx,ry])=>bodyPart(e.x,e.y,dx,dy,rx,ry,a));}
 export function rectShape({x,y,w,h}){return [{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];}
 export function roundedShape(rect){return ellipse(rect.x+rect.w/2,rect.y+rect.h/2,rect.w/2,rect.h/2);}
 export function intersects(a,b){

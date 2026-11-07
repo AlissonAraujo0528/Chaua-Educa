@@ -18,6 +18,17 @@ const fs=require('node:fs');
     document.body.replaceChildren(canvas);
     window.renderer=new Renderer(canvas);await renderer.ready;
     window.game=new Game();game.state='playing';game.y=320;game.stageAge=5;
+    const {hawkShapes,playerShapes,shapesIntersect}=await import('/js/collision.mjs');
+    const {hawkUsesActionArt}=await import('/js/hawk-geometry.mjs');
+    const h={x:400,y:300,phase:'crossing',dive:false};
+    if(!hawkUsesActionArt(h))throw Error('authored predator not loaded');
+    if(!shapesIntersect(playerShapes(315,316),hawkShapes(h)))throw Error('enlarged predator head has no collision');
+    if(shapesIntersect(playerShapes(480,210),hawkShapes(h)))throw Error('empty predator corner collides');
+    for(let dx=-160;dx<=160;dx+=10)for(let dy=-130;dy<=130;dy+=10){
+     const e={...h,x:220+dx,y:320+dy};
+     if(shapesIntersect(playerShapes(220,320),hawkShapes(e))&&!(Math.abs(dx)<140&&Math.abs(dy)<110))throw Error('action predator broad phase skips body contact');
+    }
+
    });
    for(const [name,distance] of [['dawn',0],['summer',8000],['storm',11000],['transition',14900],['wind',16500],['clear',22000]]){
     const info=await page.evaluate(({distance})=>{

@@ -1,3 +1,5 @@
+// Legacy backdrop regression only. Seasonal gameplay is measured by
+// benchmark-seasonal-flight.cjs and compared by browser-season-parity.cjs.
 // Temporal visual check: compare CURRENT on-screen frame to the exact direct
 // renderer at every progress increment. Static reference captures alone cannot
 // detect color stepping from an eight-frame backdrop update.
