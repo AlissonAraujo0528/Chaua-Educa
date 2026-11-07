@@ -55,23 +55,43 @@ export class Game {
     }
 
     snapshot() {
-        if (!this._prevEntityMap) Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
-        else this._prevEntityMap.clear();
+        if (!this._prevEntityMap) {
+            Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
+            Object.defineProperty(this, '_prevEntityPool', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_previousObj', { value: {}, writable: true, enumerable: false });
+        }
+        for (const item of this._prevEntityMap.values()) {
+            this._prevEntityPool.push(item);
+        }
+        this._prevEntityMap.clear();
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
-            this._prevEntityMap.set(e.id, {
-                x: e.x, y: e.y, tumbleAngle: e.tumbleAngle,
-                retreatTime: e.snake?.retreatTime, snakeAge: e.snake?.age,
-                snakePhase: e.snake?.phase, snakePhaseAge: e.snake?.phaseAge,
-                snakeWarningAge: e.snake?.warningAge, hawkRetreatTime: e.retreatTime
-            });
+            const record = this._prevEntityPool.pop() || {};
+            record.x = e.x;
+            record.y = e.y;
+            record.tumbleAngle = e.tumbleAngle;
+            record.retreatTime = e.snake?.retreatTime;
+            record.snakeAge = e.snake?.age;
+            record.snakePhase = e.snake?.phase;
+            record.snakePhaseAge = e.snake?.phaseAge;
+            record.snakeWarningAge = e.snake?.warningAge;
+            record.hawkRetreatTime = e.retreatTime;
+            this._prevEntityMap.set(e.id, record);
         }
-        this.previous = {
-            arrivalOffset: this.arrival?.offset || 0, refugeX: this.refuge?.x, y: this.y, angle: this.angle,
-            distance: this.distance, elapsed: this.elapsed, sceneTime: this.sceneTime, stage: this.stage, stageAge: this.stageAge,
-            wing: this.wing, flapImpulse: this.flapImpulse,
-            entities: this._prevEntityMap
-        };
+        const prev = this._previousObj;
+        prev.arrivalOffset = this.arrival?.offset || 0;
+        prev.refugeX = this.refuge?.x;
+        prev.y = this.y;
+        prev.angle = this.angle;
+        prev.distance = this.distance;
+        prev.elapsed = this.elapsed;
+        prev.sceneTime = this.sceneTime;
+        prev.stage = this.stage;
+        prev.stageAge = this.stageAge;
+        prev.wing = this.wing;
+        prev.flapImpulse = this.flapImpulse;
+        prev.entities = this._prevEntityMap;
+        this.previous = prev;
     }
 
     visual(alpha) {
@@ -91,15 +111,57 @@ export class Game {
         view.shakeTime = this.shakeTime;
         view.shakeDuration = this.shakeDuration;
         view.shakeIntensity = this.shakeIntensity;
-        view.entities = this.entities.map(e => {
+
+        if (!this._visualEntities) {
+            Object.defineProperty(this, '_visualEntities', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualPool', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualSnakePool', { value: [], writable: true, enumerable: false });
+        }
+        const out = this._visualEntities;
+        out.length = this.entities.length;
+        for (let i = 0; i < this.entities.length; i++) {
+            const e = this.entities[i];
             const old = this.previous.entities.get(e.id);
-            if (!old) return e;
-            const entity = {...e, x:lerp(old.x,e.x), y:lerp(old.y,e.y)};
-            if(Number.isFinite(e.tumbleAngle))entity.tumbleAngle=lerp(old.tumbleAngle??0,e.tumbleAngle);
-            if(Number.isFinite(e.retreatTime))entity.retreatTime=lerp(old.hawkRetreatTime??0,e.retreatTime);
-            if(e.snake)entity.snake={...e.snake,phaseAge:old.snakePhase===e.snake.phase?lerp(old.snakePhaseAge??0,e.snake.phaseAge??0):e.snake.phaseAge,warningAge:lerp(old.snakeWarningAge??0,e.snake.warningAge??0),age:lerp(old.snakeAge??0,e.snake.age??0),retreatTime:lerp(old.retreatTime??0,e.snake.retreatTime??0)};
-            return entity;
-        });
+            if (!old) {
+                out[i] = e;
+                continue;
+            }
+            let entity = this._visualPool[i];
+            if (!entity) {
+                entity = {};
+                this._visualPool[i] = entity;
+            }
+            if (entity._lastId !== e.id) {
+                for (const k in entity) if (k !== '_lastId') delete entity[k];
+                entity._lastId = e.id;
+            }
+            Object.assign(entity, e);
+            entity.x = lerp(old.x, e.x);
+            entity.y = lerp(old.y, e.y);
+            if (Number.isFinite(e.tumbleAngle)) entity.tumbleAngle = lerp(old.tumbleAngle ?? 0, e.tumbleAngle);
+            if (Number.isFinite(e.retreatTime)) entity.retreatTime = lerp(old.hawkRetreatTime ?? 0, e.retreatTime);
+            if (e.snake) {
+                let snake = this._visualSnakePool[i];
+                if (!snake) {
+                    snake = {};
+                    this._visualSnakePool[i] = snake;
+                }
+                if (snake._lastId !== e.id) {
+                    for (const k in snake) if (k !== '_lastId') delete snake[k];
+                    snake._lastId = e.id;
+                }
+                Object.assign(snake, e.snake);
+                snake.phaseAge = old.snakePhase === e.snake.phase ? lerp(old.snakePhaseAge ?? 0, e.snake.phaseAge ?? 0) : e.snake.phaseAge;
+                snake.warningAge = lerp(old.snakeWarningAge ?? 0, e.snake.warningAge ?? 0);
+                snake.age = lerp(old.snakeAge ?? 0, e.snake.age ?? 0);
+                snake.retreatTime = lerp(old.retreatTime ?? 0, e.snake.retreatTime ?? 0);
+                entity.snake = snake;
+            } else {
+                entity.snake = undefined;
+            }
+            out[i] = entity;
+        }
+        view.entities = out;
         return view;
     }
 
