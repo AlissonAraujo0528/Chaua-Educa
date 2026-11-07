@@ -70,7 +70,7 @@ export function drawSeasonParticles(c,atlas,w,h,time,distance,reduced,low,wind=0
  if(reduced || !atlas)return;
  const state=journeySeason(distance);
  const weights=[0,0,0,0];weights[state.from]+=1-state.mix;weights[state.to]+=state.mix;
- const count=low?7:18, cell=atlas.naturalWidth/2;
+ const count=low?7:18, cell=(atlas.naturalWidth||atlas.width)/2;
  for(const season of [0,2]){
   if(weights[season]===0)continue;
   for(let i=0;i<count;i++){

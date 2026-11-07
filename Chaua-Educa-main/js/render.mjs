@@ -501,6 +501,16 @@ export class Renderer {
             getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
             getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
             getPepperSprite();
+            const particlesImg = images.get('season-particles');
+            if (particlesImg && !particlesImg._rasterized) {
+                const pw = particlesImg.naturalWidth || particlesImg.width;
+                const ph = particlesImg.naturalHeight || particlesImg.height;
+                const off = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : document.createElement('canvas');
+                off.width = pw; off.height = ph;
+                off.getContext('2d').drawImage(particlesImg, 0, 0);
+                off._rasterized = true;
+                images.set('season-particles', off);
+            }
             this.seasonalBackdrop=new SeasonalBackdrop();
             this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,0);
             // Initialize the enlarged predator compositor while assets load,
@@ -802,7 +812,7 @@ export class Renderer {
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
         }else if(!seasonal)this.skyLayer(light,stage===2&&stageMix===1);
-        for (let layer = 0; !images.has('forest') && layer < 3; layer++) {
+        for (let layer = 0; !images.has('forest') && !seasonal && layer < 3; layer++) {
             const gap = 180 - layer * 25, travel = (offset * (.07 + layer * .06)) % gap;
             c.globalAlpha = .12 + layer * .08;
             for (let i = -1; i < w / gap + 2; i++) {
