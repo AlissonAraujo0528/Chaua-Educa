@@ -1376,9 +1376,9 @@ export class Renderer {
         const action=hawkAction(entity,time,reduced);
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
-        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-86,-87,172,172);
-        if(!newHawk)atlasAnimation(c,'hawk',clip,.47);
-        if(retreat&&!reduced)drawOrbitingStars(c,-24,-40,80,time);
+        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-140,-140,280,280);
+        if(!newHawk)atlasAnimation(c,'hawk',clip,.78);
+        if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
         c.restore();
     }
 

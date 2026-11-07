@@ -143,9 +143,13 @@ export function snakeA2Pose(s={},reduced=false){
   if(t<0.85){
     f=frame(t/.85,8);
   } else {
-    // Loop the dazed wobble expression (frames 4, 5, 6, 7) so the stunned snake stays visibly dazed
-    const loop=[7,6,5,4,5,6];
-    f=loop[Math.floor((t-0.85)*5)%loop.length];
+    // Transition smoothly down to frames 2 and 3 and stay looping between spiral-eye stunned poses until offscreen
+    const step = Math.floor((t - 0.85) * 8);
+    if (step === 0) f = 6;
+    else if (step === 1) f = 5;
+    else if (step === 2) f = 4;
+    else if (step === 3) f = 3;
+    else f = (step % 2 === 0) ? 2 : 3;
   }
   return {key:'stunned',frame:reduced?3:f,state:'shield-stunned'};
  }
