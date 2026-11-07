@@ -5,7 +5,7 @@ import {JOURNEY,JOURNEY_LENGTH,journeyStage} from '../Chaua-Educa-main/js/journe
 function flight(){const g=new Game();g.state='playing';g.nextSpawn=Infinity;return g;}
 function ready(){const g=flight();g.distance=JOURNEY_LENGTH;g.y=320;g.vy=0;g.refuge={x:330,y:320};return g;}
 test('score awards a single medal but never ends a flight',()=>{
- const g=flight(),events=[];g.onEvent=e=>events.push(e);g.addScore(200);g.addScore(5);g.tick(STEP);
+ const g=flight(),events=[];g.onEvent=e=>events.push(e);g.addScore(1000);g.addScore(5);g.tick(STEP);
  assert.equal(g.state,'playing');assert.equal(g.medal,true);assert.equal(events.filter(e=>e.type==='medal').length,1);
 });
 test('four stages depend on distance, not score or screen size',()=>{

@@ -1207,6 +1207,23 @@ export class Renderer {
                 c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
                 if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
                 else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
+                else if(p.seed) {
+                    c.save();
+                    c.translate(p.x, p.y);
+                    c.rotate(p.rotation);
+                    const sw = p.size || 2.8, sh = sw * 1.7;
+                    c.fillStyle = p.color || '#432610';
+                    c.beginPath();
+                    c.moveTo(0, -sh);
+                    c.bezierCurveTo(sw, -sh * 0.3, sw, sh * 0.6, 0, sh);
+                    c.bezierCurveTo(-sw, sh * 0.6, -sw, -sh * 0.3, 0, -sh);
+                    c.fill();
+                    c.fillStyle = '#a67246bb';
+                    c.beginPath();
+                    c.ellipse(-sw * 0.3, -sh * 0.2, sw * 0.35, sh * 0.4, 0, 0, Math.PI * 2);
+                    c.fill();
+                    c.restore();
+                }
                 else if(p.puff) {
                     const scale = 1 + (1 - p.life / (p.maxLife ?? .28)) * 1.6;
                     oval(c, p.x, p.y, (p.size || 4) * scale, (p.size || 4) * scale * 0.7, p.color);

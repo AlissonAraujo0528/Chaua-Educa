@@ -87,11 +87,11 @@ export function snakeA2HitsPlayer(wood,playerPolygons,reduced=false){
 // The fruit must be clear of every visible pose, including shield stun.
 // 56 logical pixels includes the fruit halo, its bobbing motion and
 // a visible air gap around the snake.
-export function snakeA2FruitHasClearance(wood,x,y,radius=56){
+export function snakeA2FruitHasClearance(wood,x,y,radius=62){
  const place=snakePlacement(wood);
  if(!isSnakeA2Ready()){
   const dx=Math.abs(x-place.x),dy=place.y-y;
-  if(dx<95&&dy>0&&dy<210)return false;
+  if(dx<100&&dy>0&&dy<225)return false;
   return true;
  }
  const [colStart,colEnd]=candidateRange(x,radius,place.x,SNAKE_A2_GRID.anchorX,place.factor);

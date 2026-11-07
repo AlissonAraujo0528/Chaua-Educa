@@ -17,12 +17,12 @@ export const HEIGHT = 640;
 export const STEP = 1 / 120;
 export const FEATHER_SECONDS = 10;
 export const CONTACT = Object.freeze({top:20, bottom:HEIGHT-25, recoveryMargin:36, grace:1.6});
-export const VICTORY_SCORE = 200;
+export const VICTORY_SCORE = 1000;
 export const QUIZ_INTERVAL = 30;
 export const FLIGHT = Object.freeze({
     gravity: 900, fallLimit: 360, tapLift: 300,
     holdLift: 230, staminaLift: 50, flapInterval: .22, inputBuffer: .12,
-    aventura: {speed:275,gap:156,minGap:122,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,diveAt:42,warning:1.5,snakeClearance:144,fruitMargin:34,clearance:210,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
+    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,diveAt:42,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:210,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
     tranquilo: {speed:205,gap:220,minGap:185,interval:2.1,minInterval:1.8,ramp:.0017,speedGain:30,snakeAt:32,hawkAt:55,diveAt:78,warning:2.2},
 });
 export const STAGES = JOURNEY.map(s=>s.name);
@@ -108,7 +108,7 @@ export class Game {
         this.powerRandom = this.randomOverride ?? seededRandom(this.seed ^ 0x85ebca6b);
         Object.assign(this, {
             tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
-            scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:0,nextShield:0,nextFeather:18,nextPepper:26},
+            scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:8,nextShield:14,nextFeather:24,nextPepper:36},
             mode, state: 'menu', elapsed: 0, sceneTime: 0, distance: 0, score: 0, fruits: 0, correct: 0,
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
             flapCooldown: 0, pendingTap: 0, stamina: 1, wing: 0, flapImpulse: 0, angle: 0, y: HEIGHT * .48,
@@ -381,6 +381,24 @@ export class Game {
                 size: 2.2 + (i % 3) * 1.2
             });
         }
+        // Dispersao de sementes pelo chaua apos comer a fruta
+        const seedColors = ['#432610', '#5c3516', '#72421d', '#381e0b'];
+        for (let s = 0; s < 4; s++) {
+            const seedAngle = (s * 0.4 - 0.6) + (Math.random() - 0.5) * 0.3;
+            this.particle({
+                x: x + (Math.random() - 0.5) * 10,
+                y: y + (Math.random() - 0.5) * 8,
+                vx: Math.sin(seedAngle) * (20 + Math.random() * 30) - 15,
+                vy: Math.random() * 25 + 10,
+                life: 0.9 + Math.random() * 0.4,
+                maxLife: 1.3,
+                color: seedColors[s % seedColors.length],
+                spark: true, seed: true,
+                size: 2.5 + Math.random() * 1.0,
+                rotation: Math.random() * Math.PI * 2,
+                spin: (Math.random() - 0.5) * 8
+            });
+        }
         for (let j = 0; j < 3; j++) {
             const angle = -Math.PI * 0.5 + (j - 1) * 0.7;
             this.particle({
@@ -455,7 +473,7 @@ export class Game {
         let deadParticles=false;
         for(const p of this.particles) {
             p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
-            if(p.feather||p.chip) {p.vy+=(p.chip?380:210)*dt;p.rotation+=p.spin*dt;}
+            if(p.feather||p.chip||p.seed) {p.vy+=(p.chip?380:p.seed?320:210)*dt;p.rotation+=p.spin*dt;}
             if(!(p.life>0))deadParticles=true;
         }
         if(deadParticles)this.particles=this.particles.filter(p=>p.life>0);
@@ -517,7 +535,7 @@ export class Game {
         const nearbySnakes = this.entities.filter(entity => entity.kind === 'wood' && entity.snake);
         const placedFruits=[];
         const corridorTop = center - encounterGap / 2 + 55;
-        const corridorBottom = center + encounterGap / 2 - (hasSnake ? 200 : 55);
+        const corridorBottom = center + encounterGap / 2 - (hasSnake ? 218 : 55);
         for(const [index,point] of fruits.entries()) {
             let fy = point.y, fx=x+point.x;
             if (hasSnake) {
@@ -528,7 +546,7 @@ export class Game {
             }
             for (const s of nearbySnakes) {
                 if (Math.abs(fx - (s.x + 29)) < 110) {
-                    const safeLimit = Math.min(corridorBottom, s.bottom - 200);
+                    const safeLimit = Math.min(corridorBottom, s.bottom - 218);
                     if (fy > safeLimit) fy = safeLimit;
                     fy = Math.max(corridorTop, fy);
                 }
