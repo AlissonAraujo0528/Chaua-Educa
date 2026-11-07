@@ -76,9 +76,9 @@ test('both difficulties remain playable with 120ms reaction and 30Hz decisions, 
             }
             if(pending!==null&&g.elapsed>=pending){g.press();g.release();pending=null;}
             g.tick(STEP);
-            if(g.state==='ended')break;
+            if(g.state==='ended'||g.distance>=28000)break;
         }
-        assert.equal(g.won,true,`${mode} seed ${seed}: ${g.reason}, ${g.elapsed.toFixed(1)}s`);
+        assert.equal(g.distance,28000,`${mode} seed ${seed}: ${g.reason}, ${g.elapsed.toFixed(1)}s`);
         assert.equal(g.fruits,0);assert.equal(g.shield,false);
     }
 });

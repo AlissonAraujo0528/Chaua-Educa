@@ -1,3 +1,4 @@
+import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {drawContinuousSnake} from './snake-render.mjs';
 import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready} from './snake-a2.mjs';
@@ -28,23 +29,26 @@ const mixColor = (a, b, t) => {
     return `rgb(${r},${g},${bl})`;
 };
 
-let blendSurface, blendSurfaceCtx;
-function blendSprite(c, first, second, blend) {
-    // Add the two weighted sprites on transparency, then composite once onto
-    // the forest. Source-over crossfades make opaque bodies look like ghosts.
-    if(!blendSurface && typeof OffscreenCanvas!=='undefined')blendSurface=new OffscreenCanvas(512,512);
-    if(!blendSurface && typeof document!=='undefined') {
-        blendSurface=document.createElement('canvas');blendSurface.width=512;blendSurface.height=512;
+const spriteBlendBuffers=new Map();
+function blendSprite(c, first, second, blend, extent=128) {
+    // Separate reusable buffers avoid reallocating when switching bird sizes.
+    let buffer=spriteBlendBuffers.get(extent);
+    if(!buffer){
+        const rasterScale=extent===180?320/HAWK_ART.size:2;
+        const size=Math.ceil(extent*2*rasterScale);
+        const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(size,size):
+            typeof document!=='undefined'?document.createElement('canvas'):null;
+        if(!surface){(blend<.5?first:second)(c);return;}
+        surface.width=size;surface.height=size;
+        buffer={surface,layer:surface.getContext('2d'),rasterScale};spriteBlendBuffers.set(extent,buffer);
     }
-    if(!blendSurface){(blend<.5?first:second)(c);return;}
-    if(!blendSurfaceCtx)blendSurfaceCtx=blendSurface.getContext('2d');
-    const layer=blendSurfaceCtx;
-    layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,512,512);
-    layer.setTransform(2,0,0,2,256,256);
+    const {surface,layer,rasterScale}=buffer;
+    layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,surface.width,surface.height);
+    layer.setTransform(rasterScale,0,0,rasterScale,extent*rasterScale,extent*rasterScale);
     layer.globalCompositeOperation='source-over';layer.globalAlpha=1-blend;first(layer);
     layer.globalCompositeOperation='lighter';layer.globalAlpha=blend;second(layer);
     layer.globalAlpha=1;layer.globalCompositeOperation='source-over';
-    c.drawImage(blendSurface,-128,-128,256,256);
+    c.drawImage(surface,-extent,-extent,extent*2,extent*2);
 }
 
 function atlasFrame(c,name,index,factor){
@@ -52,8 +56,8 @@ function atlasFrame(c,name,index,factor){
     if(!image)return;
     c.drawImage(image,...frame.rect,-frame.anchor[0]*factor,-frame.anchor[1]*factor,data.cell*factor,data.cell*factor);
 }
-function atlasAnimation(c,name,clip,factor){
-    if(clip.blend>0&&clip.frame!==clip.next)blendSprite(c,layer=>atlasFrame(layer,name,clip.frame,factor),layer=>atlasFrame(layer,name,clip.next,factor),clip.blend);
+function atlasAnimation(c,name,clip,factor,extent=128){
+    if(clip.blend>0&&clip.frame!==clip.next)blendSprite(c,layer=>atlasFrame(layer,name,clip.frame,factor),layer=>atlasFrame(layer,name,clip.next,factor),clip.blend,extent);
     else atlasFrame(c,name,clip.frame,factor);
 }
 function perchedSprite(c,clip,factor){
@@ -497,6 +501,13 @@ export class Renderer {
             getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
             getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
             getPepperSprite();
+            this.seasonalBackdrop=new SeasonalBackdrop();
+            this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,0);
+            // Initialize the enlarged predator compositor while assets load,
+            // before the start button is enabled, not at its first encounter.
+            this.c.save();this.c.translate(-1000,-1000);
+            this.hawk({id:1,x:0,y:0,warning:0,phase:'crossing'},0,false);
+            this.c.restore();
         });
         this.resize();
     }
@@ -1248,11 +1259,17 @@ export class Renderer {
                 dynamicAngle=Math.cos(time*2.8+(entity.id||0)*1.5)*.035;
             }
         }
-        const action=hawkAction(entity,time,reduced);
+        const action=hawkAction(entity,time,reduced) ?? (reduced&&hawkUsesActionArt(entity)?{sheet:entity.retreat?'hawk-stunned':'hawk-flight',frame:entity.retreat?2:0}:null);
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
-        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-140,-140,280,280);
-        if(!newHawk)atlasAnimation(c,'hawk',clip,.78);
+        let newHawk=false;
+        if(action){
+            const draw=(layer,frame)=>drawActionSheet(layer,action.sheet,frame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
+            if(action.blend>0&&hawkUsesActionArt(entity)){
+                blendSprite(c,layer=>draw(layer,action.frame),layer=>draw(layer,action.next),action.blend,180);newHawk=true;
+            }else newHawk=draw(c,action.frame);
+        }
+        if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
         if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
         c.restore();
     }

@@ -25,7 +25,7 @@ const assert=require('node:assert/strict'),{chromium}=require('playwright');
      shield:text('#shield-status span'),feather:text('#feather-status span'),pepper:text('#pepper-status span'),
      energy:document.querySelector('#energy').value};
    });
-   assert.deepEqual(values,{state:'paused',score:'321',stage:'Árvores antigas',destination:'Abrigo · 4%',progress:'4',shield:'Escudo pronto',feather:'×2 · 5s',pepper:'Turbo · 4s',energy:.5});
+   assert.deepEqual(values,{state:'paused',score:'321',stage:'Árvores antigas',destination:'Abrigo · 32%',progress:'32',shield:'Escudo pronto',feather:'×2 · 5s',pepper:'Turbo · 4s',energy:.5});
    const redundant=await page.evaluate(()=>{
     const observer=new MutationObserver(()=>{});
     observer.observe(document.querySelector('#hud'),{subtree:true,attributes:true,childList:true,characterData:true});
@@ -35,7 +35,7 @@ const assert=require('node:assert/strict'),{chromium}=require('playwright');
    assert.equal(redundant,0,'unchanged HUD must not rewrite its DOM, including fractional progress');
    for(const fraction of [0,.25,.5,1]){
     const progress=await page.evaluate(async fraction=>{
-     const {game:g}=await import('/js/script.js');g.distance=28000*fraction;window.stepHud(.1);
+     const {game:g}=await import('/js/script.js');g.score=1000*fraction;window.stepHud(.1);
      const fill=document.querySelector('#progress-fill'),track=document.querySelector('#progress-track');
      return {ratio:fill.getBoundingClientRect().width/track.getBoundingClientRect().width,aria:track.getAttribute('aria-valuenow'),inlineWidth:fill.style.width};
     },fraction);

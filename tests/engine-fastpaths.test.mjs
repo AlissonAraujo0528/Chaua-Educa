@@ -8,10 +8,10 @@ test('hawk broad phase never skips an exact collision',()=>{
  for(const angle of [-.23,-.1,0,.15,.28]){
   const player=playerShapes(220,320,angle);
   for(const dive of [false,true]){
-   for(let dx=-100;dx<=100;dx+=5)for(let dy=-85;dy<=85;dy+=5){
+   for(let dx=-160;dx<=160;dx+=5)for(let dy=-130;dy<=130;dy+=5){
     const hawk={x:220+dx,y:320+dy,dive,startX:1050,startY:dive?105:320,targetX:160,targetY:dive?500:320};
     if(shapesIntersect(player,hawkShapes(hawk)))
-     assert.ok(Math.abs(dx)<80&&Math.abs(dy)<60,
+     assert.ok(Math.abs(dx)<140&&Math.abs(dy)<110,
        'hawk collision culled at '+JSON.stringify({angle,dive,dx,dy}));
    }
   }

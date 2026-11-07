@@ -25,3 +25,14 @@ test('season cache reuses surfaces and retains at most two frames',t=>{
  const old=[...cache.frames.values()];cache.draw(c,atlas,1366,638,1,42,22000,false);
  assert.ok(old.every(s=>s.width===0&&s.height===0));
 });
+
+test('upcoming seasonal frame is prepared before the transition starts',t=>{
+ const old=globalThis.OffscreenCanvas;t.after(()=>{globalThis.OffscreenCanvas=old;});
+ const c=new Proxy({},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
+ globalThis.OffscreenCanvas=class{constructor(w,h){this.width=w;this.height=h;}getContext(){return c;}};
+ const cache=new SeasonalBackdrop(),atlas={naturalWidth:1672,naturalHeight:941};
+ cache.prepare(atlas,1366,638,1,0);
+ for(let d=5100;d<5300;d+=20)cache.prepare(atlas,1366,638,1,d);
+ assert.ok(cache.frames.has(1));assert.equal(cache.frames.size,2);assert.equal(cache.pending,null);
+ const next=cache.frames.get(1);cache.prepare(atlas,1366,638,1,6100);assert.equal(cache.frames.get(1),next);
+});

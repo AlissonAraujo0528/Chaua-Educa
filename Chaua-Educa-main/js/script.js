@@ -3,13 +3,12 @@ import { LESSONS, resultAdvice } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
 import { journeyRain, journeyStorm, journeyWind } from './weather.mjs';
-import { JOURNEY_LENGTH } from './journey.mjs';
 import { FlightInput } from './input.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
 import { FRUITS } from './fruits.mjs';
 import DB from './database.js';
-import { Game, FlightClock, HEIGHT, STAGES } from './engine.mjs';
+import { Game, FlightClock, HEIGHT, STAGES, VICTORY_SCORE } from './engine.mjs';
 import { Renderer, drawBird } from './render.mjs';
 import { ACTION_SPRITES_ENABLED, preloadActionSheets } from './action-sheets.mjs';
 
@@ -60,7 +59,7 @@ export const game = new Game({ onEvent(event) {
     const messages = { shield: 'Escudo de penas · um contato protegido', feather: 'Pena dourada · pontos ×2 por 10s de voo', pepper: 'Pimenta da mata · Voo turbo com velocidade e pontos ×2!', 'shield-break': 'Escudo usado · proteção breve para retomar o voo', quiet: 'Uma clareira. Recupere o fôlego.' };
     if(event.type==='stage')toast(event.message);
     if(event.type==='refuge')toast('O bando espera no centro: alinhe o voo para pousar.');
-    if(event.type==='medal')toast('1.000 pontos · medalha conquistada! Continue até o abrigo.');
+    if(event.type==='medal')toast('1.000 pontos · abrigo liberado! Alinhe o voo com o bando.');
     if (messages[event.type]) toast(messages[event.type]);
     if(event.type==='shield-kept')toast('Seu escudo já está pronto · proteção mantida');
     if(event.type==='feather' && event.renewed)toast('Pena renovada · mais 10s de pontos ×2');
@@ -237,7 +236,7 @@ function result() {
     const progress=DB.missionProgress(player);
     const earned=completedMissions(progress).filter(m=>!flightMissionIds.includes(m.id));
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
-    $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(game.distance/JOURNEY_LENGTH*100)}% do caminho · ${STAGES[game.stage]}`;
+    $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}% do caminho · ${STAGES[game.stage]}`;
     $('#new-record').hidden = !record || game.score === 0;
     $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Frutas ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
@@ -323,11 +322,11 @@ function syncUI() {
     if (game.state === 'countdown') hudText('#count-number',Math.max(1, Math.ceil(game.countdown)));
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
-    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(game.distance/JOURNEY_LENGTH*100)}%`);
-    const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,game.distance/JOURNEY_LENGTH*100);
+    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}%`);
+    const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,Math.min(1,game.score/VICTORY_SCORE)*100);
     if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
     hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
-    hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');
+    hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Pontos para liberar o abrigo');
     hudValue('#energy',game.stamina);
     hudClass('#shield-status','active',game.shield);
     hudText('#shield-status span',game.shield ? 'Escudo pronto' : 'Sem escudo');
