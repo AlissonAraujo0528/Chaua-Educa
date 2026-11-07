@@ -480,7 +480,7 @@ export class Renderer {
         this.transitionRasterDisabled = false;
         this.transitionSlowReadbacks = 0;
         // Diagnostic-only opt-out for paired A/B; production keeps bounded readbacks.
-        this.transitionSyncEnabled = true;
+        this.transitionSyncEnabled = typeof location !== 'undefined' && location.search.includes('transitionSync=1');
         // The forest WebP is fully opaque; the sky behind an alpha=1 forest is invisible.
         // Keep an A/B override to verify exact parity against the original composition.
         this.opaqueForestSkyEnabled = true;
@@ -814,26 +814,28 @@ export class Renderer {
             this.seasonalBackdrop ??= new SeasonalBackdrop();
             this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
         }
-        if(this.decoration!=='low') {
-            c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
-            for(let i=0;i<3;i++){
-                const drift=reduced?0:Math.sin(time*.12+i*2)*w*.045;
-                c.beginPath();c.ellipse(w*(.18+i*.34)+drift,h*(.48+i*.1),w*.35,h*.035,0,0,TAU);c.fill();
+        if (!images.has('forest') && !seasonal) {
+            if(this.decoration!=='low') {
+                c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
+                for(let i=0;i<3;i++){
+                    const drift=reduced?0:Math.sin(time*.12+i*2)*w*.045;
+                    c.beginPath();c.ellipse(w*(.18+i*.34)+drift,h*(.48+i*.1),w*.35,h*.035,0,0,TAU);c.fill();
+                }
+                c.restore();
             }
-            c.restore();
-        }
-        // Low-contrast tree layers are behind gameplay, at distinct parallax speeds.
-        for(let layer=0;layer<(this.decoration==='low'?1:2);layer++) {
-            const spacing=layer?340:240, travel=offset*(layer?.22:.09);
-            c.save();c.globalAlpha=layer?.075:.045;
-            for(let i=-1;i<=Math.ceil(w/spacing)+1;i++) {
-                const worldIndex=i+Math.floor(travel/spacing);
-                const x=i*spacing-(travel%spacing)+Math.sin(worldIndex*8.2)*20;
-                c.fillStyle=layer?'#244e40':'#b8ce9c';
-                c.beginPath();c.moveTo(x-14,h);c.quadraticCurveTo(x+7,h*.5,x-3,-10);c.lineTo(x+14,-10);c.quadraticCurveTo(x+22,h*.6,x+28,h);c.fill();
-                oval(c,x,h*.08,110+layer*20,70,'#537b4a');
+            // Low-contrast tree layers are behind gameplay, at distinct parallax speeds.
+            for(let layer=0;layer<(this.decoration==='low'?1:2);layer++) {
+                const spacing=layer?340:240, travel=offset*(layer?.22:.09);
+                c.save();c.globalAlpha=layer?.075:.045;
+                for(let i=-1;i<=Math.ceil(w/spacing)+1;i++) {
+                    const worldIndex=i+Math.floor(travel/spacing);
+                    const x=i*spacing-(travel%spacing)+Math.sin(worldIndex*8.2)*20;
+                    c.fillStyle=layer?'#244e40':'#b8ce9c';
+                    c.beginPath();c.moveTo(x-14,h);c.quadraticCurveTo(x+7,h*.5,x-3,-10);c.lineTo(x+14,-10);c.quadraticCurveTo(x+22,h*.6,x+28,h);c.fill();
+                    oval(c,x,h*.08,110+layer*20,70,'#537b4a');
+                }
+                c.restore();
             }
-            c.restore();
         }
         const transition=stageMix;
         c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
@@ -970,9 +972,13 @@ export class Renderer {
             const remaining = Math.min(1, game.pepper / 2);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const turboRadius = (46 + 14 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 12) * 0.08);
-            const aura = c.createRadialGradient(game.x, game.y, 8, game.x, game.y, turboRadius);
-            aura.addColorStop(0, '#ff523366'); aura.addColorStop(0.5, '#ff883344'); aura.addColorStop(1, '#ff330000');
-            oval(c, game.x, game.y, turboRadius, turboRadius, aura);
+            const auraSurface = getPickupCache('chaua-pepper-aura', 60, [[8, 0, '#ff523366'], [8, 0.5, '#ff883344'], [8, 1, '#ff330000']]);
+            if (auraSurface) c.drawImage(auraSurface, game.x - turboRadius, game.y - turboRadius, turboRadius * 2, turboRadius * 2);
+            else {
+                const aura = c.createRadialGradient(game.x, game.y, 8, game.x, game.y, turboRadius);
+                aura.addColorStop(0, '#ff523366'); aura.addColorStop(0.5, '#ff883344'); aura.addColorStop(1, '#ff330000');
+                oval(c, game.x, game.y, turboRadius, turboRadius, aura);
+            }
             if (!reduced) {
                 for (let i = 1; i <= 8; i++) {
                     const trailX = game.x - i * 14;
@@ -998,11 +1004,15 @@ export class Renderer {
             const remaining = Math.min(1, game.feather / 3);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const radius = (66 + 18 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 3) * 0.06);
-            const aura = c.createRadialGradient(game.x, game.y, 16, game.x, game.y, radius);
-            aura.addColorStop(0, 'rgba(255, 235, 140, 0.45)');
-            aura.addColorStop(0.65, 'rgba(255, 205, 60, 0.28)');
-            aura.addColorStop(1, 'rgba(255, 216, 80, 0)');
-            oval(c, game.x, game.y, radius, radius, aura);
+            const auraSurface = getPickupCache('chaua-feather-aura', 84, [[16, 0, 'rgba(255, 235, 140, 0.45)'], [16, 0.65, 'rgba(255, 205, 60, 0.28)'], [16, 1, 'rgba(255, 216, 80, 0)']]);
+            if (auraSurface) c.drawImage(auraSurface, game.x - radius, game.y - radius, radius * 2, radius * 2);
+            else {
+                const aura = c.createRadialGradient(game.x, game.y, 16, game.x, game.y, radius);
+                aura.addColorStop(0, 'rgba(255, 235, 140, 0.45)');
+                aura.addColorStop(0.65, 'rgba(255, 205, 60, 0.28)');
+                aura.addColorStop(1, 'rgba(255, 216, 80, 0)');
+                oval(c, game.x, game.y, radius, radius, aura);
+            }
             if (!reduced) {
                 for (let i = 1; i < 9; i++) {
                     oval(c, game.x - i * 11, game.y + Math.sin(game.elapsed * 7 - i) * 8, 4 * (1 - i / 10), 4, `rgba(255, 225, 110, ${0.8 - i * 0.08})`);
@@ -1015,17 +1025,27 @@ export class Renderer {
             c.beginPath();c.arc(game.x,game.y,reduced?48:48+(1-game.powerFade/.5)*22,0,TAU);c.stroke();c.restore();
         }
         // Collection trails suggest optional trajectories, never solid obstacles.
-        const routes=new Map();
-        for(const e of game.entities) if(e.kind==='fruit' && e.route!==undefined && !e.collected) {
-            let list=routes.get(e.route);
-            if(!list){list=[];routes.set(e.route,list);}
+        this._routesMap ??= new Map();
+        this._routesLists ??= [];
+        for (const list of this._routesMap.values()) {
+            list.length = 0;
+            this._routesLists.push(list);
+        }
+        this._routesMap.clear();
+        for (const e of game.entities) if (e.kind === 'fruit' && e.route !== undefined && !e.collected) {
+            let list = this._routesMap.get(e.route);
+            if (!list) {
+                list = this._routesLists.pop() || [];
+                this._routesMap.set(e.route, list);
+            }
             list.push(e);
         }
-        for(const fruit of routes.values()) if(fruit.length>1) {
-            fruit.sort((a,b)=>a.x-b.x);c.save();c.strokeStyle=fruit[0].optional?'#f4d77caa':'#e9f3cf99';
-            c.lineWidth=2;c.setLineDash([4,8]);c.beginPath();c.moveTo(fruit[0].x,fruit[0].y);
-            for(let i=1;i<fruit.length;i++)c.lineTo(fruit[i].x,fruit[i].y);
-            c.stroke();c.restore();
+        for (const fruit of this._routesMap.values()) if (fruit.length > 1) {
+            fruit.sort((a,b) => a.x - b.x);
+            c.save(); c.strokeStyle = fruit[0].optional ? '#f4d77caa' : '#e9f3cf99';
+            c.lineWidth = 2; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
+            for (let i = 1; i < fruit.length; i++) c.lineTo(fruit[i].x, fruit[i].y);
+            c.stroke(); c.restore();
         }
         const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
         for (const e of game.entities) {
