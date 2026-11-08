@@ -2,7 +2,7 @@ import { VisualQuality } from './quality.mjs';
 import { LESSONS, resultAdvice } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
-import { journeyRain, journeyStorm, journeyWind } from './weather.mjs';
+import { journeyRain, journeyStorm, journeyWind, getWeatherMode, setWeatherMode } from './weather.mjs';
 import { FlightInput } from './input.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
@@ -120,7 +120,50 @@ function home() {
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
-    app.classList.remove('in-flight','training'); updateTrainingButton(); resize(); $('#inputPlayer').focus({ preventScroll: true });
+    app.classList.remove('in-flight','training'); updateTrainingButton();
+
+const WEATHER_MODES = [
+    { id: 'auto', label: 'Automático 🍃', icon: '🌤️' },
+    { id: 'summer', label: 'Sol de Verão ☀️', icon: '☀️' },
+    { id: 'storm', label: 'Tempestade & Relâmpagos ⚡', icon: '⚡' },
+    { id: 'rain', label: 'Chuva da Mata 🌧️', icon: '🌧️' },
+    { id: 'winter', label: 'Inverno & Neve ❄️', icon: '❄️' },
+    { id: 'autumn', label: 'Outono & Vento 🍂', icon: '🍂' },
+    { id: 'spring', label: 'Primavera & Flores 🌸', icon: '🌸' }
+];
+
+const btnWeather = $('#btn-weather-quick');
+const weatherSelect = $('#weather-mode');
+
+function updateWeatherUI() {
+    const cur = getWeatherMode();
+    const m = WEATHER_MODES.find(w => w.id === cur) || WEATHER_MODES[0];
+    if (btnWeather) {
+        btnWeather.textContent = m.icon;
+        btnWeather.title = `Clima atual: ${m.label} (clique para alternar)`;
+    }
+    if (weatherSelect) weatherSelect.value = cur;
+}
+
+if (btnWeather) {
+    btnWeather.addEventListener('click', () => {
+        const cur = getWeatherMode();
+        const idx = WEATHER_MODES.findIndex(w => w.id === cur);
+        const next = WEATHER_MODES[(idx + 1) % WEATHER_MODES.length];
+        setWeatherMode(next.id);
+        updateWeatherUI();
+        anunciar(`Clima: ${next.label}`);
+    });
+}
+
+if (weatherSelect) {
+    weatherSelect.addEventListener('change', event => {
+        setWeatherMode(event.target.value);
+        updateWeatherUI();
+    });
+}
+
+updateWeatherUI(); resize(); $('#inputPlayer').focus({ preventScroll: true });
 }
 
 $('#inputPlayer').addEventListener('input', event => {
@@ -435,6 +478,7 @@ function showSettings(fromPause=false){
     settingsFromPause=fromPause;
     if(fromPause)$('#pause-dialog').close();
     $('#quality-mode').value=quality.mode;
+    if($('#weather-mode')) $('#weather-mode').value=getWeatherMode();
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
     openDialog('#settings-dialog');

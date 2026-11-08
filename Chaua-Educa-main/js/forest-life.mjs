@@ -1,31 +1,79 @@
-import {breeze, winterAmount} from './living-motion.mjs';
+import {breeze, winterAmount, summerSunAmount} from './living-motion.mjs';
 
-// Renders ambient forest atmosphere: winter snowfall, rising humid ground mist, and atmospheric breeze.
+// Renders living forest atmosphere:
+// 1. Radiant tropical summer sun and volumetric crepuscular God rays
+// 2. Winter snowfall flurries and frosty mountain haze
+// 3. Atlantic Forest rising ground mist responding to rain and wind
+// 4. Ambient airborne drift
 // All particle motion is deterministic based on simulation time so pausing is 100% frozen.
-export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = false, low = false) {
+export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = false, low = false, storm = 0) {
     const t = reduced ? 0 : time;
     const air = breeze(t, wind, reduced);
     const snow = winterAmount(distance);
+    const sun = summerSunAmount(distance, rain, storm);
 
     c.save();
 
-    // 1. Winter mountain atmosphere & multi-layer snowfall
+    // 1. O SOL FORTE DO VERÃO (Radiant Sun & Volumetric God Rays)
+    if (sun > 0.05 && rain < 0.7 && storm < 0.5) {
+        const sunX = w * 0.78, sunY = h * 0.14;
+        const sunR = Math.min(w, h) * 0.18;
+
+        // Radiant sun core and corona
+        const sunGrad = c.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+        sunGrad.addColorStop(0, '#ffffff');
+        sunGrad.addColorStop(0.25, '#fffbeb');
+        sunGrad.addColorStop(0.55, '#fde68a66');
+        sunGrad.addColorStop(1, '#f59e0b00');
+
+        c.save();
+        c.globalAlpha = Math.min(0.9, sun * 0.85);
+        c.fillStyle = sunGrad;
+        c.beginPath();
+        c.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+        c.fill();
+
+        // Volumetric Crepuscular Sunbeams (God Rays) piercing the canopy
+        if (!reduced && !low) {
+            const beamAlpha = sun * (0.16 + 0.04 * Math.sin(t * 0.8));
+            c.globalAlpha = beamAlpha;
+            const beamGrad = c.createLinearGradient(sunX, sunY, sunX - w * 0.7, h);
+            beamGrad.addColorStop(0, '#fffbeb88');
+            beamGrad.addColorStop(0.4, '#fef08a33');
+            beamGrad.addColorStop(1, '#fef08a00');
+            c.fillStyle = beamGrad;
+
+            for (let b = 0; b < 5; b++) {
+                const angle = 0.68 + b * 0.15 + Math.sin(t * 0.2 + b) * 0.018;
+                const beamWidth = 32 + b * 18;
+                c.beginPath();
+                c.moveTo(sunX, sunY);
+                c.lineTo(sunX - Math.cos(angle) * (w * 1.5) - beamWidth, sunY + Math.sin(angle) * (h * 1.5));
+                c.lineTo(sunX - Math.cos(angle) * (w * 1.5) + beamWidth, sunY + Math.sin(angle) * (h * 1.5));
+                c.closePath();
+                c.fill();
+            }
+        }
+        c.restore();
+    }
+
+    // 2. INVERNO E NEVASCAS (Winter snowfall & mountain cold)
     if (snow > 0) {
-        c.globalAlpha = snow * 0.08;
+        c.globalAlpha = snow * 0.10;
         c.fillStyle = '#deefff';
         c.fillRect(0, 0, w, h);
 
         if (!reduced) {
             const layers = low ? 1 : 2;
             for (let layer = 0; layer < layers; layer++) {
-                const flakeCount = low ? 16 : (layer === 0 ? 36 : 24);
-                const speed = 18 + layer * 16;
-                const r = layer === 0 ? 1.2 : 2.2;
-                c.globalAlpha = snow * (layer === 0 ? 0.35 : 0.68);
+                const flakeCount = low ? 16 : (layer === 0 ? 38 : 26);
+                const speed = 20 + layer * 18;
+                const r = layer === 0 ? 1.3 : 2.4;
+                c.globalAlpha = snow * (layer === 0 ? 0.40 : 0.75);
                 c.fillStyle = '#f5faff';
                 c.beginPath();
                 for (let i = 0; i < flakeCount; i++) {
-                    const x = ((i * 139.73 - t * speed + Math.sin(t * 0.65 + i) * 16 + air * 22) % (w + 40) + w + 40) % (w + 40) - 20;
+                    const x = ((i * 139.73 - t * speed + Math.sin(t * 0.65 + i) * 16 + air * 24) % (w + 40) + w + 40) % (w + 40) - 20;
                     const y = (i * 71.17 + t * (speed + (i % 3) * 6)) % (h + 30) - 15;
                     c.moveTo(x + r, y);
                     c.arc(x, y, r, 0, Math.PI * 2);
@@ -35,7 +83,7 @@ export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = fa
         }
     }
 
-    // 2. Rising Atlantic Forest ground mist (Névoa da Mata)
+    // 3. NÉVOA DA MATA (Humid ground mist rising from Atlantic Forest)
     if (!low) {
         const mistTop = h * 0.70;
         const mist = c.createLinearGradient(0, mistTop, 0, h);

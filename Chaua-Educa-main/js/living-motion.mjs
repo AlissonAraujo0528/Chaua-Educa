@@ -1,4 +1,5 @@
 import {smoothstep} from './motion.mjs';
+import {getWeatherMode} from './weather.mjs';
 
 const clamp = v => Math.max(0, Math.min(1, Number.isFinite(v) ? v : 0));
 
@@ -16,7 +17,22 @@ export function treeBend(time, wind, id, hitAge, reduced = false) {
     return breeze(time, wind, false, id * 41) * 0.003 + recoil;
 }
 
-// Distance-based winter mountain transition
+// Distance-based or weather-override winter mountain transition
 export function winterAmount(distance) {
+    const wm = getWeatherMode();
+    if (wm === 'winter') return 1.0;
+    if (wm !== 'auto') return 0;
     return smoothstep(clamp((distance - 17500) / 700)) * smoothstep(clamp((20200 - distance) / 700));
+}
+
+// Bright summer tropical sun presence
+export function summerSunAmount(distance = 0, rain = 0, storm = 0) {
+    const wm = getWeatherMode();
+    if (wm === 'summer') return 1.0;
+    if (wm === 'storm' || wm === 'rain' || wm === 'winter') return 0;
+    if (wm === 'autumn') return 0.25;
+    if (wm === 'spring') return 0.55;
+    if (rain > 0.1 || storm > 0.1) return Math.max(0, 1 - (rain * 0.8 + storm * 0.9));
+    // In auto journey: vibrant tropical sunlight that breathes naturally with distance
+    return 0.75;
 }

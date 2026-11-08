@@ -1,8 +1,15 @@
 import {smoothstep} from './motion.mjs';
+import {getWeatherMode} from './weather.mjs';
 
 // Artistic ambiences along the journey, not a simulation of the local calendar.
 const PHASES = [[0,0],[6000,1],[9000,3],[14000,2],[20000,0]];
 export function journeySeason(distance) {
+ const wm = getWeatherMode();
+ if (wm === 'spring') return {from: 0, to: 0, mix: 1};
+ if (wm === 'autumn') return {from: 1, to: 1, mix: 1};
+ if (wm === 'winter') return {from: 3, to: 3, mix: 1};
+ if (wm === 'summer') return {from: 2, to: 2, mix: 1};
+
  let phase=0;
  while(phase+1<PHASES.length && distance>=PHASES[phase+1][0])phase++;
  const to=PHASES[phase][1], from=phase?PHASES[phase-1][1]:to;
