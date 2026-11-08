@@ -1,3 +1,5 @@
+import {breeze,treeBend} from './living-motion.mjs';
+import {drawForestLife} from './forest-life.mjs';
 import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {drawContinuousSnake} from './snake-render.mjs';
@@ -874,6 +876,7 @@ export class Renderer {
         c.fill();
         c.restore();
         if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
+        drawForestLife(c,w,h,time,seasonDistance??0,rain,wind,reduced,this.decoration==='low');
         drawJourneyFog(c, w, h, fog);
         drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm);
         if (wind > 0 && !reduced) {
@@ -1143,7 +1146,24 @@ export class Renderer {
                 const p = pList[i];
                 c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
                 if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
-                else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
+                else if(p.chip) {
+                    c.save();
+                    c.translate(p.x,p.y);
+                    c.rotate(p.rotation);
+                    c.fillStyle=p.color;
+                    if(p.splinter) {
+                        c.beginPath();
+                        c.moveTo(-p.size*0.35,0);
+                        c.lineTo(0,-p.size*1.6);
+                        c.lineTo(p.size*0.35,0);
+                        c.lineTo(0,p.size*1.6);
+                        c.closePath();
+                        c.fill();
+                    } else {
+                        c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2);
+                    }
+                    c.restore();
+                }
                 else if(p.seed) {
                     c.save();
                     c.translate(p.x, p.y);
@@ -1211,7 +1231,6 @@ export class Renderer {
         const variant = (e.id ?? 0) % 3;
         const x = e.x + 29;
         const wind = reduced ? 0 : journeyWind(game.distance, game.mode, game.tutorial);
-        const sway = wind * .008 * Math.sin(time * 4 + (e.id ?? 0));
         for (const side of ['top', 'bottom']) {
             const upper = side === 'top';
             const y = e[side];
@@ -1223,10 +1242,7 @@ export class Renderer {
             }
             if (broken) continue;
             const hit = game.hit;
-            const recoil = !reduced && hit?.id === e.id && hit.side === side
-                ? .012 * Math.sin(hit.age * 33) * (1 - hit.age / .3)
-                : 0;
-            const lean = sway + recoil;
+            const lean = treeBend(time, wind, e.id ?? 0, hit?.id === e.id && hit.side === side ? hit.age : null, reduced);
             if (lean) {
                 c.save();
                 c.transform(1, 0, lean, 1, -lean * y, 0);
@@ -1234,8 +1250,8 @@ export class Renderer {
             if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind);
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
                 !upper && e.variant === 'branch' ? 3 : variant);
-            if (!upper && e.snake) this.snake(e, reduced);
             if (lean) c.restore();
+            if (!upper && e.snake) this.snake(e, reduced);
         }
     }
     trunk(key,preset,x,y,flip,time=0,variant=0){

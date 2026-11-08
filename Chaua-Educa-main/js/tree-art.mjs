@@ -61,19 +61,44 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge) {
   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
    left, 0, TREE_CELL * scale, join);
   if (breakAge !== undefined) {
+   // Primary fracture fissure
    c.beginPath();
    c.moveTo(-9, 6);
    c.lineTo(2, 23);
    c.lineTo(-5, 39);
    c.lineTo(11, 57);
    c.lineTo(2, 83);
-   c.strokeStyle = '#352218';
-   c.lineWidth = 3;
+   c.strokeStyle = '#2b180e';
+   c.lineWidth = 3.5;
+   c.stroke();
+
+   // Branching structural cracks radiating along wood grain
+   c.beginPath();
+   c.moveTo(2, 23);
+   c.lineTo(-14, 30);
+   c.lineTo(-22, 38);
+   c.moveTo(-5, 39);
+   c.lineTo(12, 44);
+   c.lineTo(21, 56);
+   c.moveTo(11, 57);
+   c.lineTo(-3, 69);
+   c.strokeStyle = '#3e2723';
+   c.lineWidth = 1.8;
+   c.stroke();
+
+   // Inner highlighted split lip for 3D wood relief
+   c.beginPath();
+   c.moveTo(-8, 8);
+   c.lineTo(3, 24);
+   c.lineTo(-4, 40);
+   c.lineTo(12, 58);
+   c.strokeStyle = '#8d6e63';
+   c.lineWidth = 1;
    c.stroke();
   }
  } else {
   const elapsed = breakAge - .055;
-  c.globalAlpha *= Math.max(0, 1 - elapsed / .185);
+  c.globalAlpha *= Math.max(0, 1 - elapsed / .26);
   // Shared jagged edges preserve the whole painted cap at the start of
   // the break. Each piece rotates about its own center, with world gravity.
   const edges = [-TREE_CELL * scale / 2, -19, 19, TREE_CELL * scale / 2];
@@ -93,6 +118,57 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge) {
    c.lineTo(l + (i > 0 ? 6 : 0), join * .3); c.closePath(); c.clip();
    c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
     left, 0, TREE_CELL * scale, join);
+   c.restore();
+  }
+
+  // Estilhacos de madeira e farpas voadoras (wood splinters & flying debris)
+  const isRot = kind === 'rot';
+  const colors = isRot
+   ? ['#2a180e', '#452b1a', '#6d4c33', '#3d522f', '#1f130b']
+   : ['#3e2723', '#5d4037', '#8d6e63', '#a1887f', '#d7ccc8'];
+
+  // Soft wood dust / decay smoke puff at impact epicenter
+  if (elapsed < 0.16) {
+   const dustAlpha = (1 - elapsed / 0.16) * 0.30;
+   c.save();
+   c.globalAlpha *= dustAlpha;
+   c.fillStyle = isRot ? '#4a3b30' : '#8d7b68';
+   for (let d = 0; d < 3; d++) {
+    const dr = 6 + d * 5 + elapsed * 50;
+    const dx = (-8 + d * 8) * (1 + elapsed * 1.5);
+    const dy = (upper ? -1 : 1) * (28 + d * 9 + elapsed * 18);
+    c.beginPath();
+    c.arc(dx, dy, dr, 0, Math.PI * 2);
+    c.fill();
+   }
+   c.restore();
+  }
+
+  // Shower of dynamic sharp wooden splinters, slivers and chips
+  for (let i = 0; i < 15; i++) {
+   const dir = (i % 2 === 0 ? 1 : -1);
+   const speedX = 42 + (i * 23) % 78;
+   const speedY = -28 + (i * 31) % 82;
+   const gravity = 720;
+   const sx = dir * speedX * elapsed;
+   const sy = (upper ? -1 : 1) * (speedY * elapsed + gravity * elapsed * elapsed);
+   const spin = dir * (4.5 + (i % 4) * 2.8) * elapsed;
+   const len = 7 + (i % 5) * 3.2;
+   const thick = 2.2 + (i % 3) * 1.2;
+   const ox = -14 + (i * 13) % 28;
+   const oy = 18 + (i * 17) % 52;
+
+   c.save();
+   c.translate(ox + sx, oy + sy);
+   c.rotate(spin);
+   c.fillStyle = colors[i % colors.length];
+   c.beginPath();
+   c.moveTo(-thick / 2, 0);
+   c.lineTo(0, -len / 2);
+   c.lineTo(thick / 2, 0);
+   c.lineTo(0, len / 2);
+   c.closePath();
+   c.fill();
    c.restore();
   }
  }

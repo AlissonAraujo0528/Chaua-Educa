@@ -525,11 +525,12 @@ export class Game {
     }
 
     woodBurst(x,y) {
-        for(let i=0;i<16;i++) {
+        const colors=['#3e2723','#8d6e63','#a1887f','#4e342e','#9aba67'];
+        for(let i=0;i<18;i++) {
             const a=i*2.39996;
-            this.particle({x,y,vx:Math.cos(a)*(90+i*5),vy:Math.sin(a)*110-75,
-                life:.65,maxLife:.65,color:i%3?'#9d7545':'#9aba67',chip:i%3!==0,
-                size:3+i%5,rotation:a,spin:i%2?7:-9});
+            this.particle({x,y,vx:Math.cos(a)*(105+i*6),vy:Math.sin(a)*120-75,
+                life:.7,maxLife:.7,color:colors[i%colors.length],chip:true,splinter:i%2===0,
+                size:3+i%5,rotation:a,spin:i%2?8:-10});
         }
     }
 
@@ -541,7 +542,7 @@ export class Game {
         let deadPopups=false;
         for(const p of this.popups){p.life-=dt;if(!this.reducedMotion)p.y-=24*dt;if(!(p.life>0))deadPopups=true;}
         if(deadPopups)this.popups=this.popups.filter(p=>p.life>0);
-        for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.24)delete e.breakFx;}
+        for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.36)delete e.breakFx;}
         if(this.hit) {this.hit.age+=dt;if(this.hit.age>=.3)this.hit=null;}
         let deadParticles=false;
         for(const p of this.particles) {
