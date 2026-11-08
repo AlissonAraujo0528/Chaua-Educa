@@ -4,23 +4,89 @@ import {images} from './assets.mjs';
 
 // Source sprites retain their authored proportions. Only an undecorated bark
 // strip extends toward the viewport edge; caps, knots and leaves never stretch.
-export function drawLivingTrunk(c,{x,y,upper=false,width=TREE_WIDTH,length=900,variant=0}){
- const kind=upper?'upper':'lower',image=images.get(`trees-${kind}`);if(!image)return;
- const f=FOREST_ART[kind][((variant%4)+4)%4],s=width/(f.core[1]-f.core[0]);
- const [sx,sy]=f.rect,[cx,cy,cw,ch]=f.content;
- const px=x+(cx-f.anchor[0])*s,py=y+(cy-f.anchor[1])*s;
- const coreLeft=x+(f.core[0]-f.anchor[0])*s;
- const stripLeft=f.core[0],stripWidth=f.core[1]-f.core[0];
- const splice=upper?f.spliceY:f.spliceY-1;
- const join=y+(splice-f.anchor[1])*s;
- if(upper){
-  const start=y-length;
-  if(join>start)c.drawImage(image,sx+stripLeft,sy+splice,stripWidth,1,coreLeft,start,width,join-start+.5);
-  c.drawImage(image,sx+cx,sy+splice,cw,f.endY-splice,px,join,cw*s,(f.endY-splice)*s);
- }else{
-  const end=y+length;
-  if(end>join)c.drawImage(image,sx+stripLeft,sy+splice,stripWidth,1,coreLeft,join-.5,width,end-join+.5);
-  c.drawImage(image,sx+cx,sy+cy,cw,splice-cy,px,py,cw*s,(splice-cy)*s);
+export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
+ const kind = upper ? 'upper' : 'lower', image = images.get(`trees-${kind}`); if (!image) return;
+ const f = FOREST_ART[kind][((variant % 4) + 4) % 4], s = width / (f.core[1] - f.core[0]);
+ const [sx, sy] = f.rect, [cx, cy, cw, ch] = f.content;
+ const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
+ const coreLeft = x + (f.core[0] - f.anchor[0]) * s;
+ const stripLeft = f.core[0], stripWidth = f.core[1] - f.core[0];
+ const splice = upper ? f.spliceY : f.spliceY - 1;
+ const join = y + (splice - f.anchor[1]) * s;
+ if (upper) {
+  const start = y - length;
+  if (join > start) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
+  c.drawImage(image, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
+ } else {
+  const end = y + length;
+  if (end > join) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
+  c.drawImage(image, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
+ }
+
+ // Wet wood and glossy specular sheen in rain
+ if (rain > 0 && typeof c.save === 'function') {
+  c.save();
+  const topY = upper ? y - length : py;
+  const hVal = upper ? length + (f.endY - splice) * s : (y + length - py);
+
+  // Glossy specular sheen catching storm sky light
+  if (typeof c.createLinearGradient === 'function') {
+   const sheen = c.createLinearGradient(coreLeft, 0, coreLeft + width, 0);
+   sheen.addColorStop(0, 'rgba(255, 255, 255, 0)');
+   sheen.addColorStop(0.24, `rgba(215, 238, 255, ${rain * 0.16})`);
+   sheen.addColorStop(0.36, `rgba(240, 250, 255, ${rain * 0.28})`);
+   sheen.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+   c.fillStyle = sheen;
+   c.fillRect(coreLeft, topY, width, hVal);
+  }
+
+  // Water droplets trickling down and dripping from branch caps
+  if (upper) {
+   const dropCycle = (time * 1.5 + variant * 0.67) % 1;
+   const tipX = px + cw * s * 0.52;
+   const tipY = join + (f.endY - splice) * s;
+   if (dropCycle > 0.22) {
+    const fallT = (dropCycle - 0.22) / 0.78;
+    const dropY = tipY + fallT * 32 + 220 * fallT * fallT;
+    c.fillStyle = '#d2ecff';
+    c.beginPath();
+    c.ellipse(tipX, dropY, 1.4, 2.8, 0, 0, Math.PI * 2);
+    c.fill();
+   }
+  } else {
+   const dropCycle = (time * 1.4 + variant * 0.79) % 1;
+   const isBranch = variant === 3 && f.perch;
+   const tipX = isBranch ? px + f.perch[0] * s : coreLeft + width * 0.18;
+   const tipY = isBranch ? py + f.perch[1] * s : py + 6;
+   if (dropCycle > 0.25) {
+    const fallT = (dropCycle - 0.25) / 0.75;
+    const dropY = tipY + fallT * 28 + 200 * fallT * fallT;
+    c.fillStyle = '#d2ecff';
+    c.beginPath();
+    c.ellipse(tipX, dropY, 1.3, 2.6, 0, 0, Math.PI * 2);
+    c.fill();
+   }
+  }
+  c.restore();
+ }
+
+ // Snow accumulation transition
+ if (snow > 0) {
+  const snowImage = images.get(`trees-${kind}-snow`);
+  if (snowImage) {
+   c.save?.();
+   if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, snow * 1.15);
+   if (upper) {
+    const start = y - length;
+    if (join > start) c.drawImage(snowImage, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
+    c.drawImage(snowImage, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
+   } else {
+    const end = y + length;
+    if (end > join) c.drawImage(snowImage, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
+    c.drawImage(snowImage, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
+   }
+   c.restore?.();
+  }
  }
 }
 
@@ -32,7 +98,7 @@ const TREE_CORE_WIDTH = 128;
 const TREE_VARIANTS = ['rot', 'hollow', 'moss', 'vine'];
 const TREE_SPLICES = [181, 180, 180, 182];
 
-export function drawTreeVariant(c, x, y, upper, kind, breakAge) {
+export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0) {
  const image = images.get('tree-variants');
  const index = TREE_VARIANTS.indexOf(kind);
  if (!image || index < 0) return;
@@ -60,6 +126,54 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge) {
   }
   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
    left, 0, TREE_CELL * scale, join);
+
+  // Wet bark in rain
+  if (rain > 0 && breakAge === undefined) {
+   c.save();
+   if (typeof c.createLinearGradient === 'function') {
+    const sheen = c.createLinearGradient(-TREE_WIDTH / 2, 0, TREE_WIDTH / 2, 0);
+    sheen.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    sheen.addColorStop(0.24, `rgba(210, 235, 255, ${rain * 0.16})`);
+    sheen.addColorStop(0.36, `rgba(240, 250, 255, ${rain * 0.28})`);
+    sheen.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
+    c.fillStyle = sheen;
+    c.fillRect(-TREE_WIDTH / 2, 0, TREE_WIDTH, join + 400);
+   }
+
+   const dropCycle = (time * 1.5 + (index + 1) * 0.83) % 1;
+   if (dropCycle > 0.24) {
+    const fallT = (dropCycle - 0.24) / 0.76;
+    const dropY = join * 0.85 + fallT * 30 + 210 * fallT * fallT;
+    const dropX = -TREE_WIDTH * 0.25;
+    c.fillStyle = '#d2ecff';
+    c.beginPath();
+    c.ellipse(dropX, dropY, 1.4, 2.7, 0, 0, Math.PI * 2);
+    c.fill();
+   }
+   c.restore();
+  }
+
+  // Snow variant transition
+  if (snow > 0 && breakAge === undefined) {
+   const snowImage = images.get('tree-variants-snow');
+   if (snowImage) {
+    c.save();
+    c.globalAlpha = Math.min(1, snow * 1.15);
+    const bandHeight = 96, tileHeight = bandHeight * scale;
+    for (let pos = join - .5, tile = 0; pos < 1000; pos += tileHeight, tile++) {
+     c.save();
+     c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
+     if (tile % 2 === 0) c.scale(1, -1);
+     c.drawImage(snowImage, sx + (TREE_CELL - TREE_CORE_WIDTH) / 2, sy + splice - bandHeight,
+      TREE_CORE_WIDTH, bandHeight, -TREE_WIDTH / 2, 0, TREE_WIDTH, tileHeight + .5);
+     c.restore();
+    }
+    c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
+     left, 0, TREE_CELL * scale, join);
+    c.restore();
+   }
+  }
+
   if (breakAge !== undefined) {
    // Primary fracture fissure
    c.beginPath();
@@ -175,11 +289,10 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge) {
  c.restore();
 }
 
-export function drawRefugeTree(c,r,support,time=0,width=215,footX=7){
- const f=FOREST_ART.lower[3],s=width/(f.core[1]-f.core[0]);
- // Measured landing point on the integrated left branch (cell-local pixels).
- const perch=f.perch;
- const rootX=r.x+footX-(perch[0]-f.anchor[0])*s;
- const top=support-4-(perch[1]-f.anchor[1])*s;
- drawLivingTrunk(c,{x:rootX,y:top,width,length:900,variant:3});
+export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, snow = 0, rain = 0) {
+ const f = FOREST_ART.lower[3], s = width / (f.core[1] - f.core[0]);
+ const perch = f.perch;
+ const rootX = r.x + footX - (perch[0] - f.anchor[0]) * s;
+ const top = support - 4 - (perch[1] - f.anchor[1]) * s;
+ drawLivingTrunk(c, {x: rootX, y: top, width, length: 900, variant: 3, time, snow, rain});
 }

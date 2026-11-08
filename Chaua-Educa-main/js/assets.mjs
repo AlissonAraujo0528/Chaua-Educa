@@ -6,10 +6,12 @@ export const ASSET_PATHS = Object.fromEntries([
  ['snake-atlas','../assets/v7/snake-atlas.webp'],
  ['snake-wrap','../assets/v8/snake-wrap.webp'],
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
+ ...['lower','upper'].map(k=>[`trees-${k}-snow`,`../assets/v10/trees-${k}-snow.webp`]),
  ...FRUITS.map(f=>[`fruit-${f.id}`,`../assets/v3/fruit-${f.id}.webp`]),
  ...['forest'].map(k=>[k,`../assets/v3/${k}.webp`]),
  ...['feather','shield'].map(k=>[k,`../assets/v4/${k}.webp`]),
  ['tree-variants','../assets/v9/tree-variants.webp'],
+ ['tree-variants-snow','../assets/v10/tree-variants-snow.webp'],
  ['season-backgrounds','../assets/v10/season-backgrounds.webp'],
  ['season-particles','../assets/v10/season-particles.webp'],
 ]);

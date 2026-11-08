@@ -1,4 +1,4 @@
-import {breeze,treeBend} from './living-motion.mjs';
+import {breeze,treeBend,winterAmount} from './living-motion.mjs';
 import {drawForestLife} from './forest-life.mjs';
 import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
@@ -102,7 +102,7 @@ function birdFoot(scale){
     const f=SPRITES.chaua.frames[12];return (f.content[1]+f.content[3]-5-f.anchor[1])*27.7027*scale/SPRITES.chaua.landmarkWidth;
 }
 function animatedBird(c,p){
-    const {x,y,scale=1,angle=0,time=0,reduced=false,reaction=0,defeated=false,impactProgress=0,turbo=false,stamina=1,perched=false,surprise=false,won=false,landing=null}=p;
+    const {x,y,scale=1,angle=0,time=0,reduced=false,reaction=0,defeated=false,impactProgress=0,turbo=false,stamina=1,perched=false,surprise=false,won=false,landing=null,snow=0,rain=0}=p;
     const clip=birdAnimation({wing:p.wing,time,perched:perched&&!surprise,landing,defeated:defeated||surprise,impactProgress:surprise?1:impactProgress,reduced});
     const factor=27.7027*scale/SPRITES.chaua.landmarkWidth,size=125*scale;
     c.save();c.translate(x,y);
@@ -127,6 +127,19 @@ function animatedBird(c,p){
     }
     else if(reaction>0&&!reduced)drawFruitSparkles(c,size*.44,-size*.08,reaction,time);
     else if(stamina<.28&&!reduced&&!perched)drawSweatDrops(c,ex,ey,size,time);
+    if(snow>0&&!reduced&&!defeated&&!surprise){
+        drawAnimalBreath(c,44*scale,2*scale,snow,time,2.4,0.46,1,20*scale,-10*scale);
+    }
+    if(rain>0&&!reduced&&p.flapImpulse>0.1){
+        c.save();
+        c.fillStyle='#d2ecff';
+        for(let i=0;i<3;i++){
+            const dx=-14*scale-(i*10+p.flapImpulse*18);
+            const dy=6*scale+(i*6+p.flapImpulse*10);
+            c.beginPath();c.arc(dx,dy,1.3,0,TAU);c.fill();
+        }
+        c.restore();
+    }
     if(turbo&&!perched&&!reduced)drawTurboWindLines(c,size,time);
     if(won&&!reduced)drawRefugeHearts(c,0,-size*.25,size,time);
     c.restore();
@@ -279,6 +292,34 @@ function drawFruitSparkles(c, bx, by, reaction, t) {
     const sp2X = bx - 4 - wobble * 0.4;
     const sp2Y = by - 26 + floatY * 1.1;
     drawMiniSparkle(c, sp2X, sp2Y, 4.5, t * 8 + 1);
+    c.restore();
+}
+
+
+export function drawAnimalBreath(c, x, y, snow, time, period = 2.4, duration = 0.45, dirX = 1, speedX = 18, liftY = -8) {
+    if (snow <= 0.05) return;
+    const cycle = (time / period) % 1;
+    if (cycle >= duration) return;
+    const phase = cycle / duration;
+    const alphaBase = Math.sin(phase * Math.PI) * 0.75 * snow;
+    c.save();
+    for (let i = 0; i < 4; i++) {
+        const delay = i * 0.14;
+        if (phase < delay) continue;
+        const p = (phase - delay) / (1 - delay);
+        const px = x + dirX * p * (speedX + i * 6);
+        const py = y + p * (liftY - i * 3);
+        const pr = 2.8 + p * (6.5 + i * 2.5);
+        const pa = alphaBase * (1 - p * 0.55);
+        c.fillStyle = `rgba(255, 255, 255, ${pa})`;
+        c.beginPath();
+        c.arc(px, py, pr, 0, TAU);
+        c.fill();
+        c.fillStyle = `rgba(215, 238, 255, ${pa * 0.5})`;
+        c.beginPath();
+        c.arc(px - dirX * 1.2, py + 1.2, pr * 0.7, 0, TAU);
+        c.fill();
+    }
     c.restore();
 }
 
@@ -458,10 +499,10 @@ export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
     defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
-    shieldHitAge = null
+    shieldHitAge = null, snow = 0, rain = 0
 }) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge});
+    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge,snow,rain});
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
@@ -948,9 +989,13 @@ export class Renderer {
         }
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
+        const rain = journeyRain(game.distance, game.tutorial);
+        const storm = journeyStorm(game.distance, game.mode, game.tutorial);
+        const fog = journeyFog(game.distance, game.tutorial);
+        const wind = journeyWind(game.distance, game.mode, game.tutorial);
+        const snow = winterAmount(game.distance);
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4),
-            journeyRain(game.distance, game.tutorial), journeyStorm(game.distance, game.mode, game.tutorial),
-            journeyFog(game.distance, game.tutorial), journeyWind(game.distance, game.mode, game.tutorial), game.tutorial?null:game.distance);
+            rain, storm, fog, wind, game.tutorial?null:game.distance);
         const baseView = this.getViewport();
         // Follow the player only on screens that cannot fit the full world at
         // the improved sprite scale. The camera does not touch gameplay math.
@@ -1083,8 +1128,8 @@ export class Renderer {
                     c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
                     c.beginPath(); c.moveTo(e.targetX, e.targetY); c.lineTo(e.startX, e.startY); c.stroke(); c.restore();
                 }
-                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced);
-            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced);
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow);
+            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, rain);
         }
         if (game.shield || game.invincible > 0) {
             const r = 68;
@@ -1138,7 +1183,8 @@ export class Renderer {
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
             shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
             defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
-            stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won
+            stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won,
+            snow, rain
         });
         if (!reduced) {
             const pList = this.decoration==='low'?game.particles:game.particles;
@@ -1232,13 +1278,15 @@ export class Renderer {
         const variant = (e.id ?? 0) % 3;
         const x = e.x + 29;
         const wind = reduced ? 0 : journeyWind(game.distance, game.mode, game.tutorial);
+        const rain = reduced ? 0 : journeyRain(game.distance, game.tutorial);
+        const snow = reduced ? 0 : winterAmount(game.distance);
         for (const side of ['top', 'bottom']) {
             const upper = side === 'top';
             const y = e[side];
             const broken = e.broken && e.brokenSide === side;
             if (broken && (reduced || !e.breakFx)) continue;
             if (e.fragileSide === side) {
-                drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined);
+                drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined, snow, rain, time);
                 continue;
             }
             if (broken) continue;
@@ -1248,17 +1296,17 @@ export class Renderer {
                 c.save();
                 c.transform(1, 0, lean, 1, -lean * y, 0);
             }
-            if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind);
+            if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind, undefined, snow, rain, time);
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
-                !upper && e.variant === 'branch' ? 3 : variant);
+                !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
             if (lean) c.restore();
-            if (!upper && e.snake) this.snake(e, reduced);
+            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time);
         }
     }
-    trunk(key,preset,x,y,flip,time=0,variant=0){
-        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time});
+    trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0){
+        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time,snow,rain});
     }
-    snake(wood,reduced){
+    snake(wood,reduced,snow=0,rain=0,time=0){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
         if(!drawSnakeA2(c,s,place.factor,reduced)){
@@ -1270,10 +1318,23 @@ export class Renderer {
             drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced,wood.id);
         }
         if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
+        if(snow>0&&!reduced&&!s.retreat){
+            const t=(time||0)+(wood.id||0)*1.3;
+            drawAnimalBreath(c,-45,-90,snow,t,3.4,0.46,-1,18,-12);
+        }
+        if(rain>0&&!reduced){
+            c.save();
+            c.globalAlpha=rain*0.22;
+            c.fillStyle='#e2f2ff';
+            c.beginPath();
+            c.ellipse(0,-60,25,45,0.2,0,TAU);
+            c.fill();
+            c.restore();
+        }
         c.restore();
     }
     flightBorders(view) {}
-    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false) {
+    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0) {
         const c = this.c;
         let x, y, time, e = null;
         if (typeof entityOrX === 'object') {
@@ -1318,10 +1379,14 @@ export class Renderer {
         }
         if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
         if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
+        if(snow>0&&!reduced&&!retreat){
+            const t=(time||0)+((entity?.id)||0)*0.7;
+            drawAnimalBreath(c,-86,14,snow,t,1.5,0.48,1,40,-6);
+        }
         c.restore();
     }
 
-    pickup(e, time, reduced) {
+    pickup(e, time, reduced, snow = 0, rain = 0) {
         const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 3;
         const pulse = reduced ? 1 : 1 + Math.sin(time * 3.2 + e.id) * 0.07;
         c.save(); c.translate(e.x, e.y);
@@ -1339,6 +1404,25 @@ export class Renderer {
                 const scale = 50 / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * scale / 2, float - image.naturalHeight * scale / 2, image.naturalWidth * scale, image.naturalHeight * scale);
             } else clay(c, 0, float, 18, 20, '#edbb66', '#cb7c42');
+            if (snow > 0) {
+                c.save();
+                c.fillStyle = `rgba(245, 250, 255, ${Math.min(1, snow * 1.2)})`;
+                c.beginPath();
+                c.ellipse(0, float - 21, 14, 5, 0, 0, TAU);
+                c.fill();
+                c.fillStyle = `rgba(255, 255, 255, ${Math.min(1, snow * 1.2)})`;
+                c.beginPath();
+                c.ellipse(-2, float - 22, 9, 3, -0.1, 0, TAU);
+                c.fill();
+                c.restore();
+            } else if (rain > 0) {
+                c.save();
+                c.fillStyle = `rgba(235, 248, 255, ${rain * 0.45})`;
+                c.beginPath();
+                c.ellipse(6, float - 8, 3.5, 6, 0.4, 0, TAU);
+                c.fill();
+                c.restore();
+            }
             if (!reduced && this.decoration !== 'low') {
                 const sa = time * 2.5 + e.id * 1.5;
                 drawMiniSparkle(c, Math.cos(sa) * 22, Math.sin(sa) * 16 + float, 3, time * 5);
