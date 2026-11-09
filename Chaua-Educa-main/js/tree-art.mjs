@@ -168,8 +168,10 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
       TREE_CORE_WIDTH, bandHeight, -TREE_WIDTH / 2, 0, TREE_WIDTH, tileHeight + .5);
      c.restore();
     }
-    c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
-     left, 0, TREE_CELL * scale, join);
+    if (!upper) {
+     c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
+      left, 0, TREE_CELL * scale, join);
+    }
     c.restore();
    }
   }

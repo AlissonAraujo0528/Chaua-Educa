@@ -301,24 +301,50 @@ export function drawAnimalBreath(c, x, y, snow, time, period = 2.4, duration = 0
     const cycle = (time / period) % 1;
     if (cycle >= duration) return;
     const phase = cycle / duration;
-    const alphaBase = Math.sin(phase * Math.PI) * 0.75 * snow;
+    const alphaBase = Math.sin(phase * Math.PI) * 0.85 * snow;
+    const breathImg = images.get('clay-breath');
     c.save();
-    for (let i = 0; i < 4; i++) {
-        const delay = i * 0.14;
-        if (phase < delay) continue;
-        const p = (phase - delay) / (1 - delay);
-        const px = x + dirX * p * (speedX + i * 6);
-        const py = y + p * (liftY - i * 3);
-        const pr = 2.8 + p * (6.5 + i * 2.5);
-        const pa = alphaBase * (1 - p * 0.55);
-        c.fillStyle = `rgba(255, 255, 255, ${pa})`;
-        c.beginPath();
-        c.arc(px, py, pr, 0, TAU);
-        c.fill();
-        c.fillStyle = `rgba(215, 238, 255, ${pa * 0.5})`;
-        c.beginPath();
-        c.arc(px - dirX * 1.2, py + 1.2, pr * 0.7, 0, TAU);
-        c.fill();
+    if (breathImg) {
+        for (let i = 0; i < 3; i++) {
+            const delay = i * 0.15;
+            if (phase < delay) continue;
+            const p = (phase - delay) / (1 - delay);
+            const frame = Math.min(3, Math.floor(p * 4));
+            const sx = frame * 128;
+            const sy = 0;
+            const sw = 128;
+            const sh = 128;
+            const scale = (0.16 + p * 0.22) * (1 - i * 0.15);
+            const dw = 128 * scale;
+            const dh = 128 * scale;
+            const px = x + dirX * p * (speedX + i * 5);
+            const py = y + p * (liftY - i * 2);
+            const pa = alphaBase * (1 - p * 0.35) * (1 - i * 0.2);
+            c.save();
+            c.globalAlpha = Math.max(0, Math.min(1, pa));
+            c.translate(px, py);
+            if (dirX < 0) c.scale(-1, 1);
+            c.drawImage(breathImg, sx, sy, sw, sh, -dw * 0.35, -dh * 0.5, dw, dh);
+            c.restore();
+        }
+    } else {
+        for (let i = 0; i < 4; i++) {
+            const delay = i * 0.14;
+            if (phase < delay) continue;
+            const p = (phase - delay) / (1 - delay);
+            const px = x + dirX * p * (speedX + i * 6);
+            const py = y + p * (liftY - i * 3);
+            const pr = 2.8 + p * (6.5 + i * 2.5);
+            const pa = alphaBase * (1 - p * 0.55);
+            c.fillStyle = `rgba(255, 255, 255, ${pa})`;
+            c.beginPath();
+            c.arc(px, py, pr, 0, TAU);
+            c.fill();
+            c.fillStyle = `rgba(215, 238, 255, ${pa * 0.5})`;
+            c.beginPath();
+            c.arc(px - dirX * 1.2, py + 1.2, pr * 0.7, 0, TAU);
+            c.fill();
+        }
     }
     c.restore();
 }

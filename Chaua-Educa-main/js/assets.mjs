@@ -14,6 +14,7 @@ export const ASSET_PATHS = Object.fromEntries([
  ['tree-variants-snow','../assets/v10/tree-variants-snow.webp'],
  ['season-backgrounds','../assets/v10/season-backgrounds.webp'],
  ['season-particles','../assets/v10/season-particles.webp'],
+ ['clay-breath','../assets/v10/clay-breath.webp'],
 ]);
 export const images = new Map();
 let pending;
