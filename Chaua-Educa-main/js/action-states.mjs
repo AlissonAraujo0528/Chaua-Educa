@@ -33,8 +33,11 @@ export function hawkAction(e={},time=0,reduced=false) {
  }
  if(e.dive||e.phase==='leaving')return null; // preserve authored dive and glide.
  const t=Number.isFinite(time)?time:0;
- const position=((t*8+(e.id||0)*1.5)%8+8)%8, current=Math.floor(position), fraction=position-current;
- return {state:'flight',sheet:'hawk-flight',frame:current,next:(current+1)%8,blend:fraction*fraction*(3-2*fraction),angle:0,offsetY:0};
+ const position=((t*16+(e.id||0)*1.5)%8+8)%8, current=Math.floor(position), fraction=position-current;
+ const phase=(position/8)*Math.PI*2;
+ const offsetY=Math.sin(phase)*3.8;
+ const angle=Math.cos(phase)*0.045;
+ return {state:'flight',sheet:'hawk-flight',frame:current,next:(current+1)%8,blend:fraction*fraction*(3-2*fraction),angle,offsetY};
 }
 export function snakeAction(s={},reduced=false) {
  if(reduced)return null;

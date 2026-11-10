@@ -47,9 +47,9 @@ function blendSprite(c, first, second, blend, extent=128) {
     const {surface,layer,rasterScale}=buffer;
     layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,surface.width,surface.height);
     layer.setTransform(rasterScale,0,0,rasterScale,extent*rasterScale,extent*rasterScale);
-    layer.globalCompositeOperation='source-over';layer.globalAlpha=1-blend;first(layer);
-    layer.globalCompositeOperation='lighter';layer.globalAlpha=blend;second(layer);
-    layer.globalAlpha=1;layer.globalCompositeOperation='source-over';
+    layer.globalCompositeOperation='source-over';layer.globalAlpha=1;first(layer);
+    layer.globalAlpha=blend;second(layer);
+    layer.globalAlpha=1;
     c.drawImage(surface,-extent,-extent,extent*2,extent*2);
 }
 
@@ -1381,6 +1381,7 @@ export class Renderer {
         if(!images.has('hawk-atlas'))return;
         const entity=e??{x,y,warning:warning?1:0,retreat,dive:false};
         const clip=hawkAnimation(entity,time,reduced),cAngle=retreat?0:angle;
+        const action=hawkAction(entity,time,reduced) ?? (reduced&&hawkUsesActionArt(entity)?{sheet:entity.retreat?'hawk-stunned':'hawk-flight',frame:entity.retreat?2:0}:null);
         let dynamicY=0,dynamicAngle=0;
         if(!reduced&&!warning&&!retreat){
             if(entity.dive){
@@ -1388,20 +1389,18 @@ export class Renderer {
                 const p=span>0?Math.max(0,Math.min(1,((entity.startX||x)-x)/span)):.5;
                 dynamicY=Math.sin(p*Math.PI)*7;
                 dynamicAngle=(p-.5)*.16;
-            }else{
+            }else if(!action){
                 dynamicY=Math.sin(time*2.8+(entity.id||0)*1.5)*3.5;
                 dynamicAngle=Math.cos(time*2.8+(entity.id||0)*1.5)*.035;
             }
         }
-        const action=hawkAction(entity,time,reduced) ?? (reduced&&hawkUsesActionArt(entity)?{sheet:entity.retreat?'hawk-stunned':'hawk-flight',frame:entity.retreat?2:0}:null);
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
         let newHawk=false;
         if(action){
             const draw=(layer,frame)=>drawActionSheet(layer,action.sheet,frame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
-            if(action.blend>0&&hawkUsesActionArt(entity)){
-                blendSprite(c,layer=>draw(layer,action.frame),layer=>draw(layer,action.next),action.blend,180);newHawk=true;
-            }else newHawk=draw(c,action.frame);
+            const activeFrame=action.blend<0.5?action.frame:action.next;
+            newHawk=draw(c,activeFrame);
         }
         if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
         if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
