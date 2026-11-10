@@ -16,7 +16,7 @@ import { canvasResolution } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
-import { journeyRain, journeyStorm, journeyWind, journeyFog, drawJourneyRain, drawJourneyFog, drawLightning } from './weather.mjs';
+import { journeyRain, journeyStorm, journeyWind, journeyFog, drawJourneyRain, drawForegroundRain, drawJourneyFog, drawLightning } from './weather.mjs';
 import { FRUITS } from './fruits.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
 
@@ -130,14 +130,51 @@ function animatedBird(c,p){
     if(snow>0&&!reduced&&!defeated&&!surprise){
         drawAnimalBreath(c,44*scale,2*scale,snow,time,2.4,0.46,1,20*scale,-10*scale);
     }
-    if(rain>0&&!reduced&&p.flapImpulse>0.1){
+    if(rain>0&&!reduced&&!perched&&!defeated){
         c.save();
-        c.fillStyle='#d2ecff';
-        for(let i=0;i<3;i++){
-            const dx=-14*scale-(i*10+p.flapImpulse*18);
-            const dy=6*scale+(i*6+p.flapImpulse*10);
-            c.beginPath();c.arc(dx,dy,1.3,0,TAU);c.fill();
+        // 1. Wet glistening sheen along Chaua's top profile
+        c.fillStyle=`rgba(225, 245, 255, ${rain * 0.32})`;
+        c.beginPath();
+        c.ellipse(10*scale,-18*scale,34*scale,5*scale,-0.18,0,TAU);
+        c.fill();
+
+        // 2. Frontal rain impacts on beak and head (droplets shattering & spraying back)
+        c.fillStyle='#d2edff';
+        c.beginPath();
+        for(let i=0;i<4;i++){
+            const hitCycle=(time*9+i*1.73)%1;
+            const hitOriginX=(38-i*5)*scale;
+            const hitOriginY=(-6-i*4)*scale;
+            const spX=hitOriginX-hitCycle*(28+(i%2)*14)*scale;
+            const spY=hitOriginY-Math.sin(hitCycle*Math.PI)*(10+(i%3)*4)*scale+hitCycle*7*scale;
+            const spR=Math.max(0.7,(1-hitCycle)*2.2*scale);
+            c.moveTo(spX+spR,spY);
+            c.arc(spX,spY,spR,0,TAU);
         }
+
+        // 3. Wing flap spray (water droplets cast off wingtips on downstroke)
+        if(p.wing>0.08||p.flapImpulse>0.05){
+            const wingPhase=1-(p.wing||0);
+            for(let w=0;w<5;w++){
+                const wt=(time*11+w*1.45)%1;
+                const tipX=(-8+Math.sin(wingPhase*Math.PI)*18-wt*32)*scale;
+                const tipY=(16+(w-2)*9+wt*22)*scale;
+                const wr=Math.max(0.6,(1-wt)*2.0*scale);
+                c.moveTo(tipX+wr,tipY);
+                c.arc(tipX,tipY,wr,0,TAU);
+            }
+        }
+
+        // 4. Subtle slipstream wake from tail
+        for(let t=0;t<3;t++){
+            const tt=(time*5+t*2.3)%1;
+            const wakeX=(-42-tt*36)*scale;
+            const wakeY=(4+Math.sin(time*3+t)*5)*scale;
+            const wakeR=(1-tt)*1.8*scale;
+            c.moveTo(wakeX+wakeR,wakeY);
+            c.arc(wakeX,wakeY,wakeR,0,TAU);
+        }
+        c.fill();
         c.restore();
     }
     if(turbo&&!perched&&!reduced)drawTurboWindLines(c,size,time);
@@ -945,7 +982,7 @@ export class Renderer {
         if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
         drawForestLife(c,w,h,time,seasonDistance??0,rain,wind,reduced,this.decoration==='low',storm);
         drawJourneyFog(c, w, h, fog);
-        drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm);
+        drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm, wind);
         drawLightning(c, w, h, time, storm, reduced);
         if (wind > 0 && !reduced) {
             c.save();
@@ -1154,7 +1191,7 @@ export class Renderer {
                     c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
                     c.beginPath(); c.moveTo(e.targetX, e.targetY); c.lineTo(e.startX, e.startY); c.stroke(); c.restore();
                 }
-                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow);
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain);
             } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, rain);
         }
         if (game.shield || game.invincible > 0) {
@@ -1299,6 +1336,11 @@ export class Renderer {
             }
         }
         c.restore();
+        if(rain>0&&!reduced){
+            const rWind=journeyWind(game.distance,game.mode,game.tutorial);
+            const rStorm=journeyStorm(game.distance);
+            drawForegroundRain(c,this.w,this.h,sceneTime,rain,reduced,this.decoration==='low',rStorm,rWind,game.speed||250);
+        }
         // Natural viewport flight boundary
         const notices=[];
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
@@ -1353,6 +1395,32 @@ export class Renderer {
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
                 !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
             if (lean) c.restore();
+            if (rain > 0 && !reduced) {
+                c.save();
+                c.fillStyle = '#d2ecff';
+                c.beginPath();
+                if (!upper) {
+                    for (let s = 0; s < 4; s++) {
+                        const st = (time * 8.5 + (e.id || 0) * 2.3 + s * 1.7) % 1;
+                        const sx = x - 35 + s * 24 + Math.sin(s * 4) * 6;
+                        const sy = y - Math.sin(st * Math.PI) * (7 + (s % 3) * 5);
+                        const sr = Math.max(0.5, (1 - st) * 2.2);
+                        c.moveTo(sx + sr, sy);
+                        c.arc(sx, sy, sr, 0, TAU);
+                    }
+                } else {
+                    for (let d = 0; d < 3; d++) {
+                        const dt = (time * 4.2 + (e.id || 0) * 1.9 + d * 2.1) % 1;
+                        const dx = x - 25 + d * 25 + Math.sin(d * 3) * 5;
+                        const dy = y + dt * dt * 140;
+                        const dr = (1 - dt * 0.35) * 1.6;
+                        c.moveTo(dx + dr, dy);
+                        c.arc(dx, dy, dr, 0, TAU);
+                    }
+                }
+                c.fill();
+                c.restore();
+            }
             if (!upper && e.snake) this.snake(e, reduced, snow, rain, time);
         }
     }
@@ -1387,7 +1455,7 @@ export class Renderer {
         c.restore();
     }
     flightBorders(view) {}
-    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0) {
+    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0, rain = 0) {
         const c = this.c;
         let x, y, time, e = null;
         if (typeof entityOrX === 'object') {
@@ -1434,6 +1502,21 @@ export class Renderer {
         if(snow>0&&!reduced&&!retreat){
             const t=(time||0)+((entity?.id)||0)*0.7;
             drawAnimalBreath(c,-86,14,snow,t,1.5,0.48,1,40,-6);
+        }
+        if(rain>0&&!reduced&&!retreat){
+            c.save();
+            c.fillStyle='#d8efff';
+            c.beginPath();
+            for(let i=0;i<4;i++){
+                const dropCycle=(time*10+i*1.8+((entity?.id)||0)*1.3)%1;
+                const shearX=-86+dropCycle*(45+(i%2)*15);
+                const shearY=14-Math.sin(dropCycle*Math.PI)*(8+(i%3)*4)+dropCycle*10;
+                const sr=Math.max(0.6,(1-dropCycle)*2.0);
+                c.moveTo(shearX+sr,shearY);
+                c.arc(shearX,shearY,sr,0,TAU);
+            }
+            c.fill();
+            c.restore();
         }
         c.restore();
     }

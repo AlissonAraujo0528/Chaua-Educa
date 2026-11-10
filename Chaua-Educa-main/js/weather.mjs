@@ -146,7 +146,7 @@ export function drawLightning(context, width, height, time, storm, reduced) {
 }
 
 // Draw behind actors in screen coordinates with realistic slanted velocity, wind drift and droplet ripples
-export function drawJourneyRain(context, width, height, time, rain, reduced, lowDetail, storm = 0) {
+export function drawJourneyRain(context, width, height, time, rain, reduced, lowDetail, storm = 0, wind = 0, speed = 250) {
     if (rain === 0) return;
 
     context.save();
@@ -156,15 +156,15 @@ export function drawJourneyRain(context, width, height, time, rain, reduced, low
 
     if (!reduced) {
         const count = (lowDetail ? 28 : 72) + Math.round(storm * (lowDetail ? 16 : 48));
-        const drift = time * 78;
-        const slant = 6 + storm * 8 + Math.sin(time * .65) * 2;
+        const drift = -time * (70 + wind * 60);
+        const slant = -((speed * 0.025) + wind * 10 + 8 + storm * 7 + Math.sin(time * .65) * 2);
         context.globalAlpha = Math.min(0.85, rain * .48 + storm * .25);
         context.strokeStyle = storm > 0.4 ? '#f0f8ff' : '#e6f6ff';
         context.lineWidth = storm > 0.4 ? 1.4 : 1.2;
         context.beginPath();
 
         for (let i = 0; i < count; i++) {
-            const x = ((i * 137.7 + drift) % (width + 24)) - 12;
+            const x = ((i * 137.7 + drift) % (width + 48) + (width + 48)) % (width + 48) - 24;
             const y = ((i * 93.4 + time * (360 + (i % 4) * 45)) % (height + 36)) - 18;
             context.moveTo(x, y);
             context.lineTo(x + slant, y + 14 + (i % 4) * 3);
@@ -187,5 +187,31 @@ export function drawJourneyRain(context, width, height, time, rain, reduced, low
             context.fill();
         }
     }
+    context.restore();
+}
+
+// Draw in front of actors and obstacles in screen coordinates for cinematic depth
+export function drawForegroundRain(context, width, height, time, rain, reduced, lowDetail, storm = 0, wind = 0, speed = 250) {
+    if (rain === 0 || reduced) return;
+
+    context.save();
+    const count = (lowDetail ? 16 : 36) + Math.round(storm * (lowDetail ? 10 : 22));
+    const drift = -time * (90 + wind * 80);
+    const slant = -((speed * 0.035) + wind * 14 + 10 + storm * 8 + Math.sin(time * 0.75) * 2);
+    const fallSpeed = 580 + storm * 160;
+
+    context.globalAlpha = Math.min(0.72, rain * 0.38 + storm * 0.26);
+    context.strokeStyle = storm > 0.4 ? '#f5faff' : '#d8f0ff';
+    context.lineWidth = storm > 0.4 ? 1.8 : 1.4;
+    context.beginPath();
+
+    for (let i = 0; i < count; i++) {
+        const x = ((i * 187.3 + drift) % (width + 60) + (width + 60)) % (width + 60) - 30;
+        const y = ((i * 113.7 + time * (fallSpeed + (i % 4) * 55)) % (height + 50)) - 25;
+        const len = 22 + (i % 4) * 6;
+        context.moveTo(x, y);
+        context.lineTo(x + slant * (len / 18), y + len);
+    }
+    context.stroke();
     context.restore();
 }
