@@ -5,7 +5,12 @@ import {images} from './assets.mjs';
 // Source sprites retain their authored proportions. Only an undecorated bark
 // strip extends toward the viewport edge; caps, knots and leaves never stretch.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
- const kind = upper ? 'upper' : 'lower', image = images.get(`trees-${kind}`); if (!image) return;
+ const kind = upper ? 'upper' : 'lower';
+ const fullSnow = snow >= 0.98;
+ const snowImg4 = fullSnow ? (images.get(`trees-${kind}-snow-04`) || images.get(`trees-${kind}-snow`)) : null;
+ const image = snowImg4 || images.get(`trees-${kind}`);
+ if (!image) return;
+
  const f = FOREST_ART[kind][((variant % 4) + 4) % 4], s = width / (f.core[1] - f.core[0]);
  const [sx, sy] = f.rect, [cx, cy, cw, ch] = f.content;
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
@@ -70,22 +75,34 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
   c.restore();
  }
 
- // Snow accumulation transition
- if (snow > 0) {
+ // Snow accumulation transition: overlay pure snow layer progressively
+ if (snow > 0 && !fullSnow) {
   const stageNum = Math.min(4, Math.max(1, Math.ceil(snow * 4)));
-  const snowImage = images.get(`trees-${kind}-snow-0${stageNum}`) || images.get(`trees-${kind}-snow`);
-  if (snowImage) {
+  const overlay = images.get(`trees-${kind}-overlay-0${stageNum}`) || images.get(`trees-${kind}-snow-0${stageNum}`) || images.get(`trees-${kind}-snow`);
+  if (overlay) {
    c.save?.();
    if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, snow * 1.15);
    if (upper) {
     const start = y - length;
-    if (join > start) c.drawImage(snowImage, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
-    c.drawImage(snowImage, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
+    if (join > start) c.drawImage(overlay, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
+    c.drawImage(overlay, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
    } else {
     const end = y + length;
-    if (end > join) c.drawImage(snowImage, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
-    c.drawImage(snowImage, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
+    if (end > join) c.drawImage(overlay, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
+    c.drawImage(overlay, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
    }
+   c.restore?.();
+  }
+ }
+
+ // Ambient snow flurries shedding gently from upper tree branches in winter
+ if (upper && snow > 0.15) {
+  const shedFrame = Math.floor((time * 3 + variant * 1.5) % 6);
+  const shedImg = images.get(`trees-upper-shedding-0${shedFrame}`);
+  if (shedImg) {
+   c.save?.();
+   if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, (snow - 0.15) * 1.25);
+   c.drawImage(shedImg, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
    c.restore?.();
   }
  }
