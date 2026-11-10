@@ -72,7 +72,8 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
 
  // Snow accumulation transition
  if (snow > 0) {
-  const snowImage = images.get(`trees-${kind}-snow`);
+  const stageNum = Math.min(4, Math.max(1, Math.ceil(snow * 4)));
+  const snowImage = images.get(`trees-${kind}-snow-0${stageNum}`) || images.get(`trees-${kind}-snow`);
   if (snowImage) {
    c.save?.();
    if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, snow * 1.15);

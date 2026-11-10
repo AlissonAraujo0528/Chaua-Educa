@@ -7,6 +7,7 @@ export const ASSET_PATHS = Object.fromEntries([
  ['snake-wrap','../assets/v8/snake-wrap.webp'],
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}-snow`,`../assets/v10/trees-${k}-snow.webp`]),
+ ...['lower','upper'].flatMap(k=>[1,2,3,4].map(s=>[`trees-${k}-snow-0${s}`,`../assets/Seasons/Winter/trees-${k}-snow-0${s}.webp`])),
  ...FRUITS.map(f=>[`fruit-${f.id}`,`../assets/v3/fruit-${f.id}.webp`]),
  ...['forest'].map(k=>[k,`../assets/v3/${k}.webp`]),
  ...['feather','shield'].map(k=>[k,`../assets/v4/${k}.webp`]),
