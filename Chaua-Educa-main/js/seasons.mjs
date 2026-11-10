@@ -77,7 +77,7 @@ export function drawSeasonParticles(c,atlas,w,h,time,distance,reduced,low,wind=0
  if(reduced || !atlas)return;
  const state=journeySeason(distance);
  const weights=[0,0,0,0];weights[state.from]+=1-state.mix;weights[state.to]+=state.mix;
- const count=low?7:18, cell=(atlas.naturalWidth||atlas.width)/2;
+ const count=low?7:14, cell=(atlas.naturalWidth||atlas.width)/2;
  const layers=[
   {row: 0, weight: weights[0]},
   {row: 2, weight: weights[1] + weights[2]}
@@ -85,14 +85,15 @@ export function drawSeasonParticles(c,atlas,w,h,time,distance,reduced,low,wind=0
  for(const {row, weight} of layers){
   if(weight<=0)continue;
   for(let i=0;i<count;i++){
-   const size=(row===0?13:19)+(i%4)*2;
-   const travel=time*(14+i%3*3)+distance*.025;
-   const x=w+32-((i*137.7+travel)%(w+64))+Math.sin(time*.8+i)*9;
-   const y=((i*93.4+time*(22+i%4*7))%(h+64))-32;
-   c.save();c.globalAlpha=Math.min(1, weight*.72);
-   c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.6+time*.3+wind*.25);
+   const baseSize=row===0?32:38;
+   const size=baseSize+(i%4)*4;
+   const travel=time*(15+i%3*4)+distance*.028;
+   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
+   const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
+   c.save();c.globalAlpha=Math.min(0.92, weight*.85);
+   c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
    // A smooth tumble without swapping unrelated images or snapping scale.
-   c.scale(.72+.28*Math.sin(time*1.4+i),1);
+   c.scale(.75+.25*Math.sin(time*1.4+i),1);
    const frame=row+(i%2);
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();

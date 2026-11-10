@@ -1241,17 +1241,44 @@ export class Renderer {
                     c.save();
                     c.translate(p.x, p.y);
                     c.rotate(p.rotation);
-                    const sw = p.size || 2.8, sh = sw * 1.7;
-                    c.fillStyle = p.color || '#432610';
+                    const sw = p.size || 6.5, sh = sw * 1.65;
+                    // 1. Sombra suave de relevo 3D
+                    c.fillStyle = 'rgba(0,0,0,0.28)';
+                    c.beginPath();
+                    c.ellipse(1.5, 2.5, sw * 0.9, sh * 0.9, 0, 0, Math.PI * 2);
+                    c.fill();
+
+                    // 2. Casca anatômica de argila em gota
+                    c.fillStyle = p.color || '#a0582c';
                     c.beginPath();
                     c.moveTo(0, -sh);
-                    c.bezierCurveTo(sw, -sh * 0.3, sw, sh * 0.6, 0, sh);
-                    c.bezierCurveTo(-sw, sh * 0.6, -sw, -sh * 0.3, 0, -sh);
+                    c.bezierCurveTo(sw * 1.05, -sh * 0.25, sw * 1.05, sh * 0.65, 0, sh);
+                    c.bezierCurveTo(-sw * 1.05, sh * 0.65, -sw * 1.05, -sh * 0.25, 0, -sh);
                     c.fill();
-                    c.fillStyle = '#a67246bb';
+
+                    // 3. Contorno sutil de profundidade
+                    c.strokeStyle = 'rgba(40, 20, 8, 0.45)';
+                    c.lineWidth = 1.2;
+                    c.stroke();
+
+                    // 4. Embrião / núcleo interno com textura de argila
+                    c.fillStyle = 'rgba(255, 235, 175, 0.38)';
                     c.beginPath();
-                    c.ellipse(-sw * 0.3, -sh * 0.2, sw * 0.35, sh * 0.4, 0, 0, Math.PI * 2);
+                    c.ellipse(-sw * 0.22, -sh * 0.15, sw * 0.42, sh * 0.5, -0.15, 0, Math.PI * 2);
                     c.fill();
+
+                    // 5. Brilho especular de polpa úmida
+                    c.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    c.beginPath();
+                    c.ellipse(-sw * 0.32, -sh * 0.35, sw * 0.25, sh * 0.28, -0.2, 0, Math.PI * 2);
+                    c.fill();
+
+                    // 6. Cicatriz do ápice (hilo)
+                    c.fillStyle = 'rgba(45, 20, 10, 0.7)';
+                    c.beginPath();
+                    c.arc(0, -sh + 1.8, sw * 0.22, 0, Math.PI * 2);
+                    c.fill();
+
                     c.restore();
                 }
                 else if(p.puff) {
@@ -1259,7 +1286,7 @@ export class Renderer {
                     oval(c, p.x, p.y, (p.size || 4) * scale, (p.size || 4) * scale * 0.7, p.color);
                 }
                 else if(p.spark) oval(c,p.x,p.y,p.size||2,p.size||2,p.color);
-                else leaf(c,p.x,p.y,3,p.life*5,p.color,p.color);
+                else leaf(c,p.x,p.y,8,p.life*5,p.color,p.color);
             }
         }
         c.globalAlpha = 1;

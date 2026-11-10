@@ -455,21 +455,22 @@ export class Game {
             });
         }
         // Dispersao de sementes pelo chaua apos comer a fruta
-        const seedColors = ['#432610', '#5c3516', '#72421d', '#381e0b'];
-        for (let s = 0; s < 4; s++) {
-            const seedAngle = (s * 0.4 - 0.6) + (Math.random() - 0.5) * 0.3;
+        const seedColors = ['#c87a32', '#9e4a22', '#522b13', '#d99438', '#b85e28', '#8a4218'];
+        const seedCount = 5;
+        for (let s = 0; s < seedCount; s++) {
+            const seedAngle = (s * 0.45 - 0.9) + (Math.random() - 0.5) * 0.35;
             this.particle({
-                x: x + (Math.random() - 0.5) * 10,
-                y: y + (Math.random() - 0.5) * 8,
-                vx: Math.sin(seedAngle) * (20 + Math.random() * 30) - 15,
-                vy: Math.random() * 25 + 10,
-                life: 0.9 + Math.random() * 0.4,
-                maxLife: 1.3,
+                x: x + (Math.random() - 0.5) * 12,
+                y: y + (Math.random() - 0.5) * 10,
+                vx: Math.sin(seedAngle) * (30 + Math.random() * 40) - 20,
+                vy: Math.random() * 30 + 15,
+                life: 1.0 + Math.random() * 0.4,
+                maxLife: 1.4,
                 color: seedColors[s % seedColors.length],
                 spark: true, seed: true,
-                size: 2.5 + Math.random() * 1.0,
+                size: 6.5 + Math.random() * 1.5,
                 rotation: Math.random() * Math.PI * 2,
-                spin: (Math.random() - 0.5) * 8
+                spin: (Math.random() - 0.5) * 9
             });
         }
         for (let j = 0; j < 3; j++) {
