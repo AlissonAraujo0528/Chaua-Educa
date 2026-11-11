@@ -911,6 +911,7 @@ export class Renderer {
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
         const seasonal=seasonDistance!==null && images.get('season-backgrounds');
+        const winterLight=seasonDistance!==null?winterAmount(seasonDistance):0;
         const forest=seasonal?null:images.get('forest');
         const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
@@ -977,7 +978,7 @@ export class Renderer {
         c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
         // Sunlight and shade breathe slowly with the same wind as leaves and vines.
         c.fillStyle = '#ffffcb10';
-        c.save();c.globalAlpha = 1 - rain * .9;
+        c.save();c.globalAlpha = (1 - rain * .9)*(1-winterLight*.96);
         c.translate(reduced?0:Math.sin(time*.22)*18,0);
         c.beginPath();
         for (let i = 0; i < 3; i++) {
@@ -995,10 +996,10 @@ export class Renderer {
         drawLightning(c, w, h, time, storm, reduced);
         if (wind > 0 && !reduced) {
             c.save();
-            c.globalAlpha = wind * .24;
-            c.strokeStyle = '#e2edcb';
+            c.globalAlpha = wind * (winterLight>.15?.09:.24);
+            c.strokeStyle = winterLight>.15?'#bfd9e2':'#e2edcb';
             c.beginPath();
-            const streaks = this.decoration === 'low' ? 8 : 18;
+            const streaks = winterLight>.15?(this.decoration==='low'?4:9):(this.decoration === 'low' ? 8 : 18);
             for (let i = 0; i < streaks; i++) {
                 const x = w + 32 - ((i * 137.7 + time * 250) % (w + 64));
                 const y = (i * 93.4) % h;
@@ -1008,10 +1009,11 @@ export class Renderer {
             c.stroke();
             c.restore();
         }
-        c.save();c.globalAlpha = 1 - rain;
+        // Golden pollen belongs to warm seasons; it must not mix with snow.
+        c.save();c.globalAlpha = (1-rain)*(1-winterLight);
         c.fillStyle = '#ffedb275';
         c.beginPath();
-        const dustCount = this.decoration==='low'?8:23;
+        const dustCount = winterLight>=.999?0:(this.decoration==='low'?8:23);
         for (let i = 0; i < dustCount; i++) {
             const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
             const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
