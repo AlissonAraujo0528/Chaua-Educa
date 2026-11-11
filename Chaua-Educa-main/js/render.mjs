@@ -589,8 +589,10 @@ export class Renderer {
         this.transitionBackdrop = null;
         this.transitionRasterDisabled = false;
         this.transitionSlowReadbacks = 0;
-        // Diagnostic-only opt-out for paired A/B; production keeps bounded readbacks.
-        this.transitionSyncEnabled = typeof location !== 'undefined' && location.search.includes('transitionSync=1');
+        // Forced GPU readbacks are opt-in diagnostics: they can stall production frames.
+        // ?transitionSync=1 tests the slow/unsupported-readback fallback explicitly.
+        this.transitionSyncEnabled = typeof location !== 'undefined' &&
+            new URLSearchParams(location.search).get('transitionSync') === '1';
         // The forest WebP is fully opaque; the sky behind an alpha=1 forest is invisible.
         // Keep an A/B override to verify exact parity against the original composition.
         this.opaqueForestSkyEnabled = true;
