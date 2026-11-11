@@ -170,20 +170,24 @@ const rainWrap=(value,span)=>((value%span)+span)%span;
 const rainClamp=x=>Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250){
  if(w<=0||h<=0)return;
- const bands=foreground?[{depth:1,count:low?7:14}]:
-  [{depth:.40,count:low?10:20},{depth:.73,count:low?13:26}];
+ const bands=foreground?[{depth:1,count:low?6:16}]:
+  [{depth:.40,count:low?12:32},{depth:.73,count:low?18:48}];
+ // Similar density on laptop and portrait viewports, without letting a huge
+ // canvas spawn an unbounded number of raindrops.
+ const areaScale=Math.max(.65,Math.min(1.45,Math.sqrt(w*h/(960*640))));
  c.save();
  c.beginPath();c.rect(0,0,w,h);c.clip();
  c.lineCap='round';
  for(const {depth,count} of bands){
-  const opacity=rainClamp(rain*(foreground?.36:.17+depth*.20)+storm*.055);
+  const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.25)));
+  const opacity=rainClamp(rain*(foreground?.43:.24+depth*.28)+storm*.07);
   c.globalAlpha=opacity;
   c.strokeStyle=foreground?'#a3ccda':'#6f9daa';
   c.fillStyle=foreground?'#bde0e8':'#97b9c7';
-  c.lineWidth=foreground?1.1:.55+depth*.48;
+  c.lineWidth=foreground?1.15:.64+depth*.51;
   // Soft, short curves: visibility comes from layering, not brightness.
   c.beginPath();
-  for(let i=0;i<count;i++){
+  for(let i=0;i<visibleCount;i++){
    const seed=(i+1)*67.17+depth*119.7;
    const fallSpeed=230+depth*270+storm*120+(i%4)*27+speed*.1;
    const y=rainWrap(seed*11.17+time*fallSpeed,h+64)-32;
@@ -197,7 +201,7 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
   // Heads of droplets have volume and different focus instead of straight
   // horizontal screen-space streaks. One batch fill per depth band.
   c.beginPath();
-  for(let i=0;i<count;i++){
+  for(let i=0;i<visibleCount;i++){
    const seed=(i+1)*67.17+depth*119.7;
    const fallSpeed=230+depth*270+storm*120+(i%4)*27+speed*.1;
    const y=rainWrap(seed*11.17+time*fallSpeed,h+64)-32;
