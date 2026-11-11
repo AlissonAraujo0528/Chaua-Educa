@@ -15,6 +15,11 @@ import { ACTION_SPRITES_ENABLED, preloadActionSheets } from './action-sheets.mjs
 
 const $ = selector => document.querySelector(selector);
 const app = $('#app');
+// Mobile browsers can expose a desktop-sized layout viewport even with a
+// portrait phone display. Use the device signals in addition to CSS widths.
+const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
+app.classList.toggle('mobile-device', mobileDevice);
+document.documentElement.classList.toggle('mobile-device', mobileDevice);
 const renderer = new Renderer($('#forest'));
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 function applyVisualQuality() {
