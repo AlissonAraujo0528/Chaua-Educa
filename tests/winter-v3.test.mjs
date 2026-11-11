@@ -150,3 +150,15 @@ test('forest atmosphere no longer emits duplicate snowfall particles',()=>{
   assert.ok(calls.some(x=>x.type==='fillRect'),'winter still needs its cold atmospheric haze');
  }finally{setWeatherMode(old)}
 });
+
+
+test('upper branch crystals fall down while lower-cap crystals settle on top',()=>{
+ const falling=mock(),settled=mock();
+ drawSnowContact(falling.c,210,320,.9,8.6,13,false,false,true);
+ drawSnowContact(settled.c,210,320,.9,8.6,13,false,false,false);
+ const f=falling.calls.filter(x=>x.type==='arc').map(x=>x.args[1]);
+ const s=settled.calls.filter(x=>x.type==='arc').map(x=>x.args[1]);
+ assert.equal(f.length,4);
+ assert.ok(f.every(y=>y>=320&&y<=335),'upper tree snow must descend with gravity');
+ assert.ok(s.every(y=>y<=320),'lower cap snow should not originate below its surface');
+});
