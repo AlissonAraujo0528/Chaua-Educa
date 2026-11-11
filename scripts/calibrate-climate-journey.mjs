@@ -4,8 +4,10 @@
 // A pilot is NOT a substitute for real-player telemetry.
 import {Game,STEP,VICTORY_SCORE} from '../Chaua-Educa-main/js/engine.mjs';
 
-export const CALIBRATION_SEEDS=Object.freeze([104,217,451,999,2026,31111]);
-const MAX_SECONDS=260;
+export const CALIBRATION_SEEDS=Object.freeze([104,217,451,999]);
+// The existing real-browser journey test took 794–827 seconds to reach 1,000 points.
+// A 260-second cap would incorrectly report zero winning runs.
+const MAX_SECONDS=1180;
 const q=(values,p)=>{
  if(!values.length)return null;
  const a=[...values].sort((x,y)=>x-y);
