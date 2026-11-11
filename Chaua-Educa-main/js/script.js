@@ -4,6 +4,7 @@ import { MISSIONS, completedMissions, progressTitle, renderMissions } from './mi
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
 import { journeyRain, journeyStorm, journeyWind, getWeatherMode, setWeatherMode } from './weather.mjs';
 import { FlightInput } from './input.mjs';
+import { isMobileFlightDevice, requestFlightLandscape, releaseFlightLandscape } from './flight-orientation.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
 import { FRUITS } from './fruits.mjs';
@@ -28,7 +29,7 @@ let player = '', selectedMode = 'aventura', previousState = '', board = 'aventur
 let returnToMissionsResult = false;
 let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0;
 let resultAnimation = null, soundOn = true;
-let assetsReady = false, lastOrientation = null;
+let assetsReady = false, lastOrientation = null, openingFlight = false;
 let flightMissionIds = [];
 try { const saved = localStorage.getItem('chaua-sound'); soundOn = saved === null ? true : saved === 'true'; } catch { soundOn = true; }
 
@@ -98,6 +99,23 @@ function release(source) { flightInput.release(source); }
 function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
 function openDialog(id) { const dialog = $(id); if (!dialog.open) dialog.showModal(); }
 
+// Start only after the optional browser orientation request. This prevents
+// the normal resize-on-rotation safeguard from pausing the countdown itself.
+async function launchFlight(training = false) {
+    training = training === true;
+    if(openingFlight || !assetsReady || !['menu','ended','trained'].includes(game.state)) return;
+    openingFlight = true;
+    const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
+    try {
+        if(mobile) await requestFlightLandscape(app, document, screen);
+    } finally {
+        openingFlight = false;
+    }
+    start(training);
+    if(mobile && window.innerHeight > window.innerWidth)
+        toast('Para ampliar a visão, ative a rotação automática e vire o celular.');
+}
+
 function start(training = false) {
     training = training === true;
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
@@ -119,6 +137,7 @@ function start(training = false) {
 function home() {
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
+    releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
     app.classList.remove('in-flight','training'); updateTrainingButton();
 
@@ -178,9 +197,9 @@ $('#start-form').addEventListener('submit', event => {
     player = $('#inputPlayer').value.trim();
     if (player.length < 3 || player.length > 24) { $('#inputPlayer').setCustomValidity('Use de 3 a 24 caracteres no seu nome.'); $('#inputPlayer').reportValidity(); return; }
     selectedMode = $('input[name=mode]:checked').value;
-    sound('fruit'); start();
+    sound('fruit'); void launchFlight();
 });
-$('#restart-button').addEventListener('click', start);
+$('#restart-button').addEventListener('click', () => { void launchFlight(); });
 $('.brand').addEventListener('click', event => { event.preventDefault(); home(); });
 document.querySelectorAll('.back-home').forEach(button => button.addEventListener('click', home));
 $('#pause-button').addEventListener('click', () => { clearInputs(); game.pause(); syncUI(); });
@@ -467,8 +486,8 @@ function updateTrainingButton(){
     $('#start-training').disabled=!assetsReady;
     $('#start-training').textContent=DB.tutorialCompleted()?'Repetir treino de voo':'Experimentar o voo · treino seguro';
 }
-$('#start-training').addEventListener('click',()=>start(true));
-$('#training-again').addEventListener('click',()=>start(true));
+$('#start-training').addEventListener('click',()=>{ void launchFlight(true); });
+$('#training-again').addEventListener('click',()=>{ void launchFlight(true); });
 $('#training-home').addEventListener('click',home);
 $('#training-dialog').addEventListener('cancel',event=>{event.preventDefault();home();});
 updateTrainingButton();
