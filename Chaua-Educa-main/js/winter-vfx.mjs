@@ -8,12 +8,12 @@ const wrap=(v,span)=>((v%span)+span)%span;
 export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0,foreground=false){
  const amount=clamp01(intensity);
  if(amount<=.012||reduced||w<=0||h<=0)return;
- const layers=foreground?[{depth:1,count:low?3:8}]:
-  [{depth:.32,count:low?11:24},{depth:.68,count:low?9:23}];
+ const layers=foreground?[{depth:1,count:low?3:10}]:
+  [{depth:.32,count:low?11:30},{depth:.68,count:low?9:34}];
  c.save();c.beginPath();c.rect(0,0,w,h);c.clip();
  for(const {depth,count} of layers){
   c.fillStyle=depth>.8?'#f7fdff':'#e8f6fa';
-  c.globalAlpha=Math.min(.72,amount*(foreground?.42:.31+depth*.26));
+  c.globalAlpha=Math.min(.72,amount*(foreground?.43:.35+depth*.30));
   c.beginPath();
   for(let i=0;i<count;i++){
    const seed=(i+1)*137.71+depth*191.43;
@@ -21,7 +21,7 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
    const y=wrap(seed*17.31+time*velocity,h+60)-30;
    const sway=Math.sin(time*(.54+depth*.42)+seed)*((1-depth)*12+4);
    const x=wrap(seed*29.17+time*(wind*21+depth*4)+sway,w+60)-30;
-   const radius=(foreground?1.05:.53)+depth*(foreground?1.35:1.12)+(i%3)*.12;
+   const radius=(foreground?1.05:.63)+depth*(foreground?1.35:1.17)+(i%3)*.12;
    c.moveTo(x+radius,y);
    c.arc(x,y,radius,0,Math.PI*2);
   }
