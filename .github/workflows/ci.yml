@@ -35,6 +35,8 @@ jobs:
           npm run test:visual
           npm run test:immersion
           npm run test:browser
+          node tests/browser-mobile-orientation.cjs
+          node tests/browser-mobile-home-layout.cjs
           node tests/browser-responsive-camera.cjs
           node tests/browser-weather-trees.cjs
           node tests/browser-season-parity.cjs
