@@ -1522,13 +1522,19 @@ export class Renderer {
         if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
         if(snow>.12)drawAnimalFrost(c,'hawk',snow,1,reduced);
         if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
-        const motion=entity.dive?.82:retreat?.94:0;
-        if(snow>.32&&motion>.16)
-            drawSnowShedding(c,'hawk',snow,time,motion,
+        // Release crystals once at the start of the dive or recoil, not
+        // continuously through the entire predator's crossing animation.
+        const span=(entity.startX||0)-(entity.targetX||0);
+        const diveProgress=span>0?Math.max(0,Math.min(1,((entity.startX||x)-x)/span)):1;
+        const diving=entity.dive&&diveProgress>.04&&diveProgress<.29;
+        const recoil=retreat&&(entity.retreatTime||0)<.32;
+        const shake=diving?.82:recoil?.94:0;
+        if(snow>.32&&shake>.16)
+            drawSnowShedding(c,'hawk',snow,time,shake,
                 {low,reduced,seed:entity.id||0});
         if(snow>.18&&!retreat&&!warning){
             const breath=winterBreathSettings('hawk',snow,time,
-                {low,reduced,activity:motion,seed:entity.id||0});
+                {low,reduced,activity:entity.dive?.75:0,seed:entity.id||0});
             if(breath)drawAnimalBreath(c,-86,14,breath.strength,
                 breath.time,breath.period,breath.duration,-1,
                 breath.speedX,breath.liftY,breath.puffs,breath.sizeMultiplier);
