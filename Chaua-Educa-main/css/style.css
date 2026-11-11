@@ -2535,3 +2535,159 @@ dialog[open]::backdrop {
 .journal-shell.is-reading .journal-header h2 {
   font-size: 26px;
 }
+
+/* A readable, content-sized portrait menu on phones and touch tablets. */
+@media (orientation: portrait) {
+  html.mobile-device, html.mobile-device body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .app.mobile-device:not(.in-flight) {
+    height: auto;
+    min-height: 100svh;
+    max-height: none;
+    overflow: visible;
+  }
+  .app.mobile-device:not(.in-flight) .topbar {
+    height: 76px;
+    padding: 0 clamp(16px, 4vw, 30px);
+  }
+  .app.mobile-device:not(.in-flight) .home {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: calc(100svh - 76px);
+    padding: 18px clamp(16px, 4vw, 30px) 24px;
+  }
+  .app.mobile-device:not(.in-flight) .home-copy {
+    width: 100%;
+    max-width: 660px;
+    margin: 0 auto;
+    flex: 0 0 auto;
+  }
+  .app.mobile-device:not(.in-flight) .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.1px;
+  }
+  .app.mobile-device:not(.in-flight) .home h1 {
+    font-size: clamp(42px, 9vw, 56px);
+    line-height: 1.04;
+    letter-spacing: -1.5px;
+    margin: 12px 0;
+  }
+  .app.mobile-device:not(.in-flight) .intro {
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 550px;
+  }
+  .app.mobile-device:not(.in-flight) .start-card {
+    width: 100%;
+    max-width: none;
+    margin-top: 16px;
+    padding: clamp(16px, 3vw, 24px);
+  }
+  .app.mobile-device:not(.in-flight) .start-card > label {
+    font-size: 14px;
+  }
+  .app.mobile-device:not(.in-flight) .name-field {
+    height: 52px;
+  }
+  .app.mobile-device:not(.in-flight) .name-field input {
+    font-size: 16px;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker legend {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker label {
+    width: calc(50% - 4px);
+    min-width: 0;
+    min-height: 68px;
+    margin: 0;
+    padding: 10px 12px;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker label + label {
+    margin-left: 0;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker b {
+    font-size: 16px;
+  }
+  .app.mobile-device:not(.in-flight) .mode-picker small {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .app.mobile-device:not(.in-flight) .home .start-button {
+    min-height: 52px;
+    font-size: 18px;
+  }
+  .app.mobile-device:not(.in-flight) #start-training {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .app.mobile-device:not(.in-flight) .card-note {
+    font-size: 11px;
+  }
+  .app.mobile-device:not(.in-flight) .home-links {
+    width: 100%;
+    max-width: 660px;
+    margin: 16px auto 0;
+    justify-content: center;
+    gap: 8px 12px;
+  }
+  .app.mobile-device:not(.in-flight) .home-links button {
+    font-size: 13px;
+    min-height: 36px;
+  }
+  .app.mobile-device:not(.in-flight) .scene-caption {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    transform: none;
+    align-self: center;
+    width: 100%;
+    max-width: 420px;
+    margin: 24px auto 0;
+  }
+  .app.mobile-device:not(.in-flight) .scene-caption strong {
+    font-size: 14px;
+  }
+  .app.mobile-device:not(.in-flight) .scene-caption span:not(.location-dot) {
+    font-size: 11px;
+  }
+  .app.mobile-device:not(.in-flight) .scene-caption .species-label {
+    display: none;
+  }
+  .app.mobile-device:not(.in-flight) .home-footer {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: 660px;
+    margin: 24px auto 0;
+    padding-top: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .app.mobile-device:not(.in-flight) .home-footer > span {
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+  .app.mobile-device:not(.in-flight) .home-footer button {
+    font-size: 12px;
+    min-height: 32px;
+  }
+}
+@media (max-width: 359px) and (orientation: portrait) {
+  .app.mobile-device:not(.in-flight) .mode-picker label {
+    width: 100%;
+    min-height: 56px;
+  }
+}
