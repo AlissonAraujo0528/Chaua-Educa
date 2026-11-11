@@ -3,6 +3,7 @@
 // Reports successful runs and failed pilot attempts separately.
 // A pilot is NOT a substitute for real-player telemetry.
 import {Game,STEP,VICTORY_SCORE} from '../Chaua-Educa-main/js/engine.mjs';
+import {mkdirSync,writeFileSync} from 'node:fs';
 
 export const CALIBRATION_SEEDS=Object.freeze([104,217,451,999]);
 // The existing real-browser journey test took 794–827 seconds to reach 1,000 points.
@@ -98,6 +99,8 @@ if(import.meta.url===new URL('file://'+process.argv[1]).href){
  }
  const result=makeReport(samples);
  console.log('CLIMATE_CALIBRATION_REPORT '+JSON.stringify(result));
+ mkdirSync('test-results/climate-calibration',{recursive:true});
+ writeFileSync('test-results/climate-calibration/report.json',JSON.stringify(result,null,2)+'\n');
  const winners=samples.filter(s=>s.won);
  if(winners.length<2)throw Error('Calibration inconclusive: fewer than two successful runs');
 }
