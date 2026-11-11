@@ -1,11 +1,10 @@
-// Calibrated from the existing browser full-journey CI (seed 104, real Game):
-// Aventura: 827.4167 flight seconds; Tranquilo: 794.2583 flight seconds.
-// Both finished after distance had already hit its 28,000-unit cap.
-// These are scripted pilot baselines, NOT measured human averages.
-// Re-evaluate with the seeded report and real-player data before tuning.
+// Median successful flight time from PR #64 calibration: four seeded Game
+// simulations per mode, all reaching the refuge. This is scripted-pilot data,
+// NOT an estimate of a human player's average completion time.
+// See test-results/climate-calibration/report.json in the CI artifacts.
 export const CLIMATE_FLIGHT_REFERENCE = Object.freeze({
- aventura:827.42,
- tranquilo:794.26
+ aventura:633.25,
+ tranquilo:757.76
 });
 
 const clamp01 = x => Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
