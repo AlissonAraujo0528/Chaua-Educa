@@ -1421,7 +1421,7 @@ export class Renderer {
             if (broken && (reduced || !e.breakFx)) continue;
             if (e.fragileSide === side) {
                 drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined, snow, rain, time);
-                if(!broken&&snow>.15)drawSnowContact(c,x,upper?y-18:y-18,snow,time,e.id||0,reduced,this.decoration==='low');
+                if(!broken&&snow>.15)drawSnowContact(c,x,upper?y+4:y-18,snow,time,e.id||0,reduced,this.decoration==='low',upper);
                 continue;
             }
             if (broken) continue;
@@ -1435,7 +1435,7 @@ export class Renderer {
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
                 !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
             if (lean) c.restore();
-            if(snow>.15)drawSnowContact(c,x,y-18,snow,time,e.id||0,reduced,this.decoration==='low');
+            if(snow>.15)drawSnowContact(c,x,upper?y+4:y-18,snow,time,e.id||0,reduced,this.decoration==='low',upper);
             if(rain>.03&&!reduced)
                 drawSurfaceRainImpacts(c,x,upper?y+3:y-3,rain,time,e.id||0,
                     this.decoration==='low',reduced);
