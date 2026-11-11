@@ -8,7 +8,7 @@ import {CLIMATE_FLIGHT_REFERENCE,climateJourneyProgress,climateReferenceSeconds}
 test('climate progress follows active flight seconds, not 1,000-point victory or distance cap',()=>{
  for(const mode of ['aventura','tranquilo']){
   const seed=104,duration=climateReferenceSeconds(mode,seed);
-  assert.ok(duration>750 && duration<900,'reference is not based on full winning flight');
+  assert.ok(duration>500 && duration<850,'reference is not based on completed seeded flights');
   assert.equal(climateJourneyProgress({elapsed:0,mode,seed}),0);
   assert.equal(climateJourneyProgress({elapsed:duration,mode,seed}),1);
   assert.equal(climateJourneyProgress({elapsed:duration*4,mode,seed}),1);
