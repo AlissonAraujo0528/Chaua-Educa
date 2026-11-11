@@ -678,7 +678,10 @@ export class Game {
             // particles/stars animate until the result dialog becomes visible.
             this.advanceEffects(dt);
             this.impactRemaining=Math.max(0,this.impactRemaining-dt);
-            if(this.impactRemaining<=1e-10 || this.reducedMotion)this.state='ended';
+            if(this.impactRemaining<=1e-10 || this.reducedMotion){
+                this.impactRemaining=0;
+                this.state='ended';
+            }
             return;
         }
         if (this.state === 'countdown') {
