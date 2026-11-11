@@ -9,7 +9,7 @@ O workflow `Validate game` do PR #62 registrou, no teste real de jornada no nave
 | Aventura | Sim | 827,42 s (13min47s) | 1009 |
 | Tranquilo | Sim | 794,26 s (13min14s) | 1002 |
 
-**Limitação:** são duas simulações automatizadas bem-sucedidas, não uma média representativa de jogadores humanos. O programa `scripts/calibrate-climate-journey.mjs` coleta amostras adicionais com seeds e mostra também falhas do piloto; seus resultados são diagnósticos, não uma mudança nas regras.
+**Ampliação confirmada no PR #64:** quatro partidas vitoriosas por modo (oito no total). A mediana do tempo de voo foi **633,25 s para Aventura** e **757,76 s para Tranquilo**; faixa entre partidas vencedoras: 523,72–775,87 s (Aventura) e 737,17–820,39 s (Tranquilo). **Limitação:** são simulações automatizadas, não uma média de jogadores humanos. O relatório completo é salvo como artefato do CI; os dados não alteram física, score nem regras de vitória.
 
 ### Defeito estrutural confirmado
 
@@ -19,7 +19,7 @@ O mundo limita a distância a `JOURNEY_LENGTH = 28000` (`engine.mjs`), mas a pon
 
 ### Referência experimental
 
-O módulo puro `js/climate-progress.mjs` converte `elapsed` em `[0,1]`, com referências distintas de 827,42 s (Aventura) e 794,26 s (Tranquilo). Uma variação determinística de até ±4% pelo seed evita mudanças no mesmo instante exato em todas as partidas. Nenhum valor de pontos entra na função. A progressão não retrocede; o tempo efetivo não avança em pausa, quiz ou game over.
+O módulo puro `js/climate-progress.mjs` converte `elapsed` em `[0,1]`, com as medianas de 633,25 s (Aventura) e 757,76 s (Tranquilo). Uma variação determinística de até ±4% pelo seed evita mudanças no mesmo instante exato em todas as partidas. Nenhum valor de pontos entra na função. A progressão não retrocede; o tempo efetivo não avança em pausa, quiz ou game over.
 
 ## Contrato de integração de PRs
 
