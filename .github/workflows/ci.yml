@@ -12,6 +12,7 @@ jobs:
       - run: npm ci
       - run: node scripts/verify-all-9-spritesheets.cjs
       - run: npm test
+      - run: node scripts/calibrate-climate-journey.mjs
       - run: npm run build
       - run: git diff --exit-code -- Chaua-Educa-main/css/style.css
       - run: npx playwright install --with-deps chromium
