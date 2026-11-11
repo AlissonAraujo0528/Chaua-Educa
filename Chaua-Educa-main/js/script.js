@@ -2,13 +2,13 @@ import { VisualQuality } from './quality.mjs';
 import { LESSONS, resultAdvice } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
-import { JOURNEY_LENGTH } from './journey.mjs';
+import { journeyRain, journeyStorm, journeyWind, getWeatherMode, setWeatherMode } from './weather.mjs';
 import { FlightInput } from './input.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
 import { FRUITS } from './fruits.mjs';
 import DB from './database.js';
-import { Game, FlightClock, HEIGHT, STAGES } from './engine.mjs';
+import { Game, FlightClock, HEIGHT, STAGES, VICTORY_SCORE } from './engine.mjs';
 import { Renderer, drawBird } from './render.mjs';
 import { ACTION_SPRITES_ENABLED, preloadActionSheets } from './action-sheets.mjs';
 
@@ -59,7 +59,7 @@ export const game = new Game({ onEvent(event) {
     const messages = { shield: 'Escudo de penas · um contato protegido', feather: 'Pena dourada · pontos ×2 por 10s de voo', pepper: 'Pimenta da mata · Voo turbo com velocidade e pontos ×2!', 'shield-break': 'Escudo usado · proteção breve para retomar o voo', quiet: 'Uma clareira. Recupere o fôlego.' };
     if(event.type==='stage')toast(event.message);
     if(event.type==='refuge')toast('O bando espera no centro: alinhe o voo para pousar.');
-    if(event.type==='medal')toast('200 pontos · medalha conquistada! Continue até o abrigo.');
+    if(event.type==='medal')toast('1.000 pontos · abrigo liberado! Alinhe o voo com o bando.');
     if (messages[event.type]) toast(messages[event.type]);
     if(event.type==='shield-kept')toast('Seu escudo já está pronto · proteção mantida');
     if(event.type==='feather' && event.renewed)toast('Pena renovada · mais 10s de pontos ×2');
@@ -120,7 +120,50 @@ function home() {
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
-    app.classList.remove('in-flight','training'); updateTrainingButton(); resize(); $('#inputPlayer').focus({ preventScroll: true });
+    app.classList.remove('in-flight','training'); updateTrainingButton();
+
+const WEATHER_MODES = [
+    { id: 'auto', label: 'Automático 🍃', icon: '🌤️' },
+    { id: 'summer', label: 'Sol de Verão ☀️', icon: '☀️' },
+    { id: 'storm', label: 'Tempestade & Relâmpagos ⚡', icon: '⚡' },
+    { id: 'rain', label: 'Chuva da Mata 🌧️', icon: '🌧️' },
+    { id: 'winter', label: 'Inverno & Neve ❄️', icon: '❄️' },
+    { id: 'autumn', label: 'Outono & Vento 🍂', icon: '🍂' },
+    { id: 'spring', label: 'Primavera & Flores 🌸', icon: '🌸' }
+];
+
+const btnWeather = $('#btn-weather-quick');
+const weatherSelect = $('#weather-mode');
+
+function updateWeatherUI() {
+    const cur = getWeatherMode();
+    const m = WEATHER_MODES.find(w => w.id === cur) || WEATHER_MODES[0];
+    if (btnWeather) {
+        btnWeather.textContent = m.icon;
+        btnWeather.title = `Clima atual: ${m.label} (clique para alternar)`;
+    }
+    if (weatherSelect) weatherSelect.value = cur;
+}
+
+if (btnWeather) {
+    btnWeather.addEventListener('click', () => {
+        const cur = getWeatherMode();
+        const idx = WEATHER_MODES.findIndex(w => w.id === cur);
+        const next = WEATHER_MODES[(idx + 1) % WEATHER_MODES.length];
+        setWeatherMode(next.id);
+        updateWeatherUI();
+        anunciar(`Clima: ${next.label}`);
+    });
+}
+
+if (weatherSelect) {
+    weatherSelect.addEventListener('change', event => {
+        setWeatherMode(event.target.value);
+        updateWeatherUI();
+    });
+}
+
+updateWeatherUI(); resize(); $('#inputPlayer').focus({ preventScroll: true });
 }
 
 $('#inputPlayer').addEventListener('input', event => {
@@ -236,7 +279,7 @@ function result() {
     const progress=DB.missionProgress(player);
     const earned=completedMissions(progress).filter(m=>!flightMissionIds.includes(m.id));
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
-    $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 200 pontos':''}`:`${Math.floor(game.distance/JOURNEY_LENGTH*100)}% do caminho · ${STAGES[game.stage]}`;
+    $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}% do caminho · ${STAGES[game.stage]}`;
     $('#new-record').hidden = !record || game.score === 0;
     $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Frutas ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
@@ -322,11 +365,11 @@ function syncUI() {
     if (game.state === 'countdown') hudText('#count-number',Math.max(1, Math.ceil(game.countdown)));
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
-    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(game.distance/JOURNEY_LENGTH*100)}%`);
-    const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,game.distance/JOURNEY_LENGTH*100);
+    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}%`);
+    const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,Math.min(1,game.score/VICTORY_SCORE)*100);
     if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
     hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
-    hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');
+    hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Pontos para liberar o abrigo');
     hudValue('#energy',game.stamina);
     hudClass('#shield-status','active',game.shield);
     hudText('#shield-status span',game.shield ? 'Escudo pronto' : 'Sem escudo');
@@ -352,7 +395,9 @@ function frame(time) {
     clock.advance(delta);
     if(game.state!==previousState || time-lastHudTime>=80){syncUI();lastHudTime=time;}
     if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
-    forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage);
+    forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
+        journeyRain(game.distance, game.tutorial), journeyStorm(game.distance, game.mode, game.tutorial),
+        journeyWind(game.distance, game.mode, game.tutorial));
     if(document.hidden){requestAnimationFrame(frame);return;}
     if (game.state === 'menu') renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
     else {
@@ -433,6 +478,7 @@ function showSettings(fromPause=false){
     settingsFromPause=fromPause;
     if(fromPause)$('#pause-dialog').close();
     $('#quality-mode').value=quality.mode;
+    if($('#weather-mode')) $('#weather-mode').value=getWeatherMode();
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
     openDialog('#settings-dialog');

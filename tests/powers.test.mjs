@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Game,STEP,FLIGHT} from '../Chaua-Educa-main/js/engine.mjs';
-import {offerPower} from '../Chaua-Educa-main/js/powers.mjs';
+import {offerPower,POWER_BALANCE} from '../Chaua-Educa-main/js/powers.mjs';
 import DB from '../Chaua-Educa-main/js/database.js';
 function options(){return {elapsed:30,shield:false,feather:0,entities:[],schedule:{nextAny:0,nextShield:0,nextFeather:18},opportunity:true,random:()=>.5};}
 function route(){const g=new Game();g.state='playing';g.routes.set(1,{total:3,collected:0,awarded:false,failed:false});const fruit=Array.from({length:3},(_,i)=>({id:i,kind:'fruit',variety:0,route:1,x:220+i*100,y:320}));g.entities=fruit;return {g,fruit};}
 test('power offers respect spacing, existing shields, pending pickups and fruit opportunities',()=>{
- const o=options();assert.equal(offerPower(o),'feather');assert.equal(o.schedule.nextAny,39);assert.equal(o.schedule.nextFeather,53);assert.equal(offerPower(o),null);
+ const o=options();assert.equal(offerPower(o),'feather');assert.equal(o.schedule.nextAny,30+POWER_BALANCE.minimumOfferGap);assert.equal(o.schedule.nextFeather,30+POWER_BALANCE.featherGap+3);assert.equal(offerPower(o),null);
  o.elapsed=40;o.shield=true;o.opportunity=false;assert.equal(offerPower(o),null);o.shield=false;o.entities=[{kind:'shield'}];assert.equal(offerPower(o),null);
- o.entities=[];assert.equal(offerPower(o),'shield');assert.equal(o.schedule.nextShield,62);
+ o.entities=[];assert.equal(offerPower(o),'shield');assert.equal(o.schedule.nextShield,40+POWER_BALANCE.shieldGap+4);
  const p=options();p.feather=8;p.shield=true;assert.equal(offerPower(p),null);
 });
 test('duplicate shield is explained without extra lives or points; feather renews to ten seconds',()=>{

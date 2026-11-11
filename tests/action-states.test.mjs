@@ -41,3 +41,11 @@ test('snake states follow original 0.45/0.22/0.60 physical timings',()=>{
 test('missing sheet never prevents legacy game art rendering',()=>{
  assert.equal(drawActionSheet(null,'hawk-flight',0,0,0,32,32),false);
 });
+
+test('hawk pose weights are continuous across every wing frame boundary',()=>{
+ const weights=t=>{const a=hawkAction({id:0},t,false),w=Array(8).fill(0);w[a.frame]+=1-a.blend;w[a.next]+=a.blend;return w;};
+ for(let i=1;i<=16;i++){
+  const a=weights(i/8-1e-8),b=weights(i/8+1e-8);
+  assert.ok(a.every((v,k)=>Math.abs(v-b[k])<1e-6));
+ }
+});

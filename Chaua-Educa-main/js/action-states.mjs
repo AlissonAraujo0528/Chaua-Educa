@@ -19,22 +19,40 @@ export function hawkAction(e={},time=0,reduced=false) {
  if(e.retreat) {
    if(!e.dazed)return null;
    const t=Math.max(0,e.retreatTime||0);
+   let f;
+   if(t<.12) f=0;
+   else if(t<.38) f=1;
+   else {
+     const dazedFrames=[2,3,2,4];
+     f=dazedFrames[Math.floor((t-.38)*4)%dazedFrames.length];
+   }
    return {state:t<.12?'shield-impact':t<1.05?'stunned':'dazed-exit',
-      sheet:'hawk-stunned',frame:frame(6,t/ACTION_TIMINGS.hawkStun),
-      angle:t<1.5?Math.sin(t*17)*.105*(1-clamp(t/1.5)):0,
-      offsetY:t<1.5?Math.sin(t*12)*2.6*(1-clamp(t/1.5)):0};
+      sheet:'hawk-stunned',frame:f,
+      angle:Math.sin(t*14)*.12,
+      offsetY:Math.sin(t*10)*3.2};
  }
  if(e.dive||e.phase==='leaving')return null; // preserve authored dive and glide.
  const t=Number.isFinite(time)?time:0;
- return {state:'flight',sheet:'hawk-flight',frame:Math.floor(((t*8+(e.id||0)*1.5)%8+8)%8),angle:0,offsetY:0};
+ const position=((t*16+(e.id||0)*1.5)%8+8)%8, current=Math.floor(position), fraction=position-current;
+ const phase=(position/8)*Math.PI*2;
+ const offsetY=Math.sin(phase)*3.8;
+ const angle=Math.cos(phase)*0.045;
+ return {state:'flight',sheet:'hawk-flight',frame:current,next:(current+1)%8,blend:fraction*fraction*(3-2*fraction),angle,offsetY};
 }
 export function snakeAction(s={},reduced=false) {
  if(reduced)return null;
  if(s.retreat){
    if(!s.dazed)return null;
    const t=Math.max(0,s.retreatTime||0);
+   let f;
+   if(t<.14) f=0;
+   else if(t<.38) f=1;
+   else {
+     const loop=[3,4,3,4];
+     f=loop[Math.floor((t-.38)*4)%loop.length];
+   }
    return {state:t<.14?'shield-impact':'stunned',sheet:'snake-stunned',
-     frame:frame(6,t/ACTION_TIMINGS.snakeDaze)};
+     frame:f};
  }
  if(s.phase==='watching'||s.phase==='warning')return {state:'alert',sheet:'snake-strike',frame:s.phase==='warning'?1:0};
  if(s.phase==='windup')return {state:'windup',sheet:'snake-strike',frame:2+frame(2,(s.phaseAge||0)/SNAKE_TIMING.windup)};

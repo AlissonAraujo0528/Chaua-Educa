@@ -17,7 +17,7 @@ const {chromium}=require('playwright');
     const {game:g}=await import('/js/script.js');const {isSnakeA2Ready}=await import('/js/snake-a2.mjs');
     if(!isSnakeA2Ready())throw Error('A2 must load on the default game URL');const {flightViewport}=await import('/js/viewport.mjs');
     g.start(g.mode,[],104);let pending=null,nextDecision=0,hits=new Set(),stages=new Set();
-    for(let frame=0;frame<7000;frame++){
+    for(let frame=0;frame<40000;frame++){
      if(g.state==='playing'){
       const v=flightViewport(innerWidth,innerHeight),right=v.worldLeft+v.w/v.scale;
       const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x&&e.x<=right);

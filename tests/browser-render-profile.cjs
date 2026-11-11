@@ -55,11 +55,21 @@ const {chromium}=require('playwright');
     // all particles and snake geometry; only the backing transform may differ.
     let commands=[];const context=r.c;
     const serial=value=>value&&typeof value==='object'?value.constructor.name:value;
+    const record=(key,args)=>{
+     // Seasonal surfaces are blitted in physical pixels under the identity
+     // transform. Check their pixel snapping, then compare logical placement.
+     if(key==='drawImage' && [...r.seasonalBackdrop.frames.values()].includes(args[0])){
+      const logicalX=Math.sin(50*.035)*24-26;
+      check(args.length===3 && args[1]===Math.round(logicalX*r.dpr) && args[2]===0,
+       'seasonal backdrop lost pixel-aligned placement');
+      commands.push([key,'seasonal-surface',logicalX,0]);
+     }else commands.push([key,...args.map(serial)]);
+    };
     r.c=new Proxy(context,{
-     get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?(...args)=>{if(key!=='setTransform')commands.push([key,...args.map(serial)]);return value.apply(target,args);}:value;},
+     get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?(...args)=>{if(key!=='setTransform')record(key,args);return value.apply(target,args);}:value;},
      set(target,key,value){commands.push(['set',key,serial(value)]);return Reflect.set(target,key,value,target);}
     });
-    g.stage=2;const gameBefore=JSON.stringify(g);
+    g.stage=2;g.distance=14900;const gameBefore=JSON.stringify(g);
     for(const decoration of ['high','low']){
      const draw=resolution=>{r.setVisualProfile({resolution,decoration});commands=[];r.game(g,false,50);return JSON.stringify(commands);};
      const high=draw('high'),highSize=r.canvas.width*r.canvas.height;
