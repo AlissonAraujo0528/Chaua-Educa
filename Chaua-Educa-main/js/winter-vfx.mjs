@@ -113,9 +113,9 @@ export function winterOverlayStages(intensity){
 // schedules the original four-frame clay-breath.webp VFX, independently for
 // each animal, according to the same winter weight as the scenery.
 const BREATH_PROFILES=Object.freeze({
- chaua:Object.freeze({period:2.85,duration:.34,speedX:18,liftY:-9,offset:0}),
- snake:Object.freeze({period:3.65,duration:.28,speedX:13,liftY:-8,offset:.83}),
- hawk:Object.freeze({period:4.15,duration:.23,speedX:21,liftY:-7,offset:1.71})
+ chaua:Object.freeze({period:2.85,duration:.34,speedX:18,liftY:-9,offset:0,sizeMultiplier:.90}),
+ snake:Object.freeze({period:3.65,duration:.28,speedX:13,liftY:-8,offset:.83,sizeMultiplier:.74}),
+ hawk:Object.freeze({period:4.15,duration:.23,speedX:21,liftY:-7,offset:1.71,sizeMultiplier:.72})
 });
 export function winterBreathSettings(kind,snow,time,{reduced=false,low=false,activity=0,seed=0}={}){
  const cfg=BREATH_PROFILES[kind],cold=clamp01(snow),motion=clamp01(activity);
@@ -129,7 +129,7 @@ export function winterBreathSettings(kind,snow,time,{reduced=false,low=false,act
  const strength=Math.min(.68,(cold-.18)/.82*.56)*(1-motion*.68)*(low?.75:1);
  if(strength<=.015)return null;
  return {strength,time:shifted,period,duration:cfg.duration,
-  speedX:cfg.speedX,liftY:cfg.liftY,puffs:low?1:2};
+  speedX:cfg.speedX,liftY:cfg.liftY,puffs:low?1:2,sizeMultiplier:cfg.sizeMultiplier};
 }
 
 // A flap, dive or snake movement dislodges only a handful of crystals from
