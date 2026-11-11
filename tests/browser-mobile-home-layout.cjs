@@ -11,7 +11,7 @@ fs.mkdirSync(out,{recursive:true});
  try {
   for(const [width,height] of [[320,568],[390,844],[430,932],[768,1024],[980,1500]]) {
    const context=await browser.newContext({
-    viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,
+    viewport:{width,height},deviceScaleFactor:1,isMobile:true,hasTouch:true,reducedMotion:'reduce',
     userAgent:'Mozilla/5.0 (Linux; Android 16; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Mobile Safari/537.36'
    });
    const page=await context.newPage(),errors=[];
