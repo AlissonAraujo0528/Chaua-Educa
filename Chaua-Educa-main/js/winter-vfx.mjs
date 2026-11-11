@@ -81,7 +81,7 @@ export function drawAnimalFrost(c,kind,intensity,scale=1,reduced=false){
 
 // Tiny crystals settle on an exposed branch/cap and then fade. Existing winter
 // WebP layers supply the substantial snow; these are just contact feedback.
-export function drawSnowContact(c,x,y,intensity,time,seed=0,reduced=false,low=false){
+export function drawSnowContact(c,x,y,intensity,time,seed=0,reduced=false,low=false,falling=false){
  const snow=clamp01(intensity);
  if(snow<=.15||reduced)return;
  const count=low?2:4;
@@ -90,7 +90,9 @@ export function drawSnowContact(c,x,y,intensity,time,seed=0,reduced=false,low=fa
  for(let i=0;i<count;i++){
   const phase=wrap(time*.23+seed*.17+i*.31,1);
   const sx=x+(i-(count-1)/2)*13+Math.sin(phase*Math.PI*2)*1.8;
-  const sy=y-2-Math.sin(phase*Math.PI)*3;
+  // Downward release from an upper hanging tree must follow gravity.
+  // Lower tree caps can collect flakes that flutter just above the surface.
+  const sy=falling?y+phase*15:y-2-Math.sin(phase*Math.PI)*3;
   const r=(.65+(i%2)*.3)*Math.min(1,snow*1.2);
   c.moveTo(sx+r,sy);
   c.arc(sx,sy,r,0,Math.PI*2);
