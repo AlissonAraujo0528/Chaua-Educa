@@ -120,7 +120,7 @@ test('season backdrop prewarms the upcoming authored atlas frame under the new c
  const oldMode=getWeatherMode();t.after(()=>setWeatherMode(oldMode));setWeatherMode('auto');
  const cache=new SeasonalBackdrop(),atlas={naturalWidth:1672,naturalHeight:941};
  const before=sample(.193);
- for(let i=0;i<6;i++)cache.prepare(atlas,1366,638,1,{...before,elapsed:before.elapsed+i});
+ for(let i=0;i<10;i++)cache.prepare(atlas,1366,638,1,{...before,elapsed:before.elapsed+i*.1});
  assert.ok(cache.frames.has(2),'summer should prewarm before spring-to-summer transition');
  assert.ok(cache.frames.size<=2,'no third simultaneous backdrop');
  const later=sample(.23);
