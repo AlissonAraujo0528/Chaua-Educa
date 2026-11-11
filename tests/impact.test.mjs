@@ -14,10 +14,12 @@ test('fatal impact recoils then remains stunned with frozen flight and ends exac
  clock.advance(.25);assert.equal(g.state,'impact');
  const frozenRemaining=g.impactRemaining;
  assert.ok(frozenRemaining>.6,'daze must remain after the brief initial recoil');
- clock.advance(ACTION_TIMINGS.parrotImpact*.45);
- assert.equal(g.state,'impact');
- clock.advance(.5);
- assert.equal(g.state,'ended');assert.equal(g.impactRemaining,0);
+ // FlightClock caps each advance at .25s; simulate real frame updates
+ // rather than passing one large duration and silently dropping time.
+ clock.advance(.25);assert.equal(g.state,'impact');
+ clock.advance(.25);assert.equal(g.state,'impact');
+ clock.advance(.25);assert.equal(g.state,'ended');
+ assert.equal(g.impactRemaining,0);
  assert.equal(events.filter(e=>e.type==='lose').length,1);
  g.start();assert.equal(g.hit,null);assert.equal(g.particles.length,0);assert.equal(g.impactRemaining,0);
 });
