@@ -17,8 +17,10 @@ export function parrotAction(p = {}) {
  if(p.reduced||p.perched||p.landing!==null&&p.landing!==undefined||p.surprise)return null;
  if(p.defeated){
    const progress=clamp(p.impactProgress||0);
+   // Authored impact frames 0..3 go from surprise to spiral-eyed daze.
+   // Frames 4 and 5 are RECOVERY poses and must never occur on a fatal hit.
    return {state:progress>=1?'stunned':'impact',sheet:'parrot-impact',
-     frame:frame(6,progress)};
+     frame:Math.min(3,Math.floor(progress*4))};
  }
  if(Number.isFinite(p.shieldHitAge)&&p.shieldHitAge>=0&&p.shieldHitAge<ACTION_TIMINGS.shieldRebound)
    return {state:'shield-rebound',sheet:'parrot-impact',frame:frame(6,p.shieldHitAge/ACTION_TIMINGS.shieldRebound)};
