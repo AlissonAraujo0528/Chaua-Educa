@@ -1,9 +1,13 @@
+import {breeze,treeBend,winterAmount} from './living-motion.mjs';
+import {drawForestLife} from './forest-life.mjs';
+import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
+import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {drawContinuousSnake} from './snake-render.mjs';
 import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready} from './snake-a2.mjs';
 import {parrotAction,hawkAction} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
 import {SNAKE_WRAP} from './snake-wrap-data.mjs';
-import {drawLivingTrunk,drawRefugeTree} from './tree-art.mjs';
+import {drawLivingTrunk,drawTreeVariant,drawRefugeTree} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,snakePlacement,placeWarnings} from './animation.mjs';
@@ -12,6 +16,7 @@ import { canvasResolution } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
+import { journeyRain, journeyStorm, journeyWind, journeyFog, drawJourneyRain, drawForegroundRain, drawJourneyFog, drawLightning } from './weather.mjs';
 import { FRUITS } from './fruits.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
 
@@ -26,23 +31,26 @@ const mixColor = (a, b, t) => {
     return `rgb(${r},${g},${bl})`;
 };
 
-let blendSurface, blendSurfaceCtx;
-function blendSprite(c, first, second, blend) {
-    // Add the two weighted sprites on transparency, then composite once onto
-    // the forest. Source-over crossfades make opaque bodies look like ghosts.
-    if(!blendSurface && typeof OffscreenCanvas!=='undefined')blendSurface=new OffscreenCanvas(512,512);
-    if(!blendSurface && typeof document!=='undefined') {
-        blendSurface=document.createElement('canvas');blendSurface.width=512;blendSurface.height=512;
+const spriteBlendBuffers=new Map();
+function blendSprite(c, first, second, blend, extent=128) {
+    // Separate reusable buffers avoid reallocating when switching bird sizes.
+    let buffer=spriteBlendBuffers.get(extent);
+    if(!buffer){
+        const rasterScale=extent===180?320/HAWK_ART.size:2;
+        const size=Math.ceil(extent*2*rasterScale);
+        const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(size,size):
+            typeof document!=='undefined'?document.createElement('canvas'):null;
+        if(!surface){(blend<.5?first:second)(c);return;}
+        surface.width=size;surface.height=size;
+        buffer={surface,layer:surface.getContext('2d'),rasterScale};spriteBlendBuffers.set(extent,buffer);
     }
-    if(!blendSurface){(blend<.5?first:second)(c);return;}
-    if(!blendSurfaceCtx)blendSurfaceCtx=blendSurface.getContext('2d');
-    const layer=blendSurfaceCtx;
-    layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,512,512);
-    layer.setTransform(2,0,0,2,256,256);
-    layer.globalCompositeOperation='source-over';layer.globalAlpha=1-blend;first(layer);
-    layer.globalCompositeOperation='lighter';layer.globalAlpha=blend;second(layer);
-    layer.globalAlpha=1;layer.globalCompositeOperation='source-over';
-    c.drawImage(blendSurface,-128,-128,256,256);
+    const {surface,layer,rasterScale}=buffer;
+    layer.setTransform(1,0,0,1,0,0);layer.clearRect(0,0,surface.width,surface.height);
+    layer.setTransform(rasterScale,0,0,rasterScale,extent*rasterScale,extent*rasterScale);
+    layer.globalCompositeOperation='source-over';layer.globalAlpha=1;first(layer);
+    layer.globalAlpha=blend;second(layer);
+    layer.globalAlpha=1;
+    c.drawImage(surface,-extent,-extent,extent*2,extent*2);
 }
 
 function atlasFrame(c,name,index,factor){
@@ -50,8 +58,8 @@ function atlasFrame(c,name,index,factor){
     if(!image)return;
     c.drawImage(image,...frame.rect,-frame.anchor[0]*factor,-frame.anchor[1]*factor,data.cell*factor,data.cell*factor);
 }
-function atlasAnimation(c,name,clip,factor){
-    if(clip.blend>0&&clip.frame!==clip.next)blendSprite(c,layer=>atlasFrame(layer,name,clip.frame,factor),layer=>atlasFrame(layer,name,clip.next,factor),clip.blend);
+function atlasAnimation(c,name,clip,factor,extent=128){
+    if(clip.blend>0&&clip.frame!==clip.next)blendSprite(c,layer=>atlasFrame(layer,name,clip.frame,factor),layer=>atlasFrame(layer,name,clip.next,factor),clip.blend,extent);
     else atlasFrame(c,name,clip.frame,factor);
 }
 function perchedSprite(c,clip,factor){
@@ -94,7 +102,7 @@ function birdFoot(scale){
     const f=SPRITES.chaua.frames[12];return (f.content[1]+f.content[3]-5-f.anchor[1])*27.7027*scale/SPRITES.chaua.landmarkWidth;
 }
 function animatedBird(c,p){
-    const {x,y,scale=1,angle=0,time=0,reduced=false,reaction=0,defeated=false,impactProgress=0,turbo=false,stamina=1,perched=false,surprise=false,won=false,landing=null}=p;
+    const {x,y,scale=1,angle=0,time=0,reduced=false,reaction=0,defeated=false,impactProgress=0,turbo=false,stamina=1,perched=false,surprise=false,won=false,landing=null,snow=0,rain=0}=p;
     const clip=birdAnimation({wing:p.wing,time,perched:perched&&!surprise,landing,defeated:defeated||surprise,impactProgress:surprise?1:impactProgress,reduced});
     const factor=27.7027*scale/SPRITES.chaua.landmarkWidth,size=125*scale;
     c.save();c.translate(x,y);
@@ -119,6 +127,56 @@ function animatedBird(c,p){
     }
     else if(reaction>0&&!reduced)drawFruitSparkles(c,size*.44,-size*.08,reaction,time);
     else if(stamina<.28&&!reduced&&!perched)drawSweatDrops(c,ex,ey,size,time);
+    if(snow>0&&!reduced&&!defeated&&!surprise){
+        drawAnimalBreath(c,44*scale,2*scale,snow,time,2.4,0.46,1,20*scale,-10*scale);
+    }
+    if(rain>0&&!reduced&&!perched&&!defeated){
+        c.save();
+        // 1. Wet glistening sheen along Chaua's top profile
+        c.fillStyle=`rgba(225, 245, 255, ${rain * 0.32})`;
+        c.beginPath();
+        c.ellipse(10*scale,-18*scale,34*scale,5*scale,-0.18,0,TAU);
+        c.fill();
+
+        // 2. Frontal rain impacts on beak and head (droplets shattering & spraying back)
+        c.fillStyle='#d2edff';
+        c.beginPath();
+        for(let i=0;i<4;i++){
+            const hitCycle=(time*9+i*1.73)%1;
+            const hitOriginX=(38-i*5)*scale;
+            const hitOriginY=(-6-i*4)*scale;
+            const spX=hitOriginX-hitCycle*(28+(i%2)*14)*scale;
+            const spY=hitOriginY-Math.sin(hitCycle*Math.PI)*(10+(i%3)*4)*scale+hitCycle*7*scale;
+            const spR=Math.max(0.7,(1-hitCycle)*2.2*scale);
+            c.moveTo(spX+spR,spY);
+            c.arc(spX,spY,spR,0,TAU);
+        }
+
+        // 3. Wing flap spray (water droplets cast off wingtips on downstroke)
+        if(p.wing>0.08||p.flapImpulse>0.05){
+            const wingPhase=1-(p.wing||0);
+            for(let w=0;w<5;w++){
+                const wt=(time*11+w*1.45)%1;
+                const tipX=(-8+Math.sin(wingPhase*Math.PI)*18-wt*32)*scale;
+                const tipY=(16+(w-2)*9+wt*22)*scale;
+                const wr=Math.max(0.6,(1-wt)*2.0*scale);
+                c.moveTo(tipX+wr,tipY);
+                c.arc(tipX,tipY,wr,0,TAU);
+            }
+        }
+
+        // 4. Subtle slipstream wake from tail
+        for(let t=0;t<3;t++){
+            const tt=(time*5+t*2.3)%1;
+            const wakeX=(-42-tt*36)*scale;
+            const wakeY=(4+Math.sin(time*3+t)*5)*scale;
+            const wakeR=(1-tt)*1.8*scale;
+            c.moveTo(wakeX+wakeR,wakeY);
+            c.arc(wakeX,wakeY,wakeR,0,TAU);
+        }
+        c.fill();
+        c.restore();
+    }
     if(turbo&&!perched&&!reduced)drawTurboWindLines(c,size,time);
     if(won&&!reduced)drawRefugeHearts(c,0,-size*.25,size,time);
     c.restore();
@@ -271,6 +329,60 @@ function drawFruitSparkles(c, bx, by, reaction, t) {
     const sp2X = bx - 4 - wobble * 0.4;
     const sp2Y = by - 26 + floatY * 1.1;
     drawMiniSparkle(c, sp2X, sp2Y, 4.5, t * 8 + 1);
+    c.restore();
+}
+
+
+export function drawAnimalBreath(c, x, y, snow, time, period = 2.4, duration = 0.45, dirX = 1, speedX = 18, liftY = -8) {
+    if (snow <= 0.05) return;
+    const cycle = (time / period) % 1;
+    if (cycle >= duration) return;
+    const phase = cycle / duration;
+    const alphaBase = Math.sin(phase * Math.PI) * 0.85 * snow;
+    const breathImg = images.get('clay-breath');
+    c.save();
+    if (breathImg) {
+        for (let i = 0; i < 3; i++) {
+            const delay = i * 0.15;
+            if (phase < delay) continue;
+            const p = (phase - delay) / (1 - delay);
+            const frame = Math.min(3, Math.floor(p * 4));
+            const sx = frame * 128;
+            const sy = 0;
+            const sw = 128;
+            const sh = 128;
+            const scale = (0.16 + p * 0.22) * (1 - i * 0.15);
+            const dw = 128 * scale;
+            const dh = 128 * scale;
+            const px = x + dirX * p * (speedX + i * 5);
+            const py = y + p * (liftY - i * 2);
+            const pa = alphaBase * (1 - p * 0.35) * (1 - i * 0.2);
+            c.save();
+            c.globalAlpha = Math.max(0, Math.min(1, pa));
+            c.translate(px, py);
+            if (dirX < 0) c.scale(-1, 1);
+            c.drawImage(breathImg, sx, sy, sw, sh, -dw * 0.35, -dh * 0.5, dw, dh);
+            c.restore();
+        }
+    } else {
+        for (let i = 0; i < 4; i++) {
+            const delay = i * 0.14;
+            if (phase < delay) continue;
+            const p = (phase - delay) / (1 - delay);
+            const px = x + dirX * p * (speedX + i * 6);
+            const py = y + p * (liftY - i * 3);
+            const pr = 2.8 + p * (6.5 + i * 2.5);
+            const pa = alphaBase * (1 - p * 0.55);
+            c.fillStyle = `rgba(255, 255, 255, ${pa})`;
+            c.beginPath();
+            c.arc(px, py, pr, 0, TAU);
+            c.fill();
+            c.fillStyle = `rgba(215, 238, 255, ${pa * 0.5})`;
+            c.beginPath();
+            c.arc(px - dirX * 1.2, py + 1.2, pr * 0.7, 0, TAU);
+            c.fill();
+        }
+    }
     c.restore();
 }
 
@@ -450,10 +562,10 @@ export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
     defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
-    shieldHitAge = null
+    shieldHitAge = null, snow = 0, rain = 0
 }) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge});
+    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge,snow,rain});
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
@@ -478,7 +590,7 @@ export class Renderer {
         this.transitionRasterDisabled = false;
         this.transitionSlowReadbacks = 0;
         // Diagnostic-only opt-out for paired A/B; production keeps bounded readbacks.
-        this.transitionSyncEnabled = true;
+        this.transitionSyncEnabled = typeof location !== 'undefined' && location.search.includes('transitionSync=1');
         // The forest WebP is fully opaque; the sky behind an alpha=1 forest is invisible.
         // Keep an A/B override to verify exact parity against the original composition.
         this.opaqueForestSkyEnabled = true;
@@ -495,6 +607,23 @@ export class Renderer {
             getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
             getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
             getPepperSprite();
+            const particlesImg = images.get('season-particles');
+            if (particlesImg && !particlesImg._rasterized) {
+                const pw = particlesImg.naturalWidth || particlesImg.width;
+                const ph = particlesImg.naturalHeight || particlesImg.height;
+                const off = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : document.createElement('canvas');
+                off.width = pw; off.height = ph;
+                off.getContext('2d').drawImage(particlesImg, 0, 0);
+                off._rasterized = true;
+                images.set('season-particles', off);
+            }
+            this.seasonalBackdrop=new SeasonalBackdrop();
+            this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,0);
+            // Initialize the enlarged predator compositor while assets load,
+            // before the start button is enabled, not at its first encounter.
+            this.c.save();this.c.translate(-1000,-1000);
+            this.hawk({id:1,x:0,y:0,warning:0,phase:'crossing'},0,false);
+            this.c.restore();
         });
         this.resize();
     }
@@ -767,12 +896,13 @@ export class Renderer {
         }
         return normal;
     }
-    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1) {
+    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1, rain = 0, storm = 0, fog = 0, wind = 0, seasonDistance = null) {
         if (reduced) offset = 0;
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
-        const forest=images.get('forest');
+        const seasonal=seasonDistance!==null && images.get('season-backgrounds');
+        const forest=seasonal?null:images.get('forest');
         const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
         const backdropAlpha=stage===2?1-.4*backdropMix:stage===3?.6+.4*backdropMix:1;
@@ -787,8 +917,8 @@ export class Renderer {
         if(cachedBackdrop){
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
-        }else this.skyLayer(light,stage===2&&stageMix===1);
-        for (let layer = 0; !images.has('forest') && layer < 3; layer++) {
+        }else if(!seasonal)this.skyLayer(light,stage===2&&stageMix===1);
+        for (let layer = 0; !images.has('forest') && !seasonal && layer < 3; layer++) {
             const gap = 180 - layer * 25, travel = (offset * (.07 + layer * .06)) % gap;
             c.globalAlpha = .12 + layer * .08;
             for (let i = -1; i < w / gap + 2; i++) {
@@ -807,32 +937,39 @@ export class Renderer {
             this.drawForestSource(c,forest,drift*this.dpr);
             c.restore();
         }
-        if(this.decoration!=='low') {
-            c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
-            for(let i=0;i<3;i++){
-                const drift=reduced?0:Math.sin(time*.12+i*2)*w*.045;
-                c.beginPath();c.ellipse(w*(.18+i*.34)+drift,h*(.48+i*.1),w*.35,h*.035,0,0,TAU);c.fill();
-            }
-            c.restore();
+        if(seasonal){
+            this.seasonalBackdrop ??= new SeasonalBackdrop();
+            this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
         }
-        // Low-contrast tree layers are behind gameplay, at distinct parallax speeds.
-        for(let layer=0;layer<(this.decoration==='low'?1:2);layer++) {
-            const spacing=layer?340:240, travel=offset*(layer?.22:.09);
-            c.save();c.globalAlpha=layer?.075:.045;
-            for(let i=-1;i<=Math.ceil(w/spacing)+1;i++) {
-                const worldIndex=i+Math.floor(travel/spacing);
-                const x=i*spacing-(travel%spacing)+Math.sin(worldIndex*8.2)*20;
-                c.fillStyle=layer?'#244e40':'#b8ce9c';
-                c.beginPath();c.moveTo(x-14,h);c.quadraticCurveTo(x+7,h*.5,x-3,-10);c.lineTo(x+14,-10);c.quadraticCurveTo(x+22,h*.6,x+28,h);c.fill();
-                oval(c,x,h*.08,110+layer*20,70,'#537b4a');
+        if (!images.has('forest') && !seasonal) {
+            if(this.decoration!=='low') {
+                c.save();c.globalAlpha=.08;c.fillStyle='#e6f0d9';
+                for(let i=0;i<3;i++){
+                    const drift=reduced?0:Math.sin(time*.12+i*2)*w*.045;
+                    c.beginPath();c.ellipse(w*(.18+i*.34)+drift,h*(.48+i*.1),w*.35,h*.035,0,0,TAU);c.fill();
+                }
+                c.restore();
             }
-            c.restore();
+            // Low-contrast tree layers are behind gameplay, at distinct parallax speeds.
+            for(let layer=0;layer<(this.decoration==='low'?1:2);layer++) {
+                const spacing=layer?340:240, travel=offset*(layer?.22:.09);
+                c.save();c.globalAlpha=layer?.075:.045;
+                for(let i=-1;i<=Math.ceil(w/spacing)+1;i++) {
+                    const worldIndex=i+Math.floor(travel/spacing);
+                    const x=i*spacing-(travel%spacing)+Math.sin(worldIndex*8.2)*20;
+                    c.fillStyle=layer?'#244e40':'#b8ce9c';
+                    c.beginPath();c.moveTo(x-14,h);c.quadraticCurveTo(x+7,h*.5,x-3,-10);c.lineTo(x+14,-10);c.quadraticCurveTo(x+22,h*.6,x+28,h);c.fill();
+                    oval(c,x,h*.08,110+layer*20,70,'#537b4a');
+                }
+                c.restore();
+            }
         }
         const transition=stageMix;
         c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
         // Sunlight and shade breathe slowly with the same wind as leaves and vines.
         c.fillStyle = '#ffffcb10';
-        c.save();c.translate(reduced?0:Math.sin(time*.22)*18,0);
+        c.save();c.globalAlpha = 1 - rain * .9;
+        c.translate(reduced?0:Math.sin(time*.22)*18,0);
         c.beginPath();
         for (let i = 0; i < 3; i++) {
             c.moveTo(w * .65 + i * 95, 0);
@@ -842,6 +979,27 @@ export class Renderer {
         }
         c.fill();
         c.restore();
+        if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
+        drawForestLife(c,w,h,time,seasonDistance??0,rain,wind,reduced,this.decoration==='low',storm);
+        drawJourneyFog(c, w, h, fog);
+        drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm, wind);
+        drawLightning(c, w, h, time, storm, reduced);
+        if (wind > 0 && !reduced) {
+            c.save();
+            c.globalAlpha = wind * .24;
+            c.strokeStyle = '#e2edcb';
+            c.beginPath();
+            const streaks = this.decoration === 'low' ? 8 : 18;
+            for (let i = 0; i < streaks; i++) {
+                const x = w + 32 - ((i * 137.7 + time * 250) % (w + 64));
+                const y = (i * 93.4) % h;
+                c.moveTo(x, y);
+                c.quadraticCurveTo(x - 12, y - 4, x - 26, y + 1);
+            }
+            c.stroke();
+            c.restore();
+        }
+        c.save();c.globalAlpha = 1 - rain;
         c.fillStyle = '#ffedb275';
         c.beginPath();
         const dustCount = this.decoration==='low'?8:23;
@@ -852,6 +1010,7 @@ export class Renderer {
             c.arc(x, y, 1.6, 0, TAU);
         }
         c.fill();
+        c.restore();
         if (home) {
             const wash = c.createLinearGradient(0, 0, w * .7, 0);
             wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');
@@ -893,7 +1052,13 @@ export class Renderer {
         }
         const c = this.c;
         const sceneTime = game.sceneTime ?? game.elapsed;
-        this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4));
+        const rain = journeyRain(game.distance, game.tutorial);
+        const storm = journeyStorm(game.distance, game.mode, game.tutorial);
+        const fog = journeyFog(game.distance, game.tutorial);
+        const wind = journeyWind(game.distance, game.mode, game.tutorial);
+        const snow = winterAmount(game.distance);
+        this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4),
+            rain, storm, fog, wind, game.tutorial?null:game.distance);
         const baseView = this.getViewport();
         // Follow the player only on screens that cannot fit the full world at
         // the improved sprite scale. The camera does not touch gameplay math.
@@ -921,6 +1086,17 @@ export class Renderer {
             shakeX = Math.sin(game.shakeTime * 65) * mag;
             shakeY = Math.cos(game.shakeTime * 80) * mag;
         }
+        // Trees continue into the canopy and ground outside the flight corridor.
+        // Keep horizontal camera clipping, but do not cut their trunks at the HUD.
+        c.save(); c.beginPath(); c.rect(view.x, 0, view.w, this.h); c.clip();
+        c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY);
+        c.scale(s, s);
+        for (const e of game.entities) {
+            if (e.kind === 'wood' && (this.drawOffscreenEntitiesForTest === true ||
+                !Number.isFinite(e.x) || (e.x >= view.worldLeft - 320 &&
+                e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced);
+        }
+        c.restore();
         c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY); c.scale(s, s);
         c.beginPath(); c.rect(view.worldLeft - 120, view.worldTop - 600, Math.max(WIDTH, view.worldWidth) + 240, view.worldHeight + 1200); c.clip();
@@ -929,9 +1105,13 @@ export class Renderer {
             const remaining = Math.min(1, game.pepper / 2);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const turboRadius = (46 + 14 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 12) * 0.08);
-            const aura = c.createRadialGradient(game.x, game.y, 8, game.x, game.y, turboRadius);
-            aura.addColorStop(0, '#ff523366'); aura.addColorStop(0.5, '#ff883344'); aura.addColorStop(1, '#ff330000');
-            oval(c, game.x, game.y, turboRadius, turboRadius, aura);
+            const auraSurface = getPickupCache('chaua-pepper-aura', 60, [[8, 0, '#ff523366'], [8, 0.5, '#ff883344'], [8, 1, '#ff330000']]);
+            if (auraSurface) c.drawImage(auraSurface, game.x - turboRadius, game.y - turboRadius, turboRadius * 2, turboRadius * 2);
+            else {
+                const aura = c.createRadialGradient(game.x, game.y, 8, game.x, game.y, turboRadius);
+                aura.addColorStop(0, '#ff523366'); aura.addColorStop(0.5, '#ff883344'); aura.addColorStop(1, '#ff330000');
+                oval(c, game.x, game.y, turboRadius, turboRadius, aura);
+            }
             if (!reduced) {
                 for (let i = 1; i <= 8; i++) {
                     const trailX = game.x - i * 14;
@@ -957,11 +1137,15 @@ export class Renderer {
             const remaining = Math.min(1, game.feather / 3);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const radius = (66 + 18 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 3) * 0.06);
-            const aura = c.createRadialGradient(game.x, game.y, 16, game.x, game.y, radius);
-            aura.addColorStop(0, 'rgba(255, 235, 140, 0.45)');
-            aura.addColorStop(0.65, 'rgba(255, 205, 60, 0.28)');
-            aura.addColorStop(1, 'rgba(255, 216, 80, 0)');
-            oval(c, game.x, game.y, radius, radius, aura);
+            const auraSurface = getPickupCache('chaua-feather-aura', 84, [[16, 0, 'rgba(255, 235, 140, 0.45)'], [16, 0.65, 'rgba(255, 205, 60, 0.28)'], [16, 1, 'rgba(255, 216, 80, 0)']]);
+            if (auraSurface) c.drawImage(auraSurface, game.x - radius, game.y - radius, radius * 2, radius * 2);
+            else {
+                const aura = c.createRadialGradient(game.x, game.y, 16, game.x, game.y, radius);
+                aura.addColorStop(0, 'rgba(255, 235, 140, 0.45)');
+                aura.addColorStop(0.65, 'rgba(255, 205, 60, 0.28)');
+                aura.addColorStop(1, 'rgba(255, 216, 80, 0)');
+                oval(c, game.x, game.y, radius, radius, aura);
+            }
             if (!reduced) {
                 for (let i = 1; i < 9; i++) {
                     oval(c, game.x - i * 11, game.y + Math.sin(game.elapsed * 7 - i) * 8, 4 * (1 - i / 10), 4, `rgba(255, 225, 110, ${0.8 - i * 0.08})`);
@@ -974,32 +1158,41 @@ export class Renderer {
             c.beginPath();c.arc(game.x,game.y,reduced?48:48+(1-game.powerFade/.5)*22,0,TAU);c.stroke();c.restore();
         }
         // Collection trails suggest optional trajectories, never solid obstacles.
-        const routes=new Map();
-        for(const e of game.entities) if(e.kind==='fruit' && e.route!==undefined && !e.collected) {
-            let list=routes.get(e.route);
-            if(!list){list=[];routes.set(e.route,list);}
+        this._routesMap ??= new Map();
+        this._routesLists ??= [];
+        for (const list of this._routesMap.values()) {
+            list.length = 0;
+            this._routesLists.push(list);
+        }
+        this._routesMap.clear();
+        for (const e of game.entities) if (e.kind === 'fruit' && e.route !== undefined && !e.collected) {
+            let list = this._routesMap.get(e.route);
+            if (!list) {
+                list = this._routesLists.pop() || [];
+                this._routesMap.set(e.route, list);
+            }
             list.push(e);
         }
-        for(const fruit of routes.values()) if(fruit.length>1) {
-            fruit.sort((a,b)=>a.x-b.x);c.save();c.strokeStyle=fruit[0].optional?'#f4d77caa':'#e9f3cf99';
-            c.lineWidth=2;c.setLineDash([4,8]);c.beginPath();c.moveTo(fruit[0].x,fruit[0].y);
-            for(let i=1;i<fruit.length;i++)c.lineTo(fruit[i].x,fruit[i].y);
-            c.stroke();c.restore();
+        for (const fruit of this._routesMap.values()) if (fruit.length > 1) {
+            fruit.sort((a,b) => a.x - b.x);
+            c.save(); c.strokeStyle = fruit[0].optional ? '#f4d77caa' : '#e9f3cf99';
+            c.lineWidth = 2; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
+            for (let i = 1; i < fruit.length; i++) c.lineTo(fruit[i].x, fruit[i].y);
+            c.stroke(); c.restore();
         }
         const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
         for (const e of game.entities) {
             const margin=e.kind==='wood'?320:e.kind==='hawk'?180:100;
             const drawSprite=this.drawOffscreenEntitiesForTest===true||
                 !Number.isFinite(e.x)||(e.x>=visibleLeft-margin&&e.x<=visibleRight+margin);
-            if (e.kind === 'wood') {
-                if(drawSprite)this.obstacle(e, game, reduced);
-            } else if (e.kind === 'hawk') {
+            if (e.kind === 'wood') continue;
+            if (e.kind === 'hawk') {
                 if (e.warning > 0 || (!e.harmless && e.x>game.x+180)) {
                     c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
                     c.beginPath(); c.moveTo(e.targetX, e.targetY); c.lineTo(e.startX, e.startY); c.stroke(); c.restore();
                 }
-                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced);
-            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced);
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain);
+            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, rain);
         }
         if (game.shield || game.invincible > 0) {
             const r = 68;
@@ -1053,7 +1246,8 @@ export class Renderer {
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
             shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
             defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
-            stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won
+            stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won,
+            snow, rain
         });
         if (!reduced) {
             const pList = this.decoration==='low'?game.particles:game.particles;
@@ -1062,9 +1256,74 @@ export class Renderer {
                 const p = pList[i];
                 c.globalAlpha=Math.max(0,p.life/(p.maxLife??.7));
                 if(p.feather)feather(c,p.x,p.y,7,p.rotation,p.color);
-                else if(p.chip) { c.save(); c.translate(p.x,p.y); c.rotate(p.rotation); c.fillStyle=p.color; c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); c.restore(); }
-                else if(p.spark) oval(c,p.x,p.y,2,2,p.color);
-                else leaf(c,p.x,p.y,3,p.life*5,p.color,p.color);
+                else if(p.chip) {
+                    c.save();
+                    c.translate(p.x,p.y);
+                    c.rotate(p.rotation);
+                    c.fillStyle=p.color;
+                    if(p.splinter) {
+                        c.beginPath();
+                        c.moveTo(-p.size*0.35,0);
+                        c.lineTo(0,-p.size*1.6);
+                        c.lineTo(p.size*0.35,0);
+                        c.lineTo(0,p.size*1.6);
+                        c.closePath();
+                        c.fill();
+                    } else {
+                        c.fillRect(-p.size/2,-p.size/4,p.size,p.size/2);
+                    }
+                    c.restore();
+                }
+                else if(p.seed) {
+                    c.save();
+                    c.translate(p.x, p.y);
+                    c.rotate(p.rotation);
+                    const sw = p.size || 6.5, sh = sw * 1.65;
+                    // 1. Sombra suave de relevo 3D
+                    c.fillStyle = 'rgba(0,0,0,0.28)';
+                    c.beginPath();
+                    c.ellipse(1.5, 2.5, sw * 0.9, sh * 0.9, 0, 0, Math.PI * 2);
+                    c.fill();
+
+                    // 2. Casca anatômica de argila em gota
+                    c.fillStyle = p.color || '#a0582c';
+                    c.beginPath();
+                    c.moveTo(0, -sh);
+                    c.bezierCurveTo(sw * 1.05, -sh * 0.25, sw * 1.05, sh * 0.65, 0, sh);
+                    c.bezierCurveTo(-sw * 1.05, sh * 0.65, -sw * 1.05, -sh * 0.25, 0, -sh);
+                    c.fill();
+
+                    // 3. Contorno sutil de profundidade
+                    c.strokeStyle = 'rgba(40, 20, 8, 0.45)';
+                    c.lineWidth = 1.2;
+                    c.stroke();
+
+                    // 4. Embrião / núcleo interno com textura de argila
+                    c.fillStyle = 'rgba(255, 235, 175, 0.38)';
+                    c.beginPath();
+                    c.ellipse(-sw * 0.22, -sh * 0.15, sw * 0.42, sh * 0.5, -0.15, 0, Math.PI * 2);
+                    c.fill();
+
+                    // 5. Brilho especular de polpa úmida
+                    c.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    c.beginPath();
+                    c.ellipse(-sw * 0.32, -sh * 0.35, sw * 0.25, sh * 0.28, -0.2, 0, Math.PI * 2);
+                    c.fill();
+
+                    // 6. Cicatriz do ápice (hilo)
+                    c.fillStyle = 'rgba(45, 20, 10, 0.7)';
+                    c.beginPath();
+                    c.arc(0, -sh + 1.8, sw * 0.22, 0, Math.PI * 2);
+                    c.fill();
+
+                    c.restore();
+                }
+                else if(p.puff) {
+                    const scale = 1 + (1 - p.life / (p.maxLife ?? .28)) * 1.6;
+                    oval(c, p.x, p.y, (p.size || 4) * scale, (p.size || 4) * scale * 0.7, p.color);
+                }
+                else if(p.spark) oval(c,p.x,p.y,p.size||2,p.size||2,p.color);
+                else leaf(c,p.x,p.y,8,p.life*5,p.color,p.color);
             }
         }
         c.globalAlpha = 1;
@@ -1077,6 +1336,11 @@ export class Renderer {
             }
         }
         c.restore();
+        if(rain>0&&!reduced){
+            const rWind=journeyWind(game.distance,game.mode,game.tutorial);
+            const rStorm=journeyStorm(game.distance);
+            drawForegroundRain(c,this.w,this.h,sceneTime,rain,reduced,this.decoration==='low',rStorm,rWind,game.speed||250);
+        }
         // Natural viewport flight boundary
         const notices=[];
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
@@ -1104,17 +1368,66 @@ export class Renderer {
     }
 
     obstacle(e, game, reduced=false) {
-        const c=this.c,time=reduced?0:(game.sceneTime??game.elapsed),variant=(e.id??0)%3,cx=e.x+29;
-        if(!e.broken||e.brokenSide!=='top')this.trunk(`trunk-${variant}`,null,cx,e.top,true,time,variant);
-        if(!e.broken||e.brokenSide!=='bottom'){
-            this.trunk(`trunk-${variant}`,null,cx,e.bottom,false,time,e.variant==='branch'?3:variant);
-            if(e.snake)this.snake(e,reduced);
+        const c = this.c;
+        const time = game.sceneTime ?? game.elapsed;
+        const variant = (e.id ?? 0) % 3;
+        const x = e.x + 29;
+        const wind = reduced ? 0 : journeyWind(game.distance, game.mode, game.tutorial);
+        const rain = reduced ? 0 : journeyRain(game.distance, game.tutorial);
+        const snow = reduced ? 0 : winterAmount(game.distance);
+        for (const side of ['top', 'bottom']) {
+            const upper = side === 'top';
+            const y = e[side];
+            const broken = e.broken && e.brokenSide === side;
+            if (broken && (reduced || !e.breakFx)) continue;
+            if (e.fragileSide === side) {
+                drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined, snow, rain, time);
+                continue;
+            }
+            if (broken) continue;
+            const hit = game.hit;
+            const lean = treeBend(time, wind, e.id ?? 0, hit?.id === e.id && hit.side === side ? hit.age : null, reduced);
+            if (lean) {
+                c.save();
+                c.transform(1, 0, lean, 1, -lean * y, 0);
+            }
+            if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind, undefined, snow, rain, time);
+            else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
+                !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
+            if (lean) c.restore();
+            if (rain > 0 && !reduced) {
+                c.save();
+                c.fillStyle = '#d2ecff';
+                c.beginPath();
+                if (!upper) {
+                    for (let s = 0; s < 4; s++) {
+                        const st = (time * 8.5 + (e.id || 0) * 2.3 + s * 1.7) % 1;
+                        const sx = x - 35 + s * 24 + Math.sin(s * 4) * 6;
+                        const sy = y - Math.sin(st * Math.PI) * (7 + (s % 3) * 5);
+                        const sr = Math.max(0.5, (1 - st) * 2.2);
+                        c.moveTo(sx + sr, sy);
+                        c.arc(sx, sy, sr, 0, TAU);
+                    }
+                } else {
+                    for (let d = 0; d < 3; d++) {
+                        const dt = (time * 4.2 + (e.id || 0) * 1.9 + d * 2.1) % 1;
+                        const dx = x - 25 + d * 25 + Math.sin(d * 3) * 5;
+                        const dy = y + dt * dt * 140;
+                        const dr = (1 - dt * 0.35) * 1.6;
+                        c.moveTo(dx + dr, dy);
+                        c.arc(dx, dy, dr, 0, TAU);
+                    }
+                }
+                c.fill();
+                c.restore();
+            }
+            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time);
         }
     }
-    trunk(key,preset,x,y,flip,time=0,variant=0){
-        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time});
+    trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0){
+        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time,snow,rain});
     }
-    snake(wood,reduced){
+    snake(wood,reduced,snow=0,rain=0,time=0){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
         if(!drawSnakeA2(c,s,place.factor,reduced)){
@@ -1126,10 +1439,23 @@ export class Renderer {
             drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced,wood.id);
         }
         if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
+        if(snow>0&&!reduced&&!s.retreat){
+            const t=(time||0)+(wood.id||0)*1.3;
+            drawAnimalBreath(c,-45,-90,snow,t,3.4,0.46,-1,18,-12);
+        }
+        if(rain>0&&!reduced){
+            c.save();
+            c.globalAlpha=rain*0.22;
+            c.fillStyle='#e2f2ff';
+            c.beginPath();
+            c.ellipse(0,-60,25,45,0.2,0,TAU);
+            c.fill();
+            c.restore();
+        }
         c.restore();
     }
     flightBorders(view) {}
-    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false) {
+    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0, rain = 0) {
         const c = this.c;
         let x, y, time, e = null;
         if (typeof entityOrX === 'object') {
@@ -1150,6 +1476,7 @@ export class Renderer {
         if(!images.has('hawk-atlas'))return;
         const entity=e??{x,y,warning:warning?1:0,retreat,dive:false};
         const clip=hawkAnimation(entity,time,reduced),cAngle=retreat?0:angle;
+        const action=hawkAction(entity,time,reduced) ?? (reduced&&hawkUsesActionArt(entity)?{sheet:entity.retreat?'hawk-stunned':'hawk-flight',frame:entity.retreat?2:0}:null);
         let dynamicY=0,dynamicAngle=0;
         if(!reduced&&!warning&&!retreat){
             if(entity.dive){
@@ -1157,23 +1484,48 @@ export class Renderer {
                 const p=span>0?Math.max(0,Math.min(1,((entity.startX||x)-x)/span)):.5;
                 dynamicY=Math.sin(p*Math.PI)*7;
                 dynamicAngle=(p-.5)*.16;
-            }else{
+            }else if(!action){
                 dynamicY=Math.sin(time*2.8+(entity.id||0)*1.5)*3.5;
                 dynamicAngle=Math.cos(time*2.8+(entity.id||0)*1.5)*.035;
             }
         }
-        const action=hawkAction(entity,time,reduced);
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
-        const newHawk=!!action&&drawActionSheet(c,action.sheet,action.frame,-86,-87,172,172);
-        if(!newHawk)atlasAnimation(c,'hawk',clip,.47);
-        if(retreat&&!reduced)drawOrbitingStars(c,-24,-40,80,time);
+        let newHawk=false;
+        if(action){
+            const draw=(layer,frame)=>drawActionSheet(layer,action.sheet,frame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
+            const activeFrame=action.blend<0.5?action.frame:action.next;
+            newHawk=draw(c,activeFrame);
+        }
+        if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
+        if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
+        if(snow>0&&!reduced&&!retreat){
+            const t=(time||0)+((entity?.id)||0)*0.7;
+            drawAnimalBreath(c,-86,14,snow,t,1.5,0.48,1,40,-6);
+        }
+        if(rain>0&&!reduced&&!retreat){
+            c.save();
+            c.fillStyle='#d8efff';
+            c.beginPath();
+            for(let i=0;i<4;i++){
+                const dropCycle=(time*10+i*1.8+((entity?.id)||0)*1.3)%1;
+                const shearX=-86+dropCycle*(45+(i%2)*15);
+                const shearY=14-Math.sin(dropCycle*Math.PI)*(8+(i%3)*4)+dropCycle*10;
+                const sr=Math.max(0.6,(1-dropCycle)*2.0);
+                c.moveTo(shearX+sr,shearY);
+                c.arc(shearX,shearY,sr,0,TAU);
+            }
+            c.fill();
+            c.restore();
+        }
         c.restore();
     }
 
-    pickup(e, time, reduced) {
-        const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 2;
+    pickup(e, time, reduced, snow = 0, rain = 0) {
+        const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 3;
+        const pulse = reduced ? 1 : 1 + Math.sin(time * 3.2 + e.id) * 0.07;
         c.save(); c.translate(e.x, e.y);
+        c.scale(pulse, pulse);
         if (e.kind === 'fruit') {
             const glowSurface = getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
             if (glowSurface) c.drawImage(glowSurface, -28, float - 28, 56, 56);
@@ -1187,6 +1539,29 @@ export class Renderer {
                 const scale = 50 / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * scale / 2, float - image.naturalHeight * scale / 2, image.naturalWidth * scale, image.naturalHeight * scale);
             } else clay(c, 0, float, 18, 20, '#edbb66', '#cb7c42');
+            if (snow > 0) {
+                c.save();
+                c.fillStyle = `rgba(245, 250, 255, ${Math.min(1, snow * 1.2)})`;
+                c.beginPath();
+                c.ellipse(0, float - 21, 14, 5, 0, 0, TAU);
+                c.fill();
+                c.fillStyle = `rgba(255, 255, 255, ${Math.min(1, snow * 1.2)})`;
+                c.beginPath();
+                c.ellipse(-2, float - 22, 9, 3, -0.1, 0, TAU);
+                c.fill();
+                c.restore();
+            } else if (rain > 0) {
+                c.save();
+                c.fillStyle = `rgba(235, 248, 255, ${rain * 0.45})`;
+                c.beginPath();
+                c.ellipse(6, float - 8, 3.5, 6, 0.4, 0, TAU);
+                c.fill();
+                c.restore();
+            }
+            if (!reduced && this.decoration !== 'low') {
+                const sa = time * 2.5 + e.id * 1.5;
+                drawMiniSparkle(c, Math.cos(sa) * 22, Math.sin(sa) * 16 + float, 3, time * 5);
+            }
         } else if (e.kind === 'pepper') {
             const glowSurface = getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
             if (glowSurface) c.drawImage(glowSurface, -36, -36, 72, 72);
@@ -1245,6 +1620,11 @@ export class Renderer {
                 const targetSize = gold ? 64 : 58;
                 const factor = targetSize / Math.max(image.naturalWidth, image.naturalHeight);
                 c.drawImage(image, -image.naturalWidth * factor / 2, float - image.naturalHeight * factor / 2, image.naturalWidth * factor, image.naturalHeight * factor);
+            }
+            if (!reduced && this.decoration !== 'low') {
+                const sa = time * 2.8 + e.id * 2;
+                drawMiniSparkle(c, Math.cos(sa) * 28, Math.sin(sa) * 20 + float, gold ? 4.5 : 3.5, time * 6);
+                drawMiniSparkle(c, Math.cos(sa + Math.PI) * 24, Math.sin(sa + Math.PI) * 18 + float, 3, time * 5 + 1);
             }
             if (gold) {
                 c.fillStyle = '#fff4c2'; c.font = '900 12px Nunito'; c.textAlign = 'center';

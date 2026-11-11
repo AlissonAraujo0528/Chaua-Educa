@@ -87,9 +87,13 @@ export function snakeA2HitsPlayer(wood,playerPolygons,reduced=false){
 // The fruit must be clear of every visible pose, including shield stun.
 // 56 logical pixels includes the fruit halo, its bobbing motion and
 // a visible air gap around the snake.
-export function snakeA2FruitHasClearance(wood,x,y,radius=56){
- if(!isSnakeA2Ready())return true;
+export function snakeA2FruitHasClearance(wood,x,y,radius=62){
  const place=snakePlacement(wood);
+ if(!isSnakeA2Ready()){
+  const dx=Math.abs(x-place.x),dy=place.y-y;
+  if(dx<100&&dy>0&&dy<225)return false;
+  return true;
+ }
  const [colStart,colEnd]=candidateRange(x,radius,place.x,SNAKE_A2_GRID.anchorX,place.factor);
  const [rowStart,rowEnd]=candidateRange(y,radius,place.y,SNAKE_A2_GRID.anchorY,place.factor);
  const r2=radius*radius;
@@ -139,9 +143,13 @@ export function snakeA2Pose(s={},reduced=false){
   if(t<0.85){
     f=frame(t/.85,8);
   } else {
-    // Loop the dazed wobble expression (frames 4, 5, 6, 7) so the stunned snake stays visibly dazed
-    const loop=[7,6,5,4,5,6];
-    f=loop[Math.floor((t-0.85)*5)%loop.length];
+    // Transition smoothly down to frames 2 and 3 and stay looping between spiral-eye stunned poses until offscreen
+    const step = Math.floor((t - 0.85) * 8);
+    if (step === 0) f = 6;
+    else if (step === 1) f = 5;
+    else if (step === 2) f = 4;
+    else if (step === 3) f = 3;
+    else f = (step % 2 === 0) ? 2 : 3;
   }
   return {key:'stunned',frame:reduced?3:f,state:'shield-stunned'};
  }

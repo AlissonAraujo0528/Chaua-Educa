@@ -10,6 +10,7 @@ import { offerPower, POWER_BALANCE } from './powers.mjs';
 import { advanceHawk, advanceSnake } from './animals.mjs';
 import { planEncounter, seededRandom } from './encounters.mjs';
 import { FRUITS } from './fruits.mjs';
+import { journeyWind } from './weather.mjs';
 import { QUESTIONS } from './questions.mjs';
 
 export const WIDTH = 960;
@@ -17,12 +18,12 @@ export const HEIGHT = 640;
 export const STEP = 1 / 120;
 export const FEATHER_SECONDS = 10;
 export const CONTACT = Object.freeze({top:20, bottom:HEIGHT-25, recoveryMargin:36, grace:1.6});
-export const VICTORY_SCORE = 200;
+export const VICTORY_SCORE = 1000;
 export const QUIZ_INTERVAL = 30;
 export const FLIGHT = Object.freeze({
     gravity: 900, fallLimit: 360, tapLift: 300,
     holdLift: 230, staminaLift: 50, flapInterval: .22, inputBuffer: .12,
-    aventura: {speed:275,gap:160,minGap:122,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,diveAt:42,warning:1.5,snakeClearance:144,fruitMargin:34,clearance:210,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
+    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,diveAt:42,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:210,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
     tranquilo: {speed:205,gap:220,minGap:185,interval:2.1,minInterval:1.8,ramp:.0017,speedGain:30,snakeAt:32,hawkAt:55,diveAt:78,warning:2.2},
 });
 export const STAGES = JOURNEY.map(s=>s.name);
@@ -54,23 +55,43 @@ export class Game {
     }
 
     snapshot() {
-        if (!this._prevEntityMap) Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
-        else this._prevEntityMap.clear();
+        if (!this._prevEntityMap) {
+            Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
+            Object.defineProperty(this, '_prevEntityPool', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_previousObj', { value: {}, writable: true, enumerable: false });
+        }
+        for (const item of this._prevEntityMap.values()) {
+            this._prevEntityPool.push(item);
+        }
+        this._prevEntityMap.clear();
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
-            this._prevEntityMap.set(e.id, {
-                x: e.x, y: e.y, tumbleAngle: e.tumbleAngle,
-                retreatTime: e.snake?.retreatTime, snakeAge: e.snake?.age,
-                snakePhase: e.snake?.phase, snakePhaseAge: e.snake?.phaseAge,
-                snakeWarningAge: e.snake?.warningAge, hawkRetreatTime: e.retreatTime
-            });
+            const record = this._prevEntityPool.pop() || {};
+            record.x = e.x;
+            record.y = e.y;
+            record.tumbleAngle = e.tumbleAngle;
+            record.retreatTime = e.snake?.retreatTime;
+            record.snakeAge = e.snake?.age;
+            record.snakePhase = e.snake?.phase;
+            record.snakePhaseAge = e.snake?.phaseAge;
+            record.snakeWarningAge = e.snake?.warningAge;
+            record.hawkRetreatTime = e.retreatTime;
+            this._prevEntityMap.set(e.id, record);
         }
-        this.previous = {
-            arrivalOffset: this.arrival?.offset || 0, refugeX: this.refuge?.x, y: this.y, angle: this.angle,
-            distance: this.distance, elapsed: this.elapsed, sceneTime: this.sceneTime, stage: this.stage, stageAge: this.stageAge,
-            wing: this.wing, flapImpulse: this.flapImpulse,
-            entities: this._prevEntityMap
-        };
+        const prev = this._previousObj;
+        prev.arrivalOffset = this.arrival?.offset || 0;
+        prev.refugeX = this.refuge?.x;
+        prev.y = this.y;
+        prev.angle = this.angle;
+        prev.distance = this.distance;
+        prev.elapsed = this.elapsed;
+        prev.sceneTime = this.sceneTime;
+        prev.stage = this.stage;
+        prev.stageAge = this.stageAge;
+        prev.wing = this.wing;
+        prev.flapImpulse = this.flapImpulse;
+        prev.entities = this._prevEntityMap;
+        this.previous = prev;
     }
 
     visual(alpha) {
@@ -90,15 +111,57 @@ export class Game {
         view.shakeTime = this.shakeTime;
         view.shakeDuration = this.shakeDuration;
         view.shakeIntensity = this.shakeIntensity;
-        view.entities = this.entities.map(e => {
+
+        if (!this._visualEntities) {
+            Object.defineProperty(this, '_visualEntities', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualPool', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualSnakePool', { value: [], writable: true, enumerable: false });
+        }
+        const out = this._visualEntities;
+        out.length = this.entities.length;
+        for (let i = 0; i < this.entities.length; i++) {
+            const e = this.entities[i];
             const old = this.previous.entities.get(e.id);
-            if (!old) return e;
-            const entity = {...e, x:lerp(old.x,e.x), y:lerp(old.y,e.y)};
-            if(Number.isFinite(e.tumbleAngle))entity.tumbleAngle=lerp(old.tumbleAngle??0,e.tumbleAngle);
-            if(Number.isFinite(e.retreatTime))entity.retreatTime=lerp(old.hawkRetreatTime??0,e.retreatTime);
-            if(e.snake)entity.snake={...e.snake,phaseAge:old.snakePhase===e.snake.phase?lerp(old.snakePhaseAge??0,e.snake.phaseAge??0):e.snake.phaseAge,warningAge:lerp(old.snakeWarningAge??0,e.snake.warningAge??0),age:lerp(old.snakeAge??0,e.snake.age??0),retreatTime:lerp(old.retreatTime??0,e.snake.retreatTime??0)};
-            return entity;
-        });
+            if (!old) {
+                out[i] = e;
+                continue;
+            }
+            let entity = this._visualPool[i];
+            if (!entity) {
+                entity = {};
+                this._visualPool[i] = entity;
+            }
+            if (entity._lastId !== e.id) {
+                for (const k in entity) if (k !== '_lastId') delete entity[k];
+                entity._lastId = e.id;
+            }
+            Object.assign(entity, e);
+            entity.x = lerp(old.x, e.x);
+            entity.y = lerp(old.y, e.y);
+            if (Number.isFinite(e.tumbleAngle)) entity.tumbleAngle = lerp(old.tumbleAngle ?? 0, e.tumbleAngle);
+            if (Number.isFinite(e.retreatTime)) entity.retreatTime = lerp(old.hawkRetreatTime ?? 0, e.retreatTime);
+            if (e.snake) {
+                let snake = this._visualSnakePool[i];
+                if (!snake) {
+                    snake = {};
+                    this._visualSnakePool[i] = snake;
+                }
+                if (snake._lastId !== e.id) {
+                    for (const k in snake) if (k !== '_lastId') delete snake[k];
+                    snake._lastId = e.id;
+                }
+                Object.assign(snake, e.snake);
+                snake.phaseAge = old.snakePhase === e.snake.phase ? lerp(old.snakePhaseAge ?? 0, e.snake.phaseAge ?? 0) : e.snake.phaseAge;
+                snake.warningAge = lerp(old.snakeWarningAge ?? 0, e.snake.warningAge ?? 0);
+                snake.age = lerp(old.snakeAge ?? 0, e.snake.age ?? 0);
+                snake.retreatTime = lerp(old.retreatTime ?? 0, e.snake.retreatTime ?? 0);
+                entity.snake = snake;
+            } else {
+                entity.snake = undefined;
+            }
+            out[i] = entity;
+        }
+        view.entities = out;
         return view;
     }
 
@@ -108,7 +171,7 @@ export class Game {
         this.powerRandom = this.randomOverride ?? seededRandom(this.seed ^ 0x85ebca6b);
         Object.assign(this, {
             tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
-            scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:0,nextShield:0,nextFeather:18,nextPepper:26},
+            scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:8,nextShield:14,nextFeather:24,nextPepper:36},
             mode, state: 'menu', elapsed: 0, sceneTime: 0, distance: 0, score: 0, fruits: 0, correct: 0,
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
             flapCooldown: 0, pendingTap: 0, stamina: 1, wing: 0, flapImpulse: 0, angle: 0, y: HEIGHT * .48,
@@ -124,7 +187,8 @@ export class Game {
     get speed() {
         const p = FLIGHT[this.mode];
         const gain = this.mode === 'aventura' ? Math.min(185, this.elapsed * 0.45 + Math.max(0, this.elapsed - 40) * 0.35) : Math.min(p.speedGain, this.elapsed * 0.45);
-        return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1);
+        const wind = journeyWind(this.distance, this.mode, this.tutorial);
+        return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1) * (1 + wind * .06);
     }
     start(mode = 'aventura', reviewIds = [], seed = Math.floor(Math.random()*4294967296)) { this.seed=seed>>>0; this.reset(mode); this.reviewIds = [...reviewIds]; this.state = 'countdown'; }
 
@@ -154,6 +218,21 @@ export class Game {
         this.pendingTap = 0;
         this.wing = 1;
         this.flapImpulse = 1.0;
+        if (!this.reducedMotion && this.state === 'playing') {
+            for(let i=0;i<3;i++) {
+                const angle = Math.PI * 0.65 + (i - 1) * 0.25;
+                this.particle({
+                    x: this.x - 12 + (i - 1) * 8,
+                    y: this.y + 16,
+                    vx: -Math.cos(angle) * (50 + i * 20),
+                    vy: Math.sin(angle) * (60 + i * 15),
+                    life: .28, maxLife: .28,
+                    color: '#e4f4d270',
+                    puff: true,
+                    size: 3 + i * 1.5
+                });
+            }
+        }
         this.onEvent({type:'flap'});
     }
 
@@ -218,6 +297,15 @@ export class Game {
         if(this.invincible>0)return;
         const boundary = entity.kind === 'boundary' ? entity.side : null;
         this.hit = boundary ? null : {id:host.id, age:0};
+        if (!animal && !boundary && host.kind === 'wood') {
+            this.hit.side = host.hitSide;
+            if (host.fragileSide === host.hitSide && host.fragileSide) {
+                host.broken = true;
+                host.brokenSide = host.hitSide;
+                host.breakFx = { age: 0 };
+                if (!this.reducedMotion) this.woodBurst(this.x, this.y);
+            }
+        }
         if (this.shield) {
             this.shield = false;
             this.invincible = CONTACT.grace;
@@ -245,7 +333,7 @@ export class Game {
                     entity.dryBranchBroken = true;
                     this.woodBurst(this.x, this.y);
                     this.leafBurst(this.x, host.bottom || this.y, 8);
-                } else {
+                } else if (!host.broken) {
                     this.burst(this.x, this.y, '#9aba67', 8);
                     this.leafBurst(this.x, entity.hitSide === 'top' ? host.top : host.bottom, 10);
                 }
@@ -257,7 +345,7 @@ export class Game {
             const reason = boundary ? (boundary === 'top' ? 'Você voou acima da copa. Solte para descer.' : 'Você chegou ao chão da floresta. Uma batida de asas ajuda!')
                 : animal ? (entity.kind === 'hawk' ? 'Um gavião cruzou seu caminho.' : 'Você encostou na cobra.') : 'Você esbarrou na madeira.';
             this.endCause=boundary || (animal ? (entity.kind==='hawk'?'hawk':'snake') : 'wood');
-            if(!animal&&!boundary){
+            if(!animal&&!boundary && (!host.broken || host.brokenSide!==host.hitSide)){
                 const solids=this.woodRects(host);
                 this.impactContact={...(host.hitRect??solids.reduce((a,b)=>Math.abs(b.y-this.y)<Math.abs(a.y-this.y)?b:a,solids[0]))};
             }
@@ -312,7 +400,7 @@ export class Game {
         }
         this.onEvent({ type: 'fruit', fruit: FRUITS[entity.variety ?? 0].id });
         this.collectPulse=.26;
-        this.burst(entity.x, entity.y, multiplier>=2?'#ffe39a':'#bce77f', 12);
+        this.fruitBurst(entity.x, entity.y, entity.variety ?? 0, multiplier);
         this.quizPending = true; // One pending discovery, regardless of fruit count.
     }
 
@@ -339,6 +427,64 @@ export class Game {
         this.cancelInput();
         this.nextSpawn = Math.max(this.nextSpawn, 1.5);
         return true;
+    }
+
+    fruitBurst(x, y, variety, multiplier = 1) {
+        const PALETTES = [
+            ['#e0536c', '#f58ea1', '#85bb57', '#ffe894'],
+            ['#d4a366', '#a16e38', '#ffe596', '#7bb850'],
+            ['#ffb03a', '#ff7824', '#ffdc69', '#66bb46'],
+            ['#ff7b2b', '#ffa245', '#332219', '#ffe27d'],
+            ['#6ea644', '#99cf64', '#557d38', '#ffd875'],
+            ['#ffdf40', '#ffe875', '#c8ae32', '#6fb846'],
+            ['#ffcc22', '#ffe666', '#7ec850', '#ffffff']
+        ];
+        const colors = PALETTES[(variety ?? 0) % PALETTES.length];
+        const count = 12;
+        for (let i = 0; i < count; i++) {
+            const a = i * Math.PI * 2 / count;
+            const speed = 65 + (i * 31) % 85;
+            this.particle({
+                x, y,
+                vx: Math.cos(a) * speed,
+                vy: Math.sin(a) * speed - 30,
+                life: .55, maxLife: .55,
+                color: multiplier >= 2 ? '#ffe39a' : colors[i % colors.length],
+                spark: true,
+                size: 2.2 + (i % 3) * 1.2
+            });
+        }
+        // Dispersao de sementes pelo chaua apos comer a fruta
+        const seedColors = ['#c87a32', '#9e4a22', '#522b13', '#d99438', '#b85e28', '#8a4218'];
+        const seedCount = 5;
+        for (let s = 0; s < seedCount; s++) {
+            const seedAngle = (s * 0.45 - 0.9) + (Math.random() - 0.5) * 0.35;
+            this.particle({
+                x: x + (Math.random() - 0.5) * 12,
+                y: y + (Math.random() - 0.5) * 10,
+                vx: Math.sin(seedAngle) * (30 + Math.random() * 40) - 20,
+                vy: Math.random() * 30 + 15,
+                life: 1.0 + Math.random() * 0.4,
+                maxLife: 1.4,
+                color: seedColors[s % seedColors.length],
+                spark: true, seed: true,
+                size: 6.5 + Math.random() * 1.5,
+                rotation: Math.random() * Math.PI * 2,
+                spin: (Math.random() - 0.5) * 9
+            });
+        }
+        for (let j = 0; j < 3; j++) {
+            const angle = -Math.PI * 0.5 + (j - 1) * 0.7;
+            this.particle({
+                x: x + (j - 1) * 8, y: y - 5,
+                vx: Math.cos(angle) * 35,
+                vy: Math.sin(angle) * 45 - 20,
+                life: .65, maxLife: .65,
+                color: '#fff9cf',
+                spark: true,
+                size: 3
+            });
+        }
     }
 
     burst(x, y, color, count) {
@@ -380,11 +526,12 @@ export class Game {
     }
 
     woodBurst(x,y) {
-        for(let i=0;i<16;i++) {
+        const colors=['#3e2723','#8d6e63','#a1887f','#4e342e','#9aba67'];
+        for(let i=0;i<18;i++) {
             const a=i*2.39996;
-            this.particle({x,y,vx:Math.cos(a)*(90+i*5),vy:Math.sin(a)*110-75,
-                life:.65,maxLife:.65,color:i%3?'#9d7545':'#9aba67',chip:i%3!==0,
-                size:3+i%5,rotation:a,spin:i%2?7:-9});
+            this.particle({x,y,vx:Math.cos(a)*(105+i*6),vy:Math.sin(a)*120-75,
+                life:.7,maxLife:.7,color:colors[i%colors.length],chip:true,splinter:i%2===0,
+                size:3+i%5,rotation:a,spin:i%2?8:-10});
         }
     }
 
@@ -396,12 +543,12 @@ export class Game {
         let deadPopups=false;
         for(const p of this.popups){p.life-=dt;if(!this.reducedMotion)p.y-=24*dt;if(!(p.life>0))deadPopups=true;}
         if(deadPopups)this.popups=this.popups.filter(p=>p.life>0);
-        for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.24)delete e.breakFx;}
+        for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.36)delete e.breakFx;}
         if(this.hit) {this.hit.age+=dt;if(this.hit.age>=.3)this.hit=null;}
         let deadParticles=false;
         for(const p of this.particles) {
             p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
-            if(p.feather||p.chip) {p.vy+=(p.chip?380:210)*dt;p.rotation+=p.spin*dt;}
+            if(p.feather||p.chip||p.seed) {p.vy+=(p.chip?380:p.seed?320:210)*dt;p.rotation+=p.spin*dt;}
             if(!(p.life>0))deadParticles=true;
         }
         if(deadParticles)this.particles=this.particles.filter(p=>p.life>0);
@@ -456,14 +603,22 @@ export class Game {
             encounterGap=gap+(hasSnake?(profile.snakeClearance??180):0);
             this.encounterHistory.at(-1).gap=encounterGap;
             const wood = { id: this.nextId++, kind: 'wood', x, y: 0, top: center - encounterGap / 2, bottom: center + encounterGap / 2, variant, scored: false, route:n, encounter:plan.id };
+            if (this.stage >= 1 && !hasSnake && variant === 'plain') {
+                wood.fragileSide = Math.floor(n / 2) % 2 ? 'top' : 'bottom';
+                wood.fragileKind = Math.floor(n / 4) % 2 ? 'hollow' : 'rot';
+            }
+            if (!hasSnake && variant === 'plain' && n % 3 !== 0) {
+                wood.decorSide = wood.fragileSide === 'bottom' ? 'top' : 'bottom';
+                wood.decorKind = Math.floor(n / 3) % 2 ? 'moss' : 'vine';
+            }
             if (hasSnake) wood.snake = {kind:'snake',branch:variant==='branch',phase:'watching',retreat:false};
             this.entities.push(wood);
         }
         const fruits=hawkAlone?[{x:15,y:center}]:plan.fruits;
-        const nearbySnakes = isSnakeA2Ready() ? this.entities.filter(entity => entity.kind === 'wood' && entity.snake) : [];
+        const nearbySnakes = this.entities.filter(entity => entity.kind === 'wood' && entity.snake);
         const placedFruits=[];
         const corridorTop = center - encounterGap / 2 + 55;
-        const corridorBottom = center + encounterGap / 2 - (hasSnake ? 200 : 55);
+        const corridorBottom = center + encounterGap / 2 - (hasSnake ? 218 : 55);
         for(const [index,point] of fruits.entries()) {
             let fy = point.y, fx=x+point.x;
             if (hasSnake) {
@@ -471,6 +626,13 @@ export class Game {
                 const corridorCenter = (corridorTop + corridorBottom) / 2;
                 fy = corridorCenter + (point.y - center) * 0.35;
                 fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
+            }
+            for (const s of nearbySnakes) {
+                if (Math.abs(fx - (s.x + 29)) < 110) {
+                    const safeLimit = Math.min(corridorBottom, s.bottom - 218);
+                    if (fy > safeLimit) fy = safeLimit;
+                    fy = Math.max(corridorTop, fy);
+                }
             }
             if (nearbySnakes.some(wood => !snakeA2FruitHasClearance(wood,fx,fy))) {
                 const placed = placeA2Fruit(nearbySnakes,fx,fy,corridorTop,corridorBottom,placedFruits);
@@ -489,7 +651,7 @@ export class Game {
     }
 
     advanceJourney(dt) {
-        if(this.distance<JOURNEY_LENGTH)return;
+        if(this.score<VICTORY_SCORE)return;
         const danger=this.entities.some(e=>(e.kind==='wood'&&e.x+85>this.x-36)||(e.kind==='hawk'&&!e.harmless&&e.x+30>this.x-36));
         if(danger || (this.quizDue&&!this.refuge))return;
         if(!this.refuge){this.refuge={x:Math.max(this.width,this.viewWidth||this.width)+220,y:320};this.onEvent({type:'refuge'});}
@@ -526,7 +688,8 @@ export class Game {
         }
         if (this.state !== 'playing') return;
         this.elapsed += dt;
-        if(!this.tutorial)this.distance = Math.min(JOURNEY_LENGTH,this.distance+this.speed*dt);
+        const speed = this.speed;
+        if(!this.tutorial)this.distance = Math.min(JOURNEY_LENGTH,this.distance+speed*dt);
         const nextStage=journeyStage(this.distance);
         if(nextStage!==this.stage){this.stage=nextStage;this.stageAge=0;this.onEvent({type:'stage',stage:this.stage,message:JOURNEY[this.stage].message});}
         this.stageAge+=dt;
@@ -562,7 +725,7 @@ export class Game {
             if (this.state !== 'playing') return;
         }
         this.nextSpawn -= dt;
-        if (this.nextSpawn <= 0 && !this.quizDue && this.distance<JOURNEY_LENGTH) this.spawn();
+        if (this.nextSpawn <= 0 && !this.quizDue && this.score<VICTORY_SCORE) this.spawn();
 
         // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
         let cachedPlayerBody = null;
@@ -580,11 +743,11 @@ export class Game {
             if (this.state !== 'playing') break;
             const px = this.x;
             if (e.kind === 'hawk') {
-                advanceHawk(e,dt,this.speed,px);
-                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 80 && Math.abs(e.y - this.y) < 60 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
+                advanceHawk(e,dt,speed,px);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 140 && Math.abs(e.y - this.y) < 110 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
                 continue;
             }
-            e.x -= this.speed * dt;
+            e.x -= speed * dt;
             if (e.kind === 'wood') {
                 advanceSnake(e,dt,px);
                 if (e.snake && !e.snake.retreat && Math.abs(e.x-px)<230) {
@@ -595,6 +758,12 @@ export class Game {
                 }
                 // Broad-phase horizontal check: livingWoodRects span at most [e.x - 73, e.x + 108]
                 if (e.x + 115 >= px - 28 && e.x - 80 <= px + 28) {
+                    if (!e.grazed && !this.reducedMotion && this.state === 'playing') {
+                        if (Math.abs(this.y - e.top) < 60 || Math.abs(this.y - e.bottom) < 60) {
+                            e.grazed = true;
+                            this.leafBurst(this.x, this.y > (e.top + e.bottom)/2 ? e.bottom : e.top, 3);
+                        }
+                    }
                     const pBody = getPlayerBody();
                     const woodHit = this.woodRects(e).find(rect => shapesHitRect(pBody,rect));
                     if (woodHit) { e.hitRect=woodHit; e.hitPart = woodHit.part; e.hitSide = woodHit.y >= e.bottom ? 'bottom' : 'top'; this.collide(e); }

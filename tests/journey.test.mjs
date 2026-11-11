@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {Game,STEP,FlightClock} from '../Chaua-Educa-main/js/engine.mjs';
 import {JOURNEY,JOURNEY_LENGTH,journeyStage} from '../Chaua-Educa-main/js/journey.mjs';
 function flight(){const g=new Game();g.state='playing';g.nextSpawn=Infinity;return g;}
-function ready(){const g=flight();g.distance=JOURNEY_LENGTH;g.y=320;g.vy=0;g.refuge={x:330,y:320};return g;}
-test('score awards a single medal but never ends a flight',()=>{
- const g=flight(),events=[];g.onEvent=e=>events.push(e);g.addScore(200);g.addScore(5);g.tick(STEP);
+function ready(){const g=flight();g.distance=JOURNEY_LENGTH;g.score=1000;g.y=320;g.vy=0;g.refuge={x:330,y:320};return g;}
+test('1000 points award one medal and preserve the landing sequence',()=>{
+ const g=flight(),events=[];g.onEvent=e=>events.push(e);g.addScore(1000);g.addScore(5);g.tick(STEP);
  assert.equal(g.state,'playing');assert.equal(g.medal,true);assert.equal(events.filter(e=>e.type==='medal').length,1);
 });
 test('four stages depend on distance, not score or screen size',()=>{
@@ -14,7 +14,7 @@ test('four stages depend on distance, not score or screen size',()=>{
  const before=g.distance;g.pause();g.tick(10);assert.equal(g.distance,before);
 });
 test('destination waits for hazards and arrival requires alignment',()=>{
- const g=flight();g.distance=JOURNEY_LENGTH;g.entities=[{kind:'wood',x:500,top:100,bottom:500}];g.advanceJourney(STEP);assert.equal(g.refuge,null);
+ const g=flight();g.distance=JOURNEY_LENGTH;g.score=1000;g.entities=[{kind:'wood',x:500,top:100,bottom:500}];g.advanceJourney(STEP);assert.equal(g.refuge,null);
  g.entities=[];g.y=500;g.advanceJourney(10);assert.ok(g.refuge);assert.equal(g.state,'playing');
  g.y=320;g.advanceJourney(STEP);assert.equal(g.state,'arrival');assert.equal(g.held,false);
 });
@@ -26,12 +26,14 @@ test('arrival freezes powers and physics, can pause, and wins once',()=>{
  assert.equal(g.state,'ended');assert.equal(g.won,true);assert.equal(g.y,320);assert.equal(g.x,330);assert.equal(g.feather,5);assert.equal(events.filter(e=>e.type==='win').length,1);
 });
 test('pending challenge question must be answered before reaching refuge',()=>{
- const g=flight();g.distance=JOURNEY_LENGTH;g.elapsed=40;g.quizPending=true;g.y=320;g.vy=0;g.advanceJourney(STEP);assert.equal(g.refuge,null);
+ const g=flight();g.distance=JOURNEY_LENGTH;g.score=1000;g.elapsed=40;g.quizPending=true;g.y=320;g.vy=0;g.advanceJourney(STEP);assert.equal(g.refuge,null);
  assert.equal(g.maybeOpenQuiz(),true);g.answer(!g.question.answer);g.continueQuiz();assert.equal(g.won,false);assert.equal(g.state,'ended');
 });
 test('friendly mode can arrive after a wrong answer; reduced motion skips landing animation',()=>{
- const g=flight();g.mode='tranquilo';g.distance=JOURNEY_LENGTH;g.elapsed=40;g.quizPending=true;g.y=320;g.vy=0;
+ const g=flight();g.mode='tranquilo';g.distance=JOURNEY_LENGTH;g.score=1000;g.elapsed=40;g.quizPending=true;g.y=320;g.vy=0;
  g.maybeOpenQuiz();g.answer(!g.question.answer);g.continueQuiz();for(let i=0;i<180;i++)g.tick(STEP);
  g.refuge={x:330,y:320};g.advanceJourney(STEP);g.reducedMotion=true;g.tick(STEP);assert.equal(g.won,true);
  g.start();assert.equal(g.arrival,null);assert.equal(g.refuge,null);assert.equal(g.distance,0);
 });
+
+test('distance alone cannot unlock refuge or stop encounters below 1000',()=>{const g=flight();g.distance=JOURNEY_LENGTH;g.score=999;g.advanceJourney(STEP);assert.equal(g.refuge,null);g.nextSpawn=0;g.tick(STEP);assert.ok(g.entities.length>0);g.entities=[];g.addScore(1);g.advanceJourney(STEP);assert.ok(g.refuge);assert.equal(g.won,false);});

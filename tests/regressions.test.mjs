@@ -55,7 +55,7 @@ test('releasing produces a decisive fall while retaining gentle pitch',()=>{
 test('both modes are faster and openings are compact but leave clearance',()=>{
  for(const mode of ['aventura','tranquilo']){
   const g=new Game({random:()=>.5});g.reset(mode);g.spawn();const wood=g.entities.find(e=>e.kind==='wood');
-  assert.ok(g.speed>=205);assert.ok(wood.bottom-wood.top<=220);assert.ok(wood.bottom-wood.top>=155);
+  assert.ok(g.speed>=205);assert.ok(wood.bottom-wood.top<=220);assert.ok(wood.bottom-wood.top>=145);
   assert.ok(g.nextSpawn<=2.15);
  }
 });
