@@ -146,6 +146,12 @@ function home() {
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
     app.classList.remove('in-flight','training'); updateTrainingButton();
 
+    resize(); $('#inputPlayer').focus({ preventScroll: true });
+}
+
+// Install menu controls exactly ONCE per page load, not whenever home() runs.
+// Re-registering from home() caused a dead first-click and stacked listeners
+// after returning from gameplay.
 const WEATHER_MODES = [
     { id: 'auto', label: 'Automático 🍃', icon: '🌤️' },
     { id: 'summer', label: 'Sol de Verão ☀️', icon: '☀️' },
@@ -187,8 +193,8 @@ if (weatherSelect) {
     });
 }
 
-updateWeatherUI(); resize(); $('#inputPlayer').focus({ preventScroll: true });
-}
+
+updateWeatherUI();
 
 $('#inputPlayer').addEventListener('input', event => {
     const value = event.target.value;
