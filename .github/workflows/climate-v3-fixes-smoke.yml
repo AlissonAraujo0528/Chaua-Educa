@@ -19,6 +19,7 @@ jobs:
         run: |
           node --test tests/climate-v3-verified-fixes.test.mjs tests/climate-four-seasons.test.mjs
           node --test tests/animation-polish.test.mjs tests/action-states.test.mjs
+          node --test tests/climate-v3-approved-second-plan.test.mjs
       - run: npx playwright install --with-deps chromium
       - name: Validate actual atlas and menu controls in browser
         run: |
