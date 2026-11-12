@@ -54,6 +54,8 @@ jobs:
           node tests/browser-weather-trees.cjs
           node tests/browser-season-parity.cjs
           node tests/browser-climate-v3.cjs
+          node tests/browser-season-atlas-semantic.cjs
+          node tests/browser-weather-controls-v3.cjs
           node tests/browser-climate-rain-wet.cjs
           node tests/browser-climate-winter-v3.cjs
           node tests/browser-impact-v3.cjs
@@ -77,6 +79,7 @@ jobs:
             test-results/weather-trees/
             test-results/season-performance/
             test-results/climate-v3/
+            test-results/season-atlas-semantic/
             test-results/climate-rain-wet/
             test-results/climate-winter-v3/
             test-results/climate-impact-v3/
