@@ -40,7 +40,7 @@ export function journeyRain(distance, tutorial = false) {
     if (weatherOverride === 'rain') return 0.85;
     if (weatherOverride === 'summer' || weatherOverride === 'winter' || weatherOverride === 'autumn' || weatherOverride === 'spring') return 0;
     if (tutorial || distance?.tutorial) return 0;
-    if (distance && typeof distance==='object') return visualWeights(distance)[1]*.85;
+    if (distance && typeof distance==='object') return visualWeights(distance)[2]*.85;
     if (distance <= rainStart || distance >= rainEnd) return 0;
     return smoothstep(Math.min(distance - rainStart, rainEnd - distance) / fadeDistance);
 }
@@ -50,7 +50,7 @@ export function journeyStorm(distance, mode, tutorial = false) {
     if (weatherOverride !== 'auto') return 0;
     if (tutorial || distance?.tutorial || (mode ?? distance?.mode) !== 'aventura') return 0;
     if (distance && typeof distance==='object') {
-        const autumn=visualWeights(distance)[1];
+        const autumn=visualWeights(distance)[2];
         return smoothstep(Math.max(0,(autumn-.30)/.7))*.58;
     }
     const start = rainStart + 1100;
@@ -68,7 +68,7 @@ export function journeyWind(distance, mode, tutorial = false) {
     if (tutorial || distance?.tutorial) return 0;
     if (distance && typeof distance==='object') {
         const w=visualWeights(distance);
-        return w[0]*.20+w[1]*.75+w[2]*.20+w[3]*.45;
+        return w[0]*.20+w[1]*.20+w[2]*.75+w[3]*.45;
     }
     const start = JOURNEY[2].start + 600;
     const end = JOURNEY[2].start + 3700;
@@ -83,7 +83,7 @@ export function journeyFog(distance, tutorial = false) {
     if (weatherOverride !== 'auto' || tutorial || distance?.tutorial) return 0;
     if (distance && typeof distance==='object') {
         const w=visualWeights(distance);
-        return w[0]*.52+w[1]*.32+w[2]*.10+w[3]*.55;
+        return w[0]*.52+w[1]*.10+w[2]*.32+w[3]*.55;
     }
     return 1 - smoothstep(distance / 2900);
 }
