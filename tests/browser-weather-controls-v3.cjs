@@ -8,6 +8,8 @@ const assert=require('node:assert/strict');
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const root=process.env.GAME_URL||'http://127.0.0.1:5501/';
   await page.goto(root,{waitUntil:'networkidle'});
+  // Returning to the main menu repeatedly must never stack climate listeners.
+  for(let i=0;i<3;i++)await page.locator('.brand').evaluate(el=>el.click());
   await page.locator('#btn-weather-quick').evaluate(el=>el.click());
   const first=await page.evaluate(async()=>{
    const m=await import('/js/weather.mjs');
