@@ -79,5 +79,7 @@ jobs:
             test-results/climate-rain-wet/
             test-results/climate-winter-v3/
             test-results/climate-impact-v3/
+            test-results/responsive-camera/
+            test-results/v2-action-integration/
             test-results/climate-calibration/
           if-no-files-found: ignore
