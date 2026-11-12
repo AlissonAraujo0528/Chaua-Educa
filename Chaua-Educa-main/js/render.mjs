@@ -113,6 +113,16 @@ function animatedBird(c,p){
         const heaveAngle=(!reduced&&!perched&&p.flapImpulse>0)?-p.flapImpulse*0.04:0;
         if(heave!==0)c.translate(0,-heave);
         c.rotate(angle+heaveAngle);
+        if(!reduced&&!perched&&!surprise&&!defeated){
+            // Continuous sub-pixel lift and feather-line sway while gliding.
+            // Keep the same intact WebP pose: alternating full-body frames
+            // would make the beak and wings pop / temporarily double.
+            const glide=Math.max(0,1-Math.max(0,p.wing||0)*8);
+            if(glide>0){
+                c.translate(0,Math.sin(time*2.6)*.65*scale*glide);
+                c.rotate(Math.sin(time*1.9)*.006*glide);
+            }
+        }
     }
     if(turbo&&!perched&&!reduced)drawTurboFlames(c,size,time);
     const action=parrotAction({...p,time,wing:p.wing,reduced,perched,landing,defeated,surprise,impactProgress});
