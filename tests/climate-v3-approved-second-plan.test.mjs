@@ -117,7 +117,7 @@ test('conservative broad-phase agrees with old exact SAT on varied overlaps and 
  const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296};
  for(let i=0;i<1000;i++){
   const r={x:random()*300-150,y:random()*240-120,w:10+random()*75,h:10+random()*85};
-  const make=()=>{const x=random()*340-170,y=random()*280-140,w:2+random()*120,h:2+random()*80;return rectShape({x,y,w,h})};
+  const make=()=>{const x=random()*340-170,y=random()*280-140,w=2+random()*120,h=2+random()*80;return rectShape({x,y,w,h})};
   const shapes=[make(),make()];
   const before=shapes.some(poly=>intersects(poly,rectShape(r)));
   assert.equal(shapesHitRect(shapes,r),before,`SAT broadphase mismatched test ${i}`);
