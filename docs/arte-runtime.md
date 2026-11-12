@@ -30,3 +30,14 @@ Esta especificação substitui a documentação **experimental** sobre `?actionS
 ## Proteção contra regressões
 
 `npm test`, `node scripts/verify-current-spritesheets.cjs`, `python scripts/generate-snake-a2-masks.py --check` e CI do Chromium verificam a integração. Não apagar o atlas v6 do Chauá ou do gavião enquanto estados específicos ainda dependerem dele. Não confundir fonte autoral com textura não carregada.
+
+## Resíduos visuais removidos após análise de referências
+
+- 11 texturas WebP v3 substituídas (a floresta e as sete frutas atuais permanecem).
+- 8 texturas WebP v4 substituídas (pena dourada e escudo permanecem).
+- 31 imagens antigas da interface e do antigo diário gráfico (o favicon atual permanece).
+- 7 arquivos da fonte Pixelify Sans sem uso; Baloo 2, Nunito e suas licenças continuam.
+- 3 áudios WAV históricos; o áudio atual usa Web Audio procedural.
+- CSS/SCSS modal antigo e o gerador de quadros v4 do gavião, não utilizados.
+
+**Total desta rodada: 63 arquivos, 9.760.508 bytes no checkout.** A exclusão não altera arquivos-fonte ativos das árvores v6/v7 nem a identidade artística atual. Arquivos históricos podem ser recuperados pelo Git; nenhum fallback foi acrescentado.
