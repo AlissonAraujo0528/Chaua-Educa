@@ -107,7 +107,15 @@ function animatedBird(c,p){
     const clip=birdAnimation({wing:p.wing,time,perched:perched&&!surprise,landing,defeated:defeated||surprise,impactProgress:surprise?1:impactProgress,reduced});
     const factor=27.7027*scale/SPRITES.chaua.landmarkWidth,size=125*scale;
     c.save();c.translate(x,y);
-    if(defeated&&!reduced){const hit=impactPose(impactProgress);c.translate(hit.x,hit.y);c.rotate(angle+hit.angle);}
+    if(defeated&&!reduced){
+        const hit=impactPose(impactProgress);
+        c.translate(hit.x,hit.y);
+        // Keep the original spiral-eyed impact frame, with a tiny dizzy
+        // sway after recoil to avoid looking frozen for the remaining .88s.
+        // Do not switch to the recovery frames or invent new anatomy.
+        if(impactProgress>=1)c.translate(Math.sin(time*8)*.65*scale,Math.sin(time*11)*.55*scale);
+        c.rotate(angle+hit.angle+(impactProgress>=1?Math.sin(time*9)*.017:0));
+    }
     else {
         const heave=(!reduced&&!perched&&p.flapImpulse>0)?p.flapImpulse*Math.sin(p.flapImpulse*Math.PI)*3.5:0;
         const heaveAngle=(!reduced&&!perched&&p.flapImpulse>0)?-p.flapImpulse*0.04:0;
@@ -1301,7 +1309,7 @@ export class Renderer {
         const contact=woodContactPosition(game,impactProg,reduced);
         drawBird(c, {
             x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
-            angle: game.angle, wing: reduced ? .2 : game.wing, time: game.state==='ended'&&game.won?visualTime:sceneTime,
+            angle: game.angle, wing: reduced ? .2 : game.wing, time: (game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime,
             landing: game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null,
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
             shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
