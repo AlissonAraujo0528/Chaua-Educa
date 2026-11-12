@@ -5,10 +5,6 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const scenes=[['spring',.10,0],['summer',.35,2],['autumn',.56,1],['winter',.85,3]];
-const percentile=(items,p)=>{
- const sorted=[...items].sort((a,b)=>a-b);
- return sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))];
-};
 (async()=>{
  const browser=await chromium.launch({
   executablePath:process.env.CHROMIUM_PATH||undefined,
@@ -23,6 +19,7 @@ const percentile=(items,p)=>{
    await page.route('**/js/script.js',r=>r.fulfill({contentType:'text/javascript',body:''}));
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
    const rows=await page.evaluate(async({mode,scenes})=>{
+    const percentile=(a,p)=>{const v=[...a].sort((x,y)=>x-y);return v[Math.floor((v.length-1)*p)];};
     const [{Renderer},{Game},{climateReferenceSeconds},{journeySeason},{journeyRain},{winterAmount}]
       =await Promise.all([
        import('/js/render.mjs'),import('/js/engine.mjs'),
