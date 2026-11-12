@@ -629,11 +629,18 @@ export class Game {
         const hawkAlone = soloHawk;
         let hasSnake = false, encounterGap = gap;
         if (hawkAlone) {
-            const dive = this.elapsed > profile.diveAt && n % 2 === 0;
+            const swoop=this.elapsed>profile.diveAt&&n%2===0;
             const lane=Math.max(160,Math.min(480,this.y+(this.encounterRandom()-.5)*70));
-            const y = dive ? (lane>=320?105:535) : lane;
-            this.entities.push({ id: this.nextId++, kind: 'hawk', solo: true, x, y, startX: x, targetX: this.x - 60, startY: y, targetY: dive ? lane : y,
-                warning: Math.max(profile.warning, travel * .25), phase:'warning', age: 0, dive, w: 66, h: 34 });
+            // Upper approach is a true dive with the authored angled pose.
+            // Lower approach remains in the encounter variety, but becomes
+            // an ASCENDING flight using the existing wingbeat sheet; a bird
+            // climbing from the ground must not display a "MERGULHO" warning.
+            const dive=swoop&&lane>=320,ascent=swoop&&!dive;
+            const y=dive?105:ascent?535:lane;
+            this.entities.push({ id:this.nextId++,kind:'hawk',solo:true,x,y,startX:x,
+                targetX:this.x-60,startY:y,targetY:swoop?lane:y,
+                warning:Math.max(profile.warning,travel*.25),phase:'warning',
+                age:0,dive,ascent,w:66,h:34 });
         } else {
             const variants = ['plain', 'branch', 'plain'];
             const variant = plan.variant ?? (this.stage===1 && n%2===0?'branch':this.elapsed > 17 ? variants[n % variants.length] : 'plain');
