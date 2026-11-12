@@ -10,7 +10,7 @@ import { offerPower, POWER_BALANCE } from './powers.mjs';
 import { advanceHawk, advanceSnake } from './animals.mjs';
 import { planEncounter, seededRandom } from './encounters.mjs';
 import { FRUITS } from './fruits.mjs';
-import { journeyWind } from './weather.mjs';
+import { physicsWind } from './weather.mjs';
 import { QUESTIONS } from './questions.mjs';
 import { ACTION_TIMINGS } from './action-states.mjs';
 
@@ -215,7 +215,7 @@ export class Game {
     get speed() {
         const p = FLIGHT[this.mode];
         const gain = this.mode === 'aventura' ? Math.min(185, this.elapsed * 0.45 + Math.max(0, this.elapsed - 40) * 0.35) : Math.min(p.speedGain, this.elapsed * 0.45);
-        const wind = journeyWind(this.distance, this.mode, this.tutorial);
+        const wind = physicsWind(this.distance, this.mode, this.tutorial);
         return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1) * (1 + wind * .06);
     }
     start(mode = 'aventura', reviewIds = [], seed = Math.floor(Math.random()*4294967296)) { this.seed=seed>>>0; this.reset(mode); this.reviewIds = [...reviewIds]; this.state = 'countdown'; }
