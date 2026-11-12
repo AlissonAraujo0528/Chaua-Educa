@@ -45,3 +45,7 @@ Esta especificação substitui a documentação **experimental** sobre `?actionS
 ## Fontes históricas da cobra
 
 O gerador v6 produz somente Chauá e gavião. O gerador v7 produz somente as árvores. Os atlas v6/v7/v8 da cobra foram removidos do diretório distribuído; as fontes autorais originais continuam preservadas como arquivos históricos, mas não entram no runtime ou nos dados gerados.
+
+## Uma única linha do tempo climática
+
+As estações, a neve, o sol e os cenários usam o estado atual de voo (tempo decorrido, modo e semente), via `climate-progress.mjs` e `climate-timeline.mjs`. A antiga sequência paralela de estações por distância foi removida do renderer e dos testes. A distância continua controlando **física, colisões, posições e dificuldade**, não a estação visual. O menu passa um estado explícito de tempo zero; não há mais valor numérico que reative o sistema climático histórico.

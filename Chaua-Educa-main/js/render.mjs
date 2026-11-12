@@ -660,7 +660,7 @@ export class Renderer {
                 images.set('season-particles', off);
             }
             this.seasonalBackdrop=new SeasonalBackdrop();
-            this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,0);
+            this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,{elapsed:0,mode:'aventura',seed:0});
             // Initialize the enlarged predator compositor while assets load,
             // before the start button is enabled, not at its first encounter.
             this.c.save();this.c.translate(-1000,-1000);
@@ -1029,7 +1029,7 @@ export class Renderer {
             }
             c.fill();c.restore();
         }
-        drawForestLife(c,w,h,time,seasonDistance??0,rain,wind,reduced,this.decoration==='low',storm);
+        drawForestLife(c,w,h,time,seasonDistance??{elapsed:0,mode:'aventura',seed:0},rain,wind,reduced,this.decoration==='low',storm);
         if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
         drawJourneyFog(c, w, h, fog);
         drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm, wind, rainSpeed);
