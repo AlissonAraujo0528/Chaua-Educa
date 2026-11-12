@@ -44,7 +44,9 @@ const fs=require('node:fs'),path=require('node:path');
      throw Error('A2 collision/head shape vanished during flight: '+pose.state);
     validHeads++;
     if(i%32===0){
-     const p=ctx.getImageData(330,150,160,310).data;
+     // Inspect the full raster: the A2 animation and mirror can move outside a fixed crop.
+     // This still fails when the canvas is completely transparent.
+     const p=ctx.getImageData(0,0,ctx.canvas.width,ctx.canvas.height).data;
      if(p.some((v,j)=>j%4===3&&v>0))opaque++;
     }
     frames++;
