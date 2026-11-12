@@ -170,8 +170,8 @@ const rainWrap=(value,span)=>((value%span)+span)%span;
 const rainClamp=x=>Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250){
  if(w<=0||h<=0)return;
- const bands=foreground?[{depth:1,count:low?6:16}]:
-  [{depth:.40,count:low?12:32},{depth:.73,count:low?18:48}];
+ const bands=foreground?[{depth:1,count:low?6:22}]:
+  [{depth:.40,count:low?12:56},{depth:.73,count:low?18:88}];
  // Similar density on laptop and portrait viewports, without letting a huge
  // canvas spawn an unbounded number of raindrops.
  const areaScale=Math.max(.65,Math.min(1.45,Math.sqrt(w*h/(960*640))));
