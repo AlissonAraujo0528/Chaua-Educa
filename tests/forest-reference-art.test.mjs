@@ -4,7 +4,7 @@ import {FOREST_ART} from '../Chaua-Educa-main/js/forest-art-data.mjs';
 import {SPRITES} from '../Chaua-Educa-main/js/sprite-data.mjs';
 import {ASSET_PATHS,images} from '../Chaua-Educa-main/js/assets.mjs';
 import {drawLivingTrunk,drawRefugeTree} from '../Chaua-Educa-main/js/tree-art.mjs';
-import {snakePlacement} from '../Chaua-Educa-main/js/animation.mjs';
+import {snakePlacement} from '../Chaua-Educa-main/js/snake-a2.mjs';
 import {snakeA2Pose,snakeA2HeadRect,snakeA2CollisionRects} from '../Chaua-Educa-main/js/snake-a2.mjs';
 
 test('new reference art loads through the shared cache with four upper/lower variants',()=>{

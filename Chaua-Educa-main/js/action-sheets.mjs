@@ -7,8 +7,6 @@ export const ACTION_SHEET_DEFS=Object.freeze({
  'parrot-impact': {path:'../public/parrot/animations/impact.webp',columns:3,rows:2,cell:256},
  'hawk-flight': {path:'../public/hawk/fly/flight.webp',columns:4,rows:2,cell:320},
  'hawk-stunned': {path:'../public/hawk/animations/stunned.webp',columns:3,rows:2,cell:320},
- 'snake-strike': {path:'../public/snake/animations/strike.webp',columns:3,rows:2,cell:320},
- 'snake-stunned': {path:'../public/snake/animations/stunned.webp',columns:3,rows:2,cell:320},
 });
 const sheets=new Map();
 let pending=null;

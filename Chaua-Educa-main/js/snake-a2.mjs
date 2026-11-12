@@ -1,5 +1,4 @@
 import {SNAKE_TIMING} from './animals.mjs';
-import {snakePlacement} from './animation.mjs';
 import {shapesHitRect} from './collision.mjs';
 import {SNAKE_A2_MASKS} from './snake-a2-masks.mjs';
 
@@ -10,6 +9,7 @@ const PATHS=Object.freeze({
  attack:'../public/snake/attack/attack.webp',
  stunned:'../public/snake/reactions/stunned.webp'
 });
+export function snakePlacement(wood){return {x:wood.x+29,y:wood.bottom+20,factor:.52,facing:1};}
 const images=new Map();
 // Generated offline from the official A2 artwork: deterministic physics at 120 Hz
 // without browser image readbacks. All collision shapes use the same frames.
