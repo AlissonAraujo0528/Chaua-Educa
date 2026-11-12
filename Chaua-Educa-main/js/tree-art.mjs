@@ -43,7 +43,7 @@ export function drawWetBarkSheen(c,x,y,width,wet,time=0,seed=0){
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
  const fullSnow = snow >= 1 - 1e-6;
- const snowImg4 = fullSnow ? (images.get(`trees-${kind}-snow-04`) || images.get(`trees-${kind}-snow`)) : null;
+ const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
  const image = snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
@@ -72,9 +72,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // snow along the trunk section attached to the ceiling.
  if(snow>0&&!fullSnow){
   for(const {stage,alpha} of winterOverlayStages(snow)){
-   const overlay=images.get(`trees-${kind}-overlay-0${stage}`) ||
-     images.get(`trees-${kind}-snow-0${stage}`) ||
-     images.get(`trees-${kind}-snow`);
+   const overlay=images.get(`trees-${kind}-overlay-0${stage}`);
    if(!overlay || alpha<=0)continue;
    c.save();c.globalAlpha=Math.min(1,alpha);
    if(upper){
@@ -148,15 +146,11 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    if (snowImage) {
     c.save();
     c.globalAlpha = Math.min(1, snow * 1.15);
-    const bandHeight = 96, tileHeight = bandHeight * scale;
-    for (let pos = join - .5, tile = 0; pos < 1000; pos += tileHeight, tile++) {
-     c.save();
-     c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
-     if (tile % 2 === 0) c.scale(1, -1);
-     c.drawImage(snowImage, sx + (TREE_CELL - TREE_CORE_WIDTH) / 2, sy + splice - bandHeight,
-      TREE_CORE_WIDTH, bandHeight, -TREE_WIDTH / 2, 0, TREE_WIDTH, tileHeight + .5);
-     c.restore();
-    }
+    // Keep the original snowy cut face, but do not tile the snowy bark
+    // strip all the way to the ceiling: repeating it made vertical stripes.
+    // Upper trunks are turned upside down. Mirroring this white cut-face
+    // onto their underside would make snow adhere against gravity, so
+    // falling crystals are handled separately by drawSnowContact().
     if (!upper) {
      c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
       left, 0, TREE_CELL * scale, join);
