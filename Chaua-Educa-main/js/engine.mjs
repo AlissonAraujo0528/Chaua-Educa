@@ -163,6 +163,33 @@ export class Game {
             out[i] = entity;
         }
         view.entities = out;
+        // 120Hz simulation vs 180/240Hz monitors: interpolate VFX as well
+        // as obstacles, using reusable visual buffers (no per-frame allocation).
+        if(!this._visualParticles){
+            Object.defineProperty(this,'_visualParticles',{value:[],enumerable:false});
+            Object.defineProperty(this,'_visualPopups',{value:[],enumerable:false});
+        }
+        const effects=this._visualParticles;
+        effects.length=this.particles.length;
+        for(let i=0;i<this.particles.length;i++){
+            const src=this.particles[i],dst=effects[i]||{};
+            Object.assign(dst,src);
+            dst.x=lerp(src.prevX??src.x,src.x);
+            dst.y=lerp(src.prevY??src.y,src.y);
+            if(Number.isFinite(src.rotation))
+                dst.rotation=lerp(src.prevRotation??src.rotation,src.rotation);
+            effects[i]=dst;
+        }
+        const labels=this._visualPopups;
+        labels.length=this.popups.length;
+        for(let i=0;i<this.popups.length;i++){
+            const src=this.popups[i],dst=labels[i]||{};
+            Object.assign(dst,src);
+            dst.y=lerp(src.prevY??src.y,src.y);
+            labels[i]=dst;
+        }
+        view.particles=effects;
+        view.popups=labels;
         return view;
     }
 
@@ -260,7 +287,8 @@ export class Game {
         this.scoreBreakdown[source] += value * multiplier;
         if(!this.medal && this.score>=VICTORY_SCORE){this.medal=true;this.onEvent({type:'medal'});}
         this.onEvent({ type: 'points', value: value * multiplier });
-        this.popups.push({x:this.x+28,y:this.y-30,text:`+${value*multiplier}`,gold:multiplier>=2,life:.85});
+        this.popups.push({x:this.x+28,y:this.y-30,prevY:this.y-30,
+            text:`+${value*multiplier}`,gold:multiplier>=2,life:.85});
         if(this.popups.length>6)this.popups.shift();
     }
 
@@ -523,6 +551,8 @@ export class Game {
 
     particle(p) {
         if(this.particles.length>=96)this.particles.shift();
+        p.prevX=p.x;p.prevY=p.y;
+        if(Number.isFinite(p.rotation))p.prevRotation=p.rotation;
         this.particles.push(p);
     }
 
@@ -542,12 +572,19 @@ export class Game {
         this.flapImpulse=Math.max(0,this.flapImpulse-dt*5.0);
         if(this.shakeTime>0){this.shakeTime=Math.max(0,this.shakeTime-dt);if(this.shakeTime===0){this.shakeDuration=0;this.shakeIntensity=0;}}
         let deadPopups=false;
-        for(const p of this.popups){p.life-=dt;if(!this.reducedMotion)p.y-=24*dt;if(!(p.life>0))deadPopups=true;}
+        for(const p of this.popups){
+            p.prevY=p.y;
+            p.life-=dt;
+            if(!this.reducedMotion)p.y-=24*dt;
+            if(!(p.life>0))deadPopups=true;
+        }
         if(deadPopups)this.popups=this.popups.filter(p=>p.life>0);
         for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.36)delete e.breakFx;}
         if(this.hit) {this.hit.age+=dt;if(this.hit.age>=.3)this.hit=null;}
         let deadParticles=false;
         for(const p of this.particles) {
+            p.prevX=p.x;p.prevY=p.y;
+            if(Number.isFinite(p.rotation))p.prevRotation=p.rotation;
             p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
             if(p.feather||p.chip||p.seed) {p.vy+=(p.chip?380:p.seed?320:210)*dt;p.rotation+=p.spin*dt;}
             if(!(p.life>0))deadParticles=true;
