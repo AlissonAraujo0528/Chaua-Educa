@@ -40,7 +40,13 @@ export class SeasonalBackdrop {
    this.pending=null;this.frames.clear();this.key=key;this.atlas=atlas;
   }
   const needed=new Set(state.mix===1?[state.to]:[state.from,state.to]);
-  const ahead=typeof distance==='number'?distance+900:{...distance,elapsed:(distance.elapsed||0)+10};
+  // A Game.visual(alpha) view inherits mode, seed and tutorial through its
+  // prototype. Object spread silently DROPS them, making prewarm predict the
+  // next season using the wrong flight reference and seed.
+  const ahead=typeof distance==='number'
+   ? distance+900
+   : {elapsed:(distance.elapsed||0)+10,mode:distance.mode,
+      seed:distance.seed,tutorial:distance.tutorial};
   const upcoming=journeySeason(ahead).to;
   if(this.prewarmEnabled && state.mix===1)needed.add(upcoming);
   for(const [id,surface] of this.frames)if(!needed.has(id)){
