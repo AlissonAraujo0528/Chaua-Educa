@@ -107,7 +107,7 @@ const TREE_CORE_WIDTH = 128;
 const TREE_VARIANTS = ['rot', 'hollow', 'moss', 'vine'];
 const TREE_SPLICES = [181, 180, 180, 182];
 
-export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0) {
+export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0, visibleReach = 1000) {
  const image = images.get('tree-variants');
  const index = TREE_VARIANTS.indexOf(kind);
  if (!image || index < 0) return;
@@ -125,7 +125,11 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   // Repeat a reflected bark band at native scale. Stretching a scanline
   // turned grooves and moss into long vertical stripes on portrait screens.
   const bandHeight = 96, tileHeight = bandHeight * scale;
-  for (let pos = join - .5, tile = 0; pos < 1000; pos += tileHeight, tile++) {
+  // Culling is presentation-only: include a margin for fractional camera
+  // transforms and wood sway. When called without the flight camera,
+  // preserve the complete source drawing for screenshots/tests.
+  const reach=Math.max(join,Math.min(1000,Number.isFinite(visibleReach)?visibleReach:1000));
+  for (let pos = join - .5, tile = 0; pos < reach; pos += tileHeight, tile++) {
    c.save();
    c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
    if (tile % 2 === 0) c.scale(1, -1);
