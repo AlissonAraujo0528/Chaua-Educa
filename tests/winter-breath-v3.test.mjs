@@ -8,7 +8,7 @@ import {images} from '../Chaua-Educa-main/js/assets.mjs';
 const species=['chaua','snake','hawk'];
 function mock(){
  const draws=[];
- const c={save(){},restore(){},translate(){},scale(){},beginPath(){},
+ const c={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},
   arc(){draws.push(['arc'])},fill(){},drawImage(...args){draws.push(['img',...args])}};
  return {c,draws};
 }
