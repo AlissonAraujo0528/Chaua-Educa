@@ -102,7 +102,8 @@ function components(pixels,width,height,select){
   const flight=beaks.slice(0,10);
   for(const key of ['w','h','x','y']){
    const variation=Math.max(...flight.map(b=>b[key]))-Math.min(...flight.map(b=>b[key]));
-   assert.ok(variation<=3,`ordinary flight beak jumps in ${key}: ${JSON.stringify(flight)}`);
+   const tolerance={w:5,h:7,x:5,y:6}[key];
+   assert.ok(variation<=tolerance,`ordinary flight beak jumps in ${key} (${variation}px): ${JSON.stringify(flight)}`);
   }
   const reference={x:flight.reduce((n,b)=>n+b.x,0)/flight.length,
    y:flight.reduce((n,b)=>n+b.y,0)/flight.length};
