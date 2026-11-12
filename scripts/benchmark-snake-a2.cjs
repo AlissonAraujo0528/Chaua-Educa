@@ -12,24 +12,32 @@ const pct=(a,p)=>{const b=[...a].sort((x,y)=>x-y);return b[Math.floor((b.length-
   const stats=await page.evaluate(async()=>{
    const {Renderer}=await import('/js/render.mjs');
    const c=document.createElement('canvas');c.width=960;c.height=640;
+   c.style.cssText='position:fixed;inset:0;width:960px;height:640px';
+   document.body.replaceChildren(c);
    const renderer=new Renderer(c);await renderer.ready;
-   const phases=['watching','warning','windup','striking','recovering','spent'];
-   const values=[];
-   let drawCalls=0;
-   for(let i=0;i<300;i++){
-    const wood={id:1,kind:'wood',x:420,top:120,bottom:465,
-      snake:{phase:phases[i%phases.length],age:i/60,phaseAge:(i%30)/60,warningAge:(i%60)/60}};
-    const ctx=renderer.c;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,960,640);
+   const ctx=renderer.c,phases=['watching','warning','windup','striking','recovering','spent'];
+   const batches=26,perBatch=32,samples=[];
+   let draws=0,painted=0;
+   for(let batch=0;batch<batches;batch++){
     const start=performance.now();
-    renderer.snake(wood,false,0,0,i/60,false);
-    // Symmetric raster flush with actual graphics only.
-    const alpha=ctx.getImageData(420,450,1,1).data[3];
-    if(i>=20)values.push(performance.now()-start);
-    if(alpha>=0)drawCalls++;
+    for(let i=0;i<perBatch;i++){
+     const n=batch*perBatch+i;
+     const wood={id:1,kind:'wood',x:420,top:120,bottom:465,
+       snake:{phase:phases[n%phases.length],age:n/60,phaseAge:(n%30)/60,warningAge:(n%60)/60}};
+     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,c.width,c.height);
+     renderer.snake(wood,false,0,0,n/60,false);
+     draws++;
+    }
+    // One diagnostic readback per batch, not a GPU sync on every draw.
+    const rgba=ctx.getImageData(0,0,c.width,c.height).data;
+    if(rgba.some((value,index)=>index%4===3&&value>0))painted++;
+    const ms=performance.now()-start;
+    if(batch>=3)samples.push(ms/perBatch);
    }
-   return {samples:values,drawCalls};
+   return {samples,draws,painted,batches};
   });
-  assert.equal(stats.samples.length,280);assert.equal(stats.drawCalls,300);
+  assert.equal(stats.samples.length,23);assert.equal(stats.draws,26*32);
+  assert.equal(stats.painted,stats.batches,'All batches must render real visible A2 pixels');
   const out={samples:stats.samples.length,medianMs:pct(stats.samples,.5),p95Ms:pct(stats.samples,.95),
     p99Ms:pct(stats.samples,.99),browser:browser.version()};
   console.log('A2_RENDER_PROFILE '+JSON.stringify(out));
