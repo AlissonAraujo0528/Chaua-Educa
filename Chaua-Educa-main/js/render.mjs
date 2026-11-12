@@ -1286,7 +1286,7 @@ export class Renderer {
             snow, rain, low:this.decoration==='low'
         });
         if (!reduced) {
-            const pList = this.decoration==='low'?game.particles:game.particles;
+            const pList = game.particles;
             const pLimit = this.decoration==='low'?Math.min(32,pList.length):pList.length;
             for (let i = 0; i < pLimit; i++) {
                 const p = pList[i];
