@@ -62,6 +62,21 @@ export function journeyStorm(distance, mode, tutorial = false) {
     return smoothstep(Math.min(distance - start, end - distance) / 700);
 }
 
+// WORLD PHYSICS ONLY. Visual menu overrides (sun, storm, autumn, etc.)
+// must never modify moving hazards, encounters or deterministic replays.
+// This is exactly the old AUTO numeric-distance wind curve, including
+// its adventure-only storm term, independent of weatherOverride.
+export function physicsWind(distance,mode,tutorial=false){
+    if(tutorial || !Number.isFinite(distance))return 0;
+    const gustStart=JOURNEY[2].start+600;
+    const gustEnd=JOURNEY[2].start+3700;
+    const gust=smoothstep(Math.min(distance-gustStart,gustEnd-distance)/900);
+    if(mode!=='aventura')return gust;
+    const stormStart=rainStart+1100,stormEnd=rainEnd-1100;
+    const storm=smoothstep(Math.min(distance-stormStart,stormEnd-distance)/700);
+    return Math.max(gust,storm);
+}
+
 export function journeyWind(distance, mode, tutorial = false) {
     if (weatherOverride === 'autumn') return 0.75;
     if (weatherOverride === 'storm') return 0.85;
@@ -74,10 +89,7 @@ export function journeyWind(distance, mode, tutorial = false) {
         const w=visualWeights(distance);
         return w[0]*.20+w[1]*.20+w[2]*.75+w[3]*.45;
     }
-    const start = JOURNEY[2].start + 600;
-    const end = JOURNEY[2].start + 3700;
-    const gust = smoothstep(Math.min(distance - start, end - distance) / 900);
-    return Math.max(gust, journeyStorm(distance, mode));
+    return physicsWind(distance,mode,tutorial);
 }
 
 export function journeyFog(distance, tutorial = false) {
