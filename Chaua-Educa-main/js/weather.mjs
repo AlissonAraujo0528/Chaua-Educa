@@ -179,8 +179,8 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
  c.beginPath();c.rect(0,0,w,h);c.clip();
  c.lineCap='round';
  for(const {depth,count} of bands){
-  const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.25)));
-  const opacity=rainClamp(rain*(foreground?.43:.24+depth*.28)+storm*.07);
+  const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.55)));
+  const opacity=rainClamp(rain*(foreground?.43:.24+depth*.28)+storm*.10);
   c.globalAlpha=opacity;
   c.strokeStyle=foreground?'#a3ccda':'#6f9daa';
   c.fillStyle=foreground?'#bde0e8':'#97b9c7';
@@ -261,7 +261,7 @@ export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail
  const wash=c.createLinearGradient(0,0,0,height);
  wash.addColorStop(0,'#324f61');wash.addColorStop(.62,'#6d8790');
  wash.addColorStop(1,'#92aaa8');
- c.globalAlpha=rainClamp(rain*(.12+storm*.075));
+ c.globalAlpha=rainClamp(rain*(.12+storm*.145));
  c.fillStyle=wash;c.fillRect(0,0,width,height);
  c.restore();
  if(reduced)return;
