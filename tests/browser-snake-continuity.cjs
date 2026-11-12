@@ -16,6 +16,8 @@ const fs=require('node:fs'),path=require('node:path');
    const {isSnakeA2Ready,snakeA2Pose,snakeA2HeadRect,snakeA2CollisionRects}=await import('/js/snake-a2.mjs');
    const canvas=document.createElement('canvas');
    canvas.width=960;canvas.height=640;
+   canvas.style.cssText='position:fixed;inset:0;width:960px;height:640px';
+   document.body.replaceChildren(canvas);
    const r=new Renderer(canvas);
    await r.ready;
    if(!isSnakeA2Ready())throw Error('Official A2 art failed to load');

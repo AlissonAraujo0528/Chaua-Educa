@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/verify-all-9-spritesheets.cjs
+      - run: node scripts/verify-current-spritesheets.cjs
       - run: npm test
       - run: node scripts/calibrate-climate-journey.mjs
       - run: npm run build
@@ -43,7 +43,7 @@ jobs:
           node tests/browser-v2-a2-integration.cjs
           node tests/browser-v2-a2-scenes.cjs
           node tests/browser-a2-collision-fruits.cjs
-          npm run benchmark:snake-mesh
+          npm run benchmark:snake-a2
           npm run test:reference-art
           npm run test:visual
           npm run test:immersion
