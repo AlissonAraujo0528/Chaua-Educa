@@ -1131,10 +1131,17 @@ export class Renderer {
         c.save(); c.beginPath(); c.rect(view.x, 0, view.w, this.h); c.clip();
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY);
         c.scale(s, s);
+        // Physical screen clip extends to y=0 and y=canvas height, not just
+        // the logical game viewport. Derive wood limits from the live camera,
+        // including shake and a 64px guard for transformed/leaning bark.
+        const renderBounds={
+            top:view.worldTop-(view.y+Math.abs(shakeY)+64)/s,
+            bottom:view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s
+        };
         for (const e of game.entities) {
             if (e.kind === 'wood' && (this.drawOffscreenEntitiesForTest === true ||
                 !Number.isFinite(e.x) || (e.x >= view.worldLeft - 320 &&
-                e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced);
+                e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced, renderBounds);
         }
         c.restore();
         c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
@@ -1417,7 +1424,7 @@ export class Renderer {
         }
     }
 
-    obstacle(e, game, reduced=false) {
+    obstacle(e, game, reduced=false, renderBounds=null) {
         const c = this.c;
         const time = game.sceneTime ?? game.elapsed;
         const variant = (e.id ?? 0) % 3;
@@ -1428,10 +1435,11 @@ export class Renderer {
         for (const side of ['top', 'bottom']) {
             const upper = side === 'top';
             const y = e[side];
+            const visibleReach=renderBounds?Math.max(0,upper?y-renderBounds.top:renderBounds.bottom-y):1000;
             const broken = e.broken && e.brokenSide === side;
             if (broken && (reduced || !e.breakFx)) continue;
             if (e.fragileSide === side) {
-                drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined, snow, rain, time);
+                drawTreeVariant(c, x, y, upper, e.fragileKind, broken ? e.breakFx.age : undefined, snow, rain, time, visibleReach);
                 if(!broken&&snow>.15)drawSnowContact(c,x,upper?y+4:y-18,snow,time,e.id||0,reduced,this.decoration==='low',upper);
                 continue;
             }
@@ -1442,7 +1450,7 @@ export class Renderer {
                 c.save();
                 c.transform(1, 0, lean, 1, -lean * y, 0);
             }
-            if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind, undefined, snow, rain, time);
+            if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind, undefined, snow, rain, time, visibleReach);
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
                 !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
             if (lean) c.restore();
