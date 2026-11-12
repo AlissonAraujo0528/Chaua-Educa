@@ -99,5 +99,8 @@ jobs:
             test-results/climate-breath-v3/
             test-results/responsive-camera/
             test-results/v2-action-integration/
+            test-results/reference-art/
+            test-results/render-parts/
+            test-results/snake-strike/
             test-results/climate-calibration/
           if-no-files-found: ignore

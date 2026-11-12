@@ -65,3 +65,23 @@ test('critical physics, browser, render and climate checks still run in required
   'browser-mobile-orientation.cjs', 'npm run test:journey'
  ]) assert.ok(ci.includes(marker),`Missing required CI check: ${marker}`);
 });
+
+test('final polish removes no-op border measurements and private-path screenshot helpers',()=>{
+ const renderer=read('Chaua-Educa-main/js/render.mjs');
+ assert.doesNotMatch(renderer,/\bflightBorders\s*\(/,'An empty renderer hook must not be benchmarked');
+ for(const script of ['scripts/benchmark-render-parts.cjs','scripts/diagnose-render-cost.cjs']){
+  assert.doesNotMatch(read(script),/\bflightBorders\b|['"]borders['"]/,
+   `${script} measures an absent graphical pass`);
+ }
+ const scripts=fs.readdirSync(new URL('scripts/',root)).filter(x=>/\.(?:cjs|js|py)$/.test(x));
+ for(const script of scripts){
+  const source=read('scripts/'+script);
+  assert.doesNotMatch(source,/\.gemini[\\/]antigravity|[A-Za-z]:[\\/]Users[\\/]/i,
+   `A private artist-machine directory leaked into ${script}`);
+  assert.doesNotMatch(source,/\?snakeA2=[01]|\?actionSprites=[01]/,
+   `Obsolete art-mode URL remains in ${script}`);
+ }
+ const ci=read('.github/workflows/ci.yml');
+ for(const p of ['test-results/reference-art/','test-results/snake-strike/','test-results/render-parts/'])
+  assert.ok(ci.includes(p),`Official visual QA artifact not uploaded: ${p}`);
+});

@@ -35,3 +35,30 @@ Os 26 workflows de experimentos ligados a branches históricas foram substituíd
 - `tests/test-live-game-performance-and-animations.cjs` não tinha entrada de execução e dependia de navegador e diretórios particulares do Windows. Foi removido; testes modernos de desempenho permanecem.
 - O antigo workflow de neve tinha permissões de escrita e criava commits automaticamente. Agora é manual, de leitura, e distribui apenas um artefato.
 - A cobertura de navegador entre Chromium, Firefox e WebKit continua disponível fora dos experimentos ligados a branches antigas.
+
+## Validação manual da branch antes do merge
+
+**As entradas de `workflow_dispatch` só podem ser iniciadas na interface do GitHub quando o workflow estiver presente na branch padrão.** Enquanto este PR estiver pendente, as opções de diagnóstico continuam disponíveis como comandos locais depois de fazer checkout da branch de teste.
+
+No computador de teste (Node.js 22+, Python 3, Chromium/Playwright):
+
+```sh
+npm ci
+npm start
+```
+
+Abra `http://127.0.0.1:5501/`. Com esse servidor ligado, em outro terminal:
+
+```sh
+npm test
+npm run test:browser
+npm run test:reference-art
+PERF_SECONDS=6 npm run benchmark:hotspots
+npm run benchmark:render-parts
+```
+
+Capturas de referência verificadas pelo CI principal também são anexadas ao artifact `auto-visual-captures`, nas pastas `reference-art/`, `snake-strike/` e `render-parts/`. O CI estendido anexa comparações de Firefox/WebKit.
+
+Antes de declarar 60 FPS constantes, executar sessões reais na resolução nativa do notebook e em celular, com clima e cenários ativos. Medir p95/p99, quadros acima de 33,3/50 ms e validar nitidez, responsividade e colisões. Benchmarks de máquinas virtuais são apenas diagnósticos.
+
+Os auxiliares de captura que exigiam caminhos privados do Windows e geradores dependentes de arquivos externos não distribuídos foram aposentados. Substituí-los pelos testes e capturas acima, que utilizam as artes atuais e são reproduzíveis.

@@ -1512,7 +1512,6 @@ export class Renderer {
         }
         c.restore();
     }
-    flightBorders(view) {}
     hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0, rain = 0, low = false) {
         const c = this.c;
         let x, y, time, e = null;
