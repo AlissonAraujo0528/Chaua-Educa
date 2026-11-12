@@ -12,16 +12,19 @@ const fadeDistance = 1400;
 
 let weatherOverride = 'auto';
 
-// Initialize from URL search parameters if provided (e.g. ?clima=storm, ?weather=snow, etc.)
-if (typeof location !== 'undefined' && location.search) {
-    const params = new URLSearchParams(location.search);
-    const param = params.get('clima') || params.get('weather');
-    if (param) weatherOverride = param.toLowerCase();
-} else if (typeof localStorage !== 'undefined') {
-    try {
-        const saved = localStorage.getItem('chaua-weather-mode');
-        if (saved) weatherOverride = saved;
-    } catch {}
+// Restore the saved user choice even if the URL contains unrelated query
+// parameters such as ?perf-test=1. A valid explicit ?clima= override wins.
+const VALID_WEATHER_MODES=new Set(['auto','spring','summer','autumn','winter','rain','storm']);
+if(typeof localStorage!=='undefined'){
+    try{
+        const saved=localStorage.getItem('chaua-weather-mode')?.toLowerCase();
+        if(VALID_WEATHER_MODES.has(saved))weatherOverride=saved;
+    }catch{/* Storage may be blocked; default to auto. */}
+}
+if(typeof location!=='undefined' && location.search){
+    const params=new URLSearchParams(location.search);
+    const requested=(params.get('clima')||params.get('weather')||'').toLowerCase();
+    if(VALID_WEATHER_MODES.has(requested))weatherOverride=requested;
 }
 
 export function getWeatherMode() {
@@ -29,7 +32,8 @@ export function getWeatherMode() {
 }
 
 export function setWeatherMode(mode) {
-    weatherOverride = mode || 'auto';
+    const selected=typeof mode==='string'?mode.toLowerCase():'auto';
+    weatherOverride=VALID_WEATHER_MODES.has(selected)?selected:'auto';
     if (typeof localStorage !== 'undefined') {
         try { localStorage.setItem('chaua-weather-mode', weatherOverride); } catch {}
     }
