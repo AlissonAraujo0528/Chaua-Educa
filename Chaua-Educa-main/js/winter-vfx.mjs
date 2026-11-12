@@ -50,7 +50,7 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
 const FROST_POINTS=Object.freeze({
  chaua:Object.freeze([[-27,-24,1.8],[-22,-35,1.5],[-5,-30,1.7],[-31,1,1.4]]),
  snake:Object.freeze([[-46,-99,1.4],[-28,-78,1.6],[-14,-48,1.9],[17,-37,1.7]]),
- hawk:Object.freeze([[-27,-46,1.8],[-8,-51,1.7],[24,-32,2],[41,-21,1.2]])
+ hawk:Object.freeze([[-91,-16,1.2],[-72,-19,1.3],[-44,-21,1.6],[-20,-18,1.3],[16,-13,1.1]])
 });
 export function drawAnimalFrost(c,kind,intensity,scale=1,reduced=false){
  const snow=clamp01(intensity);
@@ -140,7 +140,7 @@ export function winterBreathSettings(kind,snow,time,{reduced=false,low=false,act
 const SHAKE_ANCHORS=Object.freeze({
  chaua:Object.freeze([[-26,-22],[-11,4],[12,8]]),
  snake:Object.freeze([[-32,-85],[-11,-55],[14,-36]]),
- hawk:Object.freeze([[-28,-30],[4,-37],[30,-19]])
+ hawk:Object.freeze([[-85,-19],[-37,-22],[20,-10]])
 });
 export function drawSnowShedding(c,kind,snow,time,activity=0,{scale=1,seed=0,low=false,reduced=false}={}){
  const cold=clamp01(snow),force=clamp01(activity),anchors=SHAKE_ANCHORS[kind];
