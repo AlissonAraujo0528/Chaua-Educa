@@ -42,7 +42,7 @@ test('prewarm uses prototype-inherited seed/mode from the ACTUAL Game.visual(alp
  const previous=getWeatherMode();t.after(()=>setWeatherMode(previous));
  setWeatherMode('auto');
  const g=new Game({seed:217});
- g.mode='tranquilo';g.elapsed=300;g.snapshot();
+ g.mode='tranquilo';g.elapsed=300;g.state='playing';g.snapshot();
  const interpolated=g.visual(1);
  assert.equal(interpolated.mode,'tranquilo');
  assert.equal(interpolated.seed,217);
