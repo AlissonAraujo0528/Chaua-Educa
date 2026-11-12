@@ -1001,21 +1001,28 @@ export class Renderer {
                 c.restore();
             }
         }
-        const transition=stageMix;
-        c.save();c.globalAlpha=.10;c.fillStyle=transition===1?TINT_PALETTE[stage]:mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);c.fillRect(0,0,w,h);c.restore();
-        // Sunlight and shade breathe slowly with the same wind as leaves and vines.
-        c.fillStyle = '#ffffcb10';
-        c.save();c.globalAlpha = (1 - rain * .9)*(1-winterLight*.96);
-        c.translate(reduced?0:Math.sin(time*.22)*18,0);
-        c.beginPath();
-        for (let i = 0; i < 3; i++) {
-            c.moveTo(w * .65 + i * 95, 0);
-            c.lineTo(w * .65 + 45 + i * 95, 0);
-            c.lineTo(w * .13 + i * 110, h);
-            c.lineTo(w * .13 - 120 + i * 110, h);
+        // These legacy stage tints and gold shafts were authored for the
+        // original static forest. When the four-season atlas is active they
+        // fight the real autumn/winter palette and duplicate the living sun.
+        // Keep them ONLY for historical numeric-distance/menu backgrounds.
+        if(!seasonal){
+            const transition=stageMix;
+            c.save();c.globalAlpha=.10;
+            c.fillStyle=transition===1?TINT_PALETTE[stage]:
+                mixColor(TINT_PALETTE[Math.max(0,stage-1)],TINT_PALETTE[stage],transition);
+            c.fillRect(0,0,w,h);c.restore();
+            c.fillStyle='#ffffcb10';
+            c.save();c.globalAlpha=(1-rain*.9)*(1-winterLight*.96);
+            c.translate(reduced?0:Math.sin(time*.22)*18,0);
+            c.beginPath();
+            for(let i=0;i<3;i++){
+                c.moveTo(w*.65+i*95,0);
+                c.lineTo(w*.65+45+i*95,0);
+                c.lineTo(w*.13+i*110,h);
+                c.lineTo(w*.13-120+i*110,h);
+            }
+            c.fill();c.restore();
         }
-        c.fill();
-        c.restore();
         drawForestLife(c,w,h,time,seasonDistance??0,rain,wind,reduced,this.decoration==='low',storm);
         if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
         drawJourneyFog(c, w, h, fog);
