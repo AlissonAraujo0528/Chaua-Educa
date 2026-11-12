@@ -104,12 +104,28 @@ export function journeyFog(distance, tutorial = false) {
     return 1 - smoothstep(distance / 2900);
 }
 
+// Context-bound reusable gradients: changing canvas size invalidates the
+// cache. Reusing a CanvasGradient across different contexts is unsafe.
+const weatherGradientCache=new WeakMap();
+function weatherGradients(c,w,h){
+    const previous=weatherGradientCache.get(c);
+    if(previous&&previous.w===w&&previous.h===h)return previous;
+    const fog=c.createLinearGradient(0,h*.25,0,h);
+    fog.addColorStop(0,'#d8eee700');
+    fog.addColorStop(.55,'#d8eee738');
+    fog.addColorStop(1,'#d8eee789');
+    const rain=c.createLinearGradient(0,0,0,h);
+    rain.addColorStop(0,'#324f61');
+    rain.addColorStop(.62,'#6d8790');
+    rain.addColorStop(1,'#92aaa8');
+    const record={w,h,fog,rain};
+    weatherGradientCache.set(c,record);
+    return record;
+}
+
 export function drawJourneyFog(context, width, height, fog) {
     if (!fog) return;
-    const mist = context.createLinearGradient(0, height * .25, 0, height);
-    mist.addColorStop(0, '#d8eee700');
-    mist.addColorStop(.55, '#d8eee738');
-    mist.addColorStop(1, '#d8eee789');
+    const mist=weatherGradients(context,width,height).fog;
     context.save();
     context.globalAlpha = fog;
     context.fillStyle = mist;
@@ -144,10 +160,9 @@ export function drawLightning(context, width, height, time, storm, reduced) {
     // 2. Visible jagged electric lightning bolt tearing through the sky
     if (!reduced && flash > 0.25) {
         context.globalAlpha = Math.min(1, flash * 1.1 * storm);
-        context.strokeStyle = '#ffffff';
-        context.lineWidth = 3.2;
-        context.shadowColor = '#93c5fd';
-        context.shadowBlur = 18;
+        // Two opaque/transparent strokes preserve the bolt's authored
+        // silhouette without an expensive Canvas shadowBlur gaussian pass.
+        context.shadowBlur=0;
 
         const startX = width * 0.62;
         const targetX = width * 0.46;
@@ -166,6 +181,13 @@ export function drawLightning(context, width, height, time, storm, reduced) {
             currY = targetY * progress;
             context.lineTo(currX, currY);
         }
+        context.globalAlpha=Math.min(.30,flash*.28*storm);
+        context.strokeStyle='#93c5fd';
+        context.lineWidth=9;
+        context.stroke();
+        context.globalAlpha=Math.min(1,flash*1.1*storm);
+        context.strokeStyle='#ffffff';
+        context.lineWidth=2.8;
         context.stroke();
 
         // Fork branch
@@ -274,9 +296,7 @@ export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail
  if(rain<=0||width<=0||height<=0)return;
  const c=context;
  c.save();
- const wash=c.createLinearGradient(0,0,0,height);
- wash.addColorStop(0,'#324f61');wash.addColorStop(.62,'#6d8790');
- wash.addColorStop(1,'#92aaa8');
+ const wash=weatherGradients(c,width,height).rain;
  c.globalAlpha=rainClamp(rain*(.12+storm*.145));
  c.fillStyle=wash;c.fillRect(0,0,width,height);
  c.restore();
