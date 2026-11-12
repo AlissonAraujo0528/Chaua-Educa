@@ -1481,7 +1481,7 @@ export class Renderer {
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
         drawSnakeA2(c,s,place.factor,reduced);
-        if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
+        // A2 stunned sprites already contain their authored stars; no duplicate overlay.
         if(snow>.12)drawAnimalFrost(c,'snake',snow,1,reduced);
         const activePhase=s.phase==='striking'?1:s.phase==='windup'?.70:
             s.phase==='recovering'?.48:(s.retreat?.90:0);
