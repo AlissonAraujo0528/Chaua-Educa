@@ -46,7 +46,7 @@ export function hawkAction(e={},time=0,reduced=false) {
       angle:Math.sin(t*14)*.12,
       offsetY:Math.sin(t*10)*3.2};
  }
- if(e.dive||e.phase==='leaving')return null; // preserve authored dive and glide.
+ if(e.dive)return null; // Preserve legacy inclined dive; reuse the same flight atlas throughout crossing AND exit.
  const t=Number.isFinite(time)?time:0;
  const position=((t*16+(e.id||0)*1.5)%8+8)%8, current=Math.floor(position), fraction=position-current;
  const phase=(position/8)*Math.PI*2;
