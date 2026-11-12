@@ -17,8 +17,8 @@ transfere explicitamente esses campos antes de calcular `elapsed+10`.
 numérica original de rajada e tempestade (Aventura), sem consultar
 `weatherOverride`. `Game.speed` utiliza esta função, enquanto
 `journeyWind` continua controlando apenas visual e áudio. Trocar
-Verão/Chuva/Outono/Tempestade não muda velocidade de caminh... de
-troncos, gaviões ou progressão de encontros.
+Verão/Chuva/Outono/Tempestade não muda a velocidade dos
+troncos, gaviões nem a progressão dos encontros.
 
 ### Gavião: duas abordagens artísticas coerentes
 Quando a faixa-alvo está na metade inferior da tela, o gavião vem de
