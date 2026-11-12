@@ -3,14 +3,15 @@ import {getWeatherMode} from './weather.mjs';
 import {seasonFromFlight} from './climate-timeline.mjs';
 import {drawSnowfall} from './winter-vfx.mjs';
 
-// Artistic ambiences along the journey, not a simulation of the local calendar.
+// Legacy numeric-distance preview phases, deliberately kept separate from
+// the calibrated game-object flight clock. Order follows the original v10 plan.
 const PHASES = [[0,0],[6000,1],[9000,3],[14000,2],[20000,0]];
 export function journeySeason(distance) {
  const wm = getWeatherMode();
  if (wm === 'spring') return {from: 0, to: 0, mix: 1};
- if (wm === 'autumn') return {from: 1, to: 1, mix: 1};
+ if (wm === 'autumn') return {from: 2, to: 2, mix: 1};
  if (wm === 'winter') return {from: 3, to: 3, mix: 1};
- if (wm === 'summer') return {from: 2, to: 2, mix: 1};
+ if (wm === 'summer') return {from: 1, to: 1, mix: 1};
 
  // Active gameplay supplies the Game object (elapsed/mode/seed).
  // Numeric offsets are preserved ONLY for existing render diagnostics,
@@ -96,7 +97,7 @@ export function drawSeasonParticles(c,atlas,w,h,time,distance,reduced,low,wind=0
  const count=low?7:14, cell=(atlas.naturalWidth||atlas.width)/2;
  const layers=[
   {row: 0, weight: weights[0]},
-  {row: 2, weight: weights[1]}
+  {row: 2, weight: weights[2]}
  ];
  for(const {row, weight} of layers){
   if(weight<=0)continue;
