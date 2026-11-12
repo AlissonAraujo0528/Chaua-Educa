@@ -10,7 +10,9 @@ export function pilotTarget(game) {
     if(hawk){
         const t=Math.max(0,Math.min(1,(hawk.startX-game.x)/(hawk.startX-hawk.targetX)));
         const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;
-        return lane>=320?Math.max(145,lane-125):Math.min(495,lane+125);
+        // Follow a physically clear corridor for the official action-sheet
+        // head/chest, not the smaller collider used by historical headless tests.
+        return lane>=320?Math.max(145,lane-140):Math.min(495,lane+140);
     }
     return 320;
 }

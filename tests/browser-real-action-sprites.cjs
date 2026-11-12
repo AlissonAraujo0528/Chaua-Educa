@@ -65,7 +65,7 @@ const cases=[
        game.snapshot();
        return {state:game.state,entities:game.entities.map(e=>e.kind),sceneTime:game.sceneTime};
      };
-     return {keys:loaded,flag:action.ACTION_SPRITES_ENABLED};
+     return {keys:loaded,flag:action.hasActionSheet('hawk-flight')&&action.hasActionSheet('parrot-flight')};
    });
    const expected=4;
    assert.equal(loaded.flag,true);

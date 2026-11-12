@@ -39,6 +39,7 @@ jobs:
           npm run test:perf-probe
           npm run test:snake-continuity
           npm run test:snake
+          node tests/browser-required-action-assets.cjs
           npm run test:snake-raster-parity
           node tests/browser-v2-a2-integration.cjs
           node tests/browser-v2-a2-scenes.cjs

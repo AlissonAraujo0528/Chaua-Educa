@@ -3,9 +3,9 @@ import {drawForestLife} from './forest-life.mjs';
 import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterBreathSettings,drawSnowShedding} from './winter-vfx.mjs';
-import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
+import {drawSnakeA2,preloadSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
-import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
+import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
@@ -132,8 +132,8 @@ function animatedBird(c,p){
     }
     if(turbo&&!perched&&!reduced)drawTurboFlames(c,size,time);
     const action=parrotAction({...p,time,wing:p.wing,reduced,perched,landing,defeated,surprise,impactProgress});
-    const newSprite=!!action&&drawActionSheet(c,action.sheet,action.frame,-77*scale,-77*scale,154*scale,154*scale);
-    if(!newSprite){
+    const newSprite=action ? drawActionSheet(c,action.sheet,action.frame,-77*scale,-77*scale,154*scale,154*scale) : false;
+    if(!action){ // Explicitly authored v6: perch, landing, reduced-motion and surprise.
         if(perched&&!surprise&&!defeated&&landing===null)perchedSprite(c,clip,factor);
         else atlasAnimation(c,'chaua',clip,factor);
     }
@@ -1416,7 +1416,7 @@ export class Renderer {
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
             const p=warningPosition(view,e.startY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
         }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
-            notices.push({...snakeWarningPosition(view,e,isSnakeA2Ready()),w:136,h:26,type:'snake',entity:e});
+            notices.push({...snakeWarningPosition(view,e),w:136,h:26,type:'snake',entity:e});
         }
         if(notices.length){
             for(const box of placeWarnings(notices,view)){
@@ -1549,13 +1549,14 @@ export class Renderer {
         }
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
-        let newHawk=false;
         if(action){
-            const draw=(layer,frame)=>drawActionSheet(layer,action.sheet,frame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
             const activeFrame=action.blend<0.5?action.frame:action.next;
-            newHawk=draw(c,activeFrame);
+            // Required art missing? Throw explicitly; never switch to v6 mid-flight.
+            drawActionSheet(c,action.sheet,activeFrame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
+        }else{
+            // Deliberate original v6 poses: inclined dive, warning, unshielded retreat.
+            atlasAnimation(c,'hawk',clip,HAWK_ART.atlasScale,180);
         }
-        if(!newHawk)atlasAnimation(c,'hawk',clip,HAWK_ART.legacyScale,180);
         if(snow>.12)drawAnimalFrost(c,'hawk',snow,1,reduced);
         if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
         // Release crystals once at the start of the dive or recoil, not

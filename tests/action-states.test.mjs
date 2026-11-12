@@ -45,8 +45,8 @@ test('snake phases use the A2 artwork states only',()=>{
  }
  assert.equal(snakeA2Pose({retreat:true,dazed:true,retreatTime:.6}).key,'stunned');
 });
-test('missing sheet never prevents legacy game art rendering',()=>{
- assert.equal(drawActionSheet(null,'hawk-flight',0,0,0,32,32),false);
+test('missing required action atlas fails clearly instead of switching to old sprites',()=>{
+ assert.throws(()=>drawActionSheet(null,'hawk-flight',0,0,0,32,32),/Required action atlas/);
 });
 
 test('hawk pose weights are continuous across every wing frame boundary',()=>{

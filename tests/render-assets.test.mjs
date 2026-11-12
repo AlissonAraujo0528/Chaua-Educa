@@ -21,6 +21,10 @@ test('render paths draw authored art for home, flight, obstacles, enemies and po
   naturalWidth=627;naturalHeight=627;complete=true;
   set src(value){this.url=value;
    if(value.includes('/public/snake/')){this.naturalWidth=1536;this.naturalHeight=768;}
+   else if(value.includes('/public/parrot/fly/')){this.naturalWidth=1024;this.naturalHeight=512;}
+   else if(value.includes('/public/parrot/animations/')){this.naturalWidth=768;this.naturalHeight=512;}
+   else if(value.includes('/public/hawk/fly/')){this.naturalWidth=1280;this.naturalHeight=640;}
+   else if(value.includes('/public/hawk/animations/')){this.naturalWidth=960;this.naturalHeight=640;}
    queueMicrotask(()=>this.onload?.());}
  };
  const calls=[];
@@ -31,7 +35,11 @@ test('render paths draw authored art for home, flight, obstacles, enemies and po
  },set(target,key,value){target[key]=value;return true;}});
  globalThis.OffscreenCanvas=class {constructor(w,h){this.width=w;this.height=h;} getContext(){return ctx;}};
  const canvas={getContext:()=>ctx,getBoundingClientRect:()=>({width:960,height:640})};
+ const {hawkShapes}=await import('../Chaua-Educa-main/js/collision.mjs');
+ const actor={x:300,y:300,phase:'crossing',warning:0,dive:false};
+ const before=hawkShapes(actor);
  const r=new Renderer(canvas);await r.ready;
+ assert.deepEqual(hawkShapes(actor),before,'loading real sheets must not change the gavião hitbox');
  r.home(1,false);
  const g=new Game();g.state='playing';g.nextSpawn=Infinity;g.wing=1;
  g.entities=[
@@ -45,10 +53,14 @@ test('render paths draw authored art for home, flight, obstacles, enemies and po
  g.featherBurst(['#79aa55'],4);
  r.game(g,false);
  r.game(g,true);
+ // Inclined dive intentionally uses its own authored v6 pose, not as a load fallback.
+ r.hawk({kind:'hawk',id:8,x:700,y:320,warning:0,dive:true,startX:900,startY:320,targetX:200,targetY:200},1,false);
  r.setQuality('low');r.game(g,false);assert.equal(r.dpr,1);
  for(const name of ['forest','chaua-atlas','idle','hawk-atlas','shield','feather'])
   assert.ok(calls.some(url=>url.endsWith(`/${name}.webp`)),`${name} must be rendered`);
  assert.ok(calls.some(url=>url.endsWith('/tree-variants.webp')));
+ assert.ok(calls.some(url=>url.endsWith('/parrot/fly/flight.webp')), 'official parrot flight must render');
+ assert.ok(calls.some(url=>url.endsWith('/hawk/fly/flight.webp')), 'official hawk flight must render');
  assert.equal(images.size,Object.keys(ASSET_PATHS).length);
 });
 test('snake collision follows lower trunk and clears after shield retreat',()=>{
