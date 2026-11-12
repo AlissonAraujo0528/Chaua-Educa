@@ -176,7 +176,7 @@ if (btnWeather) {
         const next = WEATHER_MODES[(idx + 1) % WEATHER_MODES.length];
         setWeatherMode(next.id);
         updateWeatherUI();
-        anunciar(`Clima: ${next.label}`);
+        toast(`Clima: ${next.label}`);
     });
 }
 
@@ -247,16 +247,7 @@ function updateSoundButton() {
 }
 $('.sound-toggle').addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('chaua-sound', String(soundOn)); } catch { /* Optional. */ } updateSoundButton();
 
-const unlockAudio = () => {
-    if (soundOn) {
-        forestAudio.ensure();
-        if (forestAudio.context && forestAudio.context.state === 'suspended') {
-            forestAudio.context.resume().catch(() => {});
-        }
-    }
-};
-['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true, once: true }));
- sound('fruit'); });
+sound('fruit'); });
 updateSoundButton();
 
 const unlockAudio = () => {
@@ -420,8 +411,8 @@ function frame(time) {
     if(game.state!==previousState || time-lastHudTime>=80){syncUI();lastHudTime=time;}
     if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
     forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
-        journeyRain(game.distance, game.tutorial), journeyStorm(game.distance, game.mode, game.tutorial),
-        journeyWind(game.distance, game.mode, game.tutorial));
+        journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
+        journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){requestAnimationFrame(frame);return;}
     if (game.state === 'menu') renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
     else {
