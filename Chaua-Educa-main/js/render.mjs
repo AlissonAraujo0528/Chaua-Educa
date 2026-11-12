@@ -124,12 +124,13 @@ function animatedBird(c,p){
     const a=SPRITES.chaua.frames[clip.frame].eye,b=SPRITES.chaua.frames[clip.next].eye;
     const ex=(a[0]+(b[0]-a[0])*clip.blend-192)*factor,ey=(a[1]+(b[1]-a[1])*clip.blend-192)*factor;
     if(defeated||surprise){
-        // The action atlas already depicts the injured bird; never overlay a
-        // second eye or head. Orbiting stars remain visible throughout the
-        // fatal daze, including when the authored action spritesheet is active.
-        if(!newSprite)drawSpiralEye(c,ex,ey,size*.027,reduced?0:time);
-        if(!reduced)drawOrbitingStars(c,newSprite?0:ex,
-            newSprite?-50*scale:ey-size*.35,size*.82,time);
+        // The original impact sheet's stunned frame 3 already paints the
+        // spiral eye AND its own star halo. Never stamp a second star ring or
+        // a second eye on top of that authored artwork.
+        if(!newSprite){
+            drawSpiralEye(c,ex,ey,size*.027,reduced?0:time);
+            if(!reduced)drawOrbitingStars(c,ex,ey-size*.35,size,time);
+        }
     }
     else if(reaction>0&&!reduced)drawFruitSparkles(c,size*.44,-size*.08,reaction,time);
     else if(stamina<.28&&!reduced&&!perched)drawSweatDrops(c,ex,ey,size,time);
