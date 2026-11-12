@@ -57,6 +57,7 @@ jobs:
           node tests/browser-climate-rain-wet.cjs
           node tests/browser-climate-winter-v3.cjs
           node tests/browser-impact-v3.cjs
+          node tests/browser-winter-breath-v3.cjs
           node scripts/benchmark-seasonal-flight.cjs
           npm run test:journey
           npm run test:background
@@ -79,6 +80,7 @@ jobs:
             test-results/climate-rain-wet/
             test-results/climate-winter-v3/
             test-results/climate-impact-v3/
+            test-results/climate-breath-v3/
             test-results/responsive-camera/
             test-results/v2-action-integration/
             test-results/climate-calibration/
