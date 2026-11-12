@@ -31,7 +31,7 @@ test('predator keeps original dive/glide and switches to daze only after shield'
  assert.equal(hawkAction({warning:1.1},1),null);
  assert.equal(hawkAction({warning:0,phase:'crossing'},1).state,'flight');
  assert.equal(hawkAction({warning:0,dive:true},1),null);
- assert.equal(hawkAction({warning:0,phase:'leaving'},1),null);
+ assert.equal(hawkAction({warning:0,phase:'leaving'},1).state,'flight');
  assert.equal(hawkAction({retreat:true,dazed:true,retreatTime:0}).state,'shield-impact');
  assert.equal(hawkAction({retreat:true,dazed:true,retreatTime:.4}).state,'stunned');
  assert.equal(hawkAction({retreat:true,dazed:true,retreatTime:1.2}).state,'dazed-exit');
