@@ -5,15 +5,16 @@ import {CLIPS,sequence,birdAnimation,hawkAnimation,placeWarnings} from '../Chaua
 import {Game} from '../Chaua-Educa-main/js/engine.mjs';
 import {snakeA2Pose} from '../Chaua-Educa-main/js/snake-a2.mjs';
 
-test('all 48 authored frames have fixed cells, transparent gutters and usable animation clips',()=>{
+test('all 32 active v6 bird/hawk frames have fixed cells, transparent gutters and usable clips',()=>{
+ assert.deepEqual(Object.keys(SPRITES).sort(),['chaua','hawk']);
  for(const [name,data]of Object.entries(SPRITES)){
   assert.equal(data.frames.length,16);
-  if(name!=='snake'){const used=new Set(Object.values(CLIPS[name]).flat());assert.equal(used.size,16);}
+  const used=new Set(Object.values(CLIPS[name]).flat());assert.equal(used.size,16);
   for(const [i,f]of data.frames.entries()){
    assert.deepEqual(f.rect,[(i%4)*384,Math.floor(i/4)*384,384,384]);
    assert.deepEqual(f.anchor,data.anchor);
    const [x,y,w,h]=f.content;assert.ok(x>=10&&y>=10&&x+w<=374&&y+h<=374);
-   if(name!=='snake')assert.ok(f.eye.every(Number.isFinite));else assert.ok(f.head.every(Number.isFinite));
+   assert.ok(f.eye.every(Number.isFinite));
   }
  }
 });

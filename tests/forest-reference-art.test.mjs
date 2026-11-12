@@ -13,7 +13,8 @@ test('new reference art loads through the shared cache with four upper/lower var
   assert.equal(FOREST_ART[kind].length,4);
   for(const f of FOREST_ART[kind])assert.ok(f.core[1]>f.core[0]&&f.spliceY>f.content[1]&&f.spliceY<f.endY);
  }
- assert.equal(SPRITES.snake,FOREST_ART.snake);
+ assert.equal(SPRITES.snake,undefined,'Do not register the retired snake');
+ assert.equal(FOREST_ART.snake,undefined);
 });
 test('all authored tree variants extend continuously without stretching the illustrated cap',()=>{
  for(const upper of [true,false])for(let variant=0;variant<4;variant++){

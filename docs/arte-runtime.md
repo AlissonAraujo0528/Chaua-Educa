@@ -41,3 +41,7 @@ Esta especificação substitui a documentação **experimental** sobre `?actionS
 - CSS/SCSS modal antigo e o gerador de quadros v4 do gavião, não utilizados.
 
 **Total desta rodada: 63 arquivos, 9.760.508 bytes no checkout.** A exclusão não altera arquivos-fonte ativos das árvores v6/v7 nem a identidade artística atual. Arquivos históricos podem ser recuperados pelo Git; nenhum fallback foi acrescentado.
+
+## Fontes históricas da cobra
+
+O gerador v6 produz somente Chauá e gavião. O gerador v7 produz somente as árvores. Os atlas v6/v7/v8 da cobra foram removidos do diretório distribuído; as fontes autorais originais continuam preservadas como arquivos históricos, mas não entram no runtime ou nos dados gerados.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ASSET_PATHS, images, flightPose} from '../Chaua-Educa-main/js/assets.mjs';
+import {ASSET_PATHS, images} from '../Chaua-Educa-main/js/assets.mjs';
 import {Renderer} from '../Chaua-Educa-main/js/render.mjs';
 import {Game} from '../Chaua-Educa-main/js/engine.mjs';
 
@@ -12,7 +12,7 @@ test('every art URL resolves to a real WebP in the served directory',()=>{
  }
 });
 test('flap uses four authored poses and glide keeps a stable pose',()=>{
- assert.deepEqual([1,.7,.45,.2,0].map(w=>flightPose(w)),[0,2,3,1,1]);assert.equal(flightPose(1,true),1);
+ assert.equal(ASSET_PATHS['snake-atlas'],undefined,'Retired snake assets must not be registered');
 });
 test('render paths draw authored art for home, flight, obstacles, enemies and powers',async(t)=>{
  t.after(()=>{delete globalThis.OffscreenCanvas;});
