@@ -3,15 +3,13 @@ import {drawForestLife} from './forest-life.mjs';
 import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterBreathSettings,drawSnowShedding} from './winter-vfx.mjs';
-import {drawContinuousSnake} from './snake-render.mjs';
-import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready} from './snake-a2.mjs';
+import {drawSnakeA2,preloadSnakeA2,isSnakeA2Ready,snakeA2HeadRect} from './snake-a2.mjs';
 import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SPRITES_ENABLED} from './action-sheets.mjs';
-import {SNAKE_WRAP} from './snake-wrap-data.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
-import {birdAnimation,hawkAnimation,snakePlacement,spriteHeadRect,placeWarnings} from './animation.mjs';
+import {birdAnimation,hawkAnimation,snakePlacement,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import { canvasResolution } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
@@ -1482,14 +1480,7 @@ export class Renderer {
     snake(wood,reduced,snow=0,rain=0,time=0,low=false){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
-        if(!drawSnakeA2(c,s,place.factor,reduced)){
-            const wrap=images.get('snake-wrap');
-            if(wrap)c.drawImage(wrap,-SNAKE_WRAP.worldWidth/2,-8,SNAKE_WRAP.worldWidth,SNAKE_WRAP.worldHeight);
-            // Rejected legacy snake sheet includes a duplicate coil and must
-            // never be rendered over the historical snake-wrap. A2 is the
-            // only full-body replacement; otherwise draw original art.
-            drawContinuousSnake(c,images.get('snake-atlas'),s,place.factor,reduced,wood.id);
-        }
+        drawSnakeA2(c,s,place.factor,reduced);
         if(s.retreat&&s.dazed&&!reduced)drawOrbitingStars(c,0,-165,65,s.retreatTime||0);
         if(snow>.12)drawAnimalFrost(c,'snake',snow,1,reduced);
         const activePhase=s.phase==='striking'?1:s.phase==='windup'?.70:
@@ -1503,7 +1494,7 @@ export class Renderer {
             if(breath){
                 // The existing animated snake's head collider supplies
                 // the mouth anchor; no separate head art is drawn.
-                const head=spriteHeadRect(wood,reduced);
+                const head=snakeA2HeadRect(wood,reduced);
                 const mouthX=Math.max(-85,Math.min(-18,head.x-place.x+3));
                 const mouthY=Math.max(-150,Math.min(-35,head.y+head.h*.58-place.y));
                 drawAnimalBreath(c,mouthX,mouthY,breath.strength,

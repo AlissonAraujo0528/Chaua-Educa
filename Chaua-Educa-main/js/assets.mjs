@@ -3,8 +3,6 @@ import { FRUITS } from './fruits.mjs';
 // One cache for gameplay, menus and results. All files are local.
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
- ['snake-atlas','../assets/v7/snake-atlas.webp'],
- ['snake-wrap','../assets/v8/snake-wrap.webp'],
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
  // Keep only the authored full-winter atlas plus transparent transition
  // overlays. Remove 2 identical legacy copies and 6 unused intermediate

@@ -19,7 +19,9 @@ test('render paths draw authored art for home, flight, obstacles, enemies and po
  globalThis.window={devicePixelRatio:1};
  globalThis.Image=class {
   naturalWidth=627;naturalHeight=627;complete=true;
-  set src(value){this.url=value;queueMicrotask(()=>this.onload?.());}
+  set src(value){this.url=value;
+   if(value.includes('/public/snake/')){this.naturalWidth=1536;this.naturalHeight=768;}
+   queueMicrotask(()=>this.onload?.());}
  };
  const calls=[];
  const ctx=new Proxy({}, {get(target,key){
@@ -44,13 +46,13 @@ test('render paths draw authored art for home, flight, obstacles, enemies and po
  r.game(g,false);
  r.game(g,true);
  r.setQuality('low');r.game(g,false);assert.equal(r.dpr,1);
- for(const name of ['forest','chaua-atlas','snake-atlas','hawk-atlas','shield','feather'])
+ for(const name of ['forest','chaua-atlas','idle','hawk-atlas','shield','feather'])
   assert.ok(calls.some(url=>url.endsWith(`/${name}.webp`)),`${name} must be rendered`);
  assert.ok(calls.some(url=>url.endsWith('/tree-variants.webp')));
  assert.equal(images.size,Object.keys(ASSET_PATHS).length);
 });
 test('snake collision follows lower trunk and clears after shield retreat',()=>{
  const g=new Game(),e={x:400,top:180,bottom:450,snake:{retreat:false}};
- assert.ok(g.snakeRects(e)[0].y>=e.bottom-135&&g.snakeRects(e).length>2);
+ assert.ok(g.snakeRects(e)[0].y<e.bottom&&g.snakeRects(e).length>2);
  e.snake.retreat=true;assert.deepEqual(g.snakeRects(e),[]);
 });

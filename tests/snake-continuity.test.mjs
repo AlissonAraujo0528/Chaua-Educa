@@ -23,7 +23,7 @@ test('head stays rigid, coil stays anchored, reduced motion stays static and shi
   near(Math.hypot(a.x-b.x,a.y-b.y),Math.hypot(50,15));assert.deepEqual(deformSnakePoint(230,310,pose),{x:230,y:310});
   assert.deepEqual(snakeMotion({phase,phaseAge:i},true),{x:0,y:0,angle:0,mouth:0});
  }
- const g=new Game();g.state='playing';g.shield=true;const w={kind:'wood',x:400,top:100,bottom:450,snake:{kind:'snake',phase:'striking',phaseAge:.17,age:2}};const before=snakeMotion(w.snake);g.collide(w.snake,true,w);assert.deepEqual(snakeMotion(w.snake),before);
+ const g=new Game();g.state='playing';g.shield=true;const w={kind:'wood',x:400,top:100,bottom:450,snake:{kind:'snake',phase:'striking',phaseAge:.17,age:2}};g.collide(w.snake,true,w);assert.equal(w.snake.retreat,true);assert.equal(w.snake.phase,'retreat');assert.equal(g.snakeRects(w).length,0);
 });
 test('Amigavel encounter trace is bit-for-bit unchanged from v8',()=>{
  let center=320,lastPattern=null;const random=seededRandom(47),trace=[];

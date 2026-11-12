@@ -1,8 +1,5 @@
-import {snakeMotion} from './snake-motion.mjs';
 import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,roundedShape} from './collision.mjs';
-import { snakeHeadRect } from './geometry.mjs';
-import {spriteBodyRects} from './animation.mjs';
-import {isSnakeA2Ready,snakeA2HitsPlayer,snakeA2FruitHasClearance,placeA2Fruit} from './snake-a2.mjs';
+import {snakeA2HitsPlayer,snakeA2FruitHasClearance,placeA2Fruit,snakeA2CollisionRects,snakeA2HeadRect} from './snake-a2.mjs';
 import {livingWoodRects} from './forest-geometry.mjs';
 import { createTutorial, advanceTutorial } from './tutorial.mjs';
 import { JOURNEY, JOURNEY_LENGTH, ARRIVAL_SECONDS, journeyStage } from './journey.mjs';
@@ -340,7 +337,6 @@ export class Game {
             this.invincible = CONTACT.grace;
             if (host.kind === 'wood') host.contacted = true;
             if (animal) {
-                if(entity.kind==='snake'||host.snake===entity)entity.retreatPose=snakeMotion(entity,this.reducedMotion);
                 entity.phase = 'retreat';
                 entity.retreat = true;
                 entity.retreatTime = 0;
@@ -596,7 +592,8 @@ export class Game {
 
     snakeRects(entity) {
         if (!entity.snake || entity.snake.retreat) return [];
-        return [snakeHeadRect(entity,this.reducedMotion),...spriteBodyRects(entity,this.reducedMotion)];
+        const head=snakeA2HeadRect(entity,this.reducedMotion);
+        return head?[head,...snakeA2CollisionRects(entity,this.reducedMotion)]:[];
     }
 
     spawn() {
@@ -803,8 +800,7 @@ export class Game {
                 advanceSnake(e,dt,px);
                 if (e.snake && !e.snake.retreat && Math.abs(e.x-px)<230) {
                     const player=getPlayerBody();
-                    const hit=isSnakeA2Ready()?snakeA2HitsPlayer(e,player,this.reducedMotion)
-                        :this.snakeRects(e).some(rect => rect.x<px+35&&rect.x+rect.w>px-35&&rect.y<this.y+35&&rect.y+rect.h>this.y-35&&shapesIntersect(player,[roundedShape(rect)]));
+                    const hit=snakeA2HitsPlayer(e,player,this.reducedMotion);
                     if(hit)this.collide(e.snake,true,e);
                 }
                 // Broad-phase horizontal check: livingWoodRects span at most [e.x - 73, e.x + 108]
