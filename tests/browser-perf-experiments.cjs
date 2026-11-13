@@ -2,7 +2,8 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const {chromium}=require('playwright');
-const root=(process.env.GAME_URL||'http://127.0.0.1:5501/').replace(/\\/?$/,'/');
+const base=process.env.GAME_URL||'http://127.0.0.1:5501/';
+const root=base.endsWith('/')?base:base+'/';
 (async()=>{
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox']});
  try{
