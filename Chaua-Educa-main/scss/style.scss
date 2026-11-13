@@ -1902,6 +1902,7 @@ html.mobile-device body { position: fixed; inset: 0; }
 .app.mobile-device:not(.in-flight) .card-note { display: none; }
 .app.mobile-device:not(.in-flight) .home-links {
   display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); margin: 8px 0 0; gap: 2px 4px;
+  background: #fffbedf0; border-radius: 12px; color: var(--ink);
 }
 .app.mobile-device:not(.in-flight) .home-links > span { display: none; }
 .app.mobile-device:not(.in-flight) .home-links button { min-height: 44px; font-size: 11px; padding: 4px 0; line-height: 1.15; }

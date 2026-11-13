@@ -79,3 +79,18 @@ Pause/quiz use the frozen scene clock, and a new run resets the effect state.
 pause/reset and budgets. `tests/browser-animal-weather.cjs` checks all 216
 anchors against real opaque artwork, exercises production pose selection and
 captures 32 rain/snow poses in `animal-weather/contact-poses.png`.
+
+
+## Mobile framing and background clarity
+
+The mobile shell now fits the visible viewport, including browser bars and the
+software keyboard. Menus retain 44px touch targets and 16px name input; long
+dialogs scroll internally. Short landscape fits the complete 640-unit flight
+height instead of magnifying a cropped corridor. Portrait remains playable if
+the browser denies landscape/fullscreen. Device-sized browser tests cover 11
+portrait/landscape viewports, keyboard resizing, input and pause/resume.
+
+Mobile menu actions use a light backing so foliage cannot hide their labels.
+The three procedural distant butterflies (two ellipses each) were removed:
+they looked like paired dancing dots over the seasonal scenery. No replacement
+asset, alternative emitter or unused butterfly code remains.

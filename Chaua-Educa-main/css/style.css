@@ -2691,6 +2691,9 @@ html.mobile-device body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 8px 0 0;
   gap: 2px 4px;
+  background: rgba(255, 251, 237, 0.9411764706);
+  border-radius: 12px;
+  color: var(--ink);
 }
 
 .app.mobile-device:not(.in-flight) .home-links > span {
