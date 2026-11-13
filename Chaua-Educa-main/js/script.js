@@ -20,6 +20,7 @@ const app = $('#app');
 const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
 app.classList.toggle('mobile-device', mobileDevice);
 document.documentElement.classList.toggle('mobile-device', mobileDevice);
+if(mobileDevice) $('.home-links').append($('#open-credits'));
 const renderer = new Renderer($('#forest'));
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 function applyVisualQuality() {
@@ -95,7 +96,7 @@ function resize() {
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
-    const orientation=renderer.w>renderer.h?'landscape':'portrait';
+    const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         clearInputs(); game.pause(); clock.reset(); syncUI();
     }
@@ -109,6 +110,23 @@ const layoutObserver=new ResizeObserver(resize);
 layoutObserver.observe(app);
 layoutObserver.observe($('#forest'));
 window.addEventListener('resize', resize);
+// Dynamic browser bars and the software keyboard can resize the visible area
+// without changing the layout viewport (notably on iOS). Never resize on pinch zoom.
+function syncMobileViewport() {
+    if(!mobileDevice)return;
+    const vv=window.visualViewport;
+    if(vv&&Math.abs(vv.scale-1)>.05)return;
+    const height=Math.round(vv?.height||innerHeight);
+    const value=`${height}px`;
+    if(app.style.getPropertyValue('--app-height')!==value)app.style.setProperty('--app-height',value);
+    const typing=document.activeElement?.matches('input:not([type=radio]):not([type=range]),textarea');
+    app.classList.toggle('keyboard-open',!!typing&&height<innerHeight*.8);
+}
+window.visualViewport?.addEventListener('resize',syncMobileViewport);
+window.addEventListener('resize',syncMobileViewport);
+document.addEventListener('focusin',syncMobileViewport);
+document.addEventListener('focusout',()=>queueMicrotask(syncMobileViewport));
+syncMobileViewport();
 
 function clearInputs() { flightInput.clear(); }
 function hold(source) { flightInput.press(source); }
@@ -128,6 +146,7 @@ async function launchFlight(training = false) {
     training = training === true;
     if(openingFlight || !assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     openingFlight = true;
+    if(mobileDevice)document.activeElement?.blur();
     const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
     try {
         if(mobile) await requestFlightLandscape(app, document, screen);
@@ -147,7 +166,7 @@ function start(training = false) {
     // Reassess the quality profile before the layout-changing in-flight class.
     // Otherwise the renderer may synchronously measure DOM during this transition.
     if(quality.beginFlight())applyVisualQuality();
-    app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
+    app.classList.add('in-flight'); document.documentElement.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
     // The new in-flight layout is observed after browser layout by the
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
@@ -166,9 +185,9 @@ function home() {
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
     releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
-    app.classList.remove('in-flight','training'); updateTrainingButton();
+    app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();
 
-    resize(); $('#inputPlayer').focus({ preventScroll: true });
+    resize(); if(!mobileDevice)$('#inputPlayer').focus({ preventScroll: true });
 }
 
 // Install menu controls exactly ONCE per page load, not whenever home() runs.

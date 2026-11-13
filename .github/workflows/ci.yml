@@ -45,6 +45,7 @@ jobs:
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-http.log 2>&1 &
           chaua_server_pid=$!
           trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
+          node tests/browser-mobile-home-layout.cjs
           node tests/browser-animal-weather.cjs
           npm run test:surface-foods
           npm run test:quality
@@ -66,7 +67,6 @@ jobs:
           npm run test:immersion
           npm run test:browser
           node tests/browser-mobile-orientation.cjs
-          node tests/browser-mobile-home-layout.cjs
           node tests/browser-responsive-camera.cjs
           node tests/browser-weather-trees.cjs
           # Verify the new authored WebPs; do not green-light older placeholder assets.
@@ -106,6 +106,7 @@ jobs:
             test-results/auto-visual/
             test-results/surface-foods/
             test-results/animal-weather/
+            test-results/mobile-home/
             test-results/weather-trees/
             test-results/season-performance/
             test-results/climate-v3/

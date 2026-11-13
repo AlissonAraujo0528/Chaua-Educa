@@ -9,17 +9,17 @@ export function flightViewport(width,height,safe={}) {
     const portrait=width<=850&&height>width;
     const notebook=!portrait&&!compact&&height<=850;
     // HUD occupies separate screen-space bands rather than being zoomed.
-    const top=(safe.top||0)+(compact?58:notebook?96:124);
-    const bottom=(safe.bottom||0)+(compact?64:notebook?64:104);
+    const top=(safe.top||0)+(compact?52:notebook?96:114);
+    const bottom=(safe.bottom||0)+(compact?56:notebook?64:76);
     const usableWidth=Math.max(1,width-left-right),usableHeight=Math.max(1,height-top-bottom);
-    // On short windows show a vertically tracked slice of the world instead
-    // of shrinking all sprites to fit 640 logical pixels at once.
+    // Short landscape phones fit the complete flight height. Only notebooks
+    // use vertical tracking; mobile obstacles must not fill a cropped view.
     // Portrait needs at least 1.65s of visible predator approach at max speed.
     // Preserve its safe sightline rather than enlarging sprites at the cost of reaction time.
     const referenceWidth=portrait?720:960;
     // A slightly tighter notebook camera enlarges actors without touching
     // collision coordinates, and retains 500 world units of vertical sightline.
-    const referenceHeight=portrait?640:compact?500:notebook?500:640;
+    const referenceHeight=portrait?640:compact?640:notebook?500:640;
     const scale=Math.max(.01,Math.min(usableWidth/referenceWidth,usableHeight/referenceHeight));
     const worldLeft=portrait?130:0;
     const worldWidth=usableWidth/scale;
