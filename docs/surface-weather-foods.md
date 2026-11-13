@@ -23,8 +23,9 @@ wind physics, scoring, victory score or number of simultaneous collectables.
   data and mission credit; they cannot unlock replacement foods. Catalogue
   version 2 is recorded without rewriting old scoreboards.
 - Food moisture and snow are clipped to each food's alpha in one reusable
-  128px buffer. The journal uses still crops of the same atlas and direct links
-  to the source for each food.
+  128px buffer during gameplay. The journal shares catalogue text/IDs and
+  source links, while its reader uses independent photography and numbered
+  food entries; it never samples the gameplay atlas.
 - The adaptive-quality fix compares a RAF interval to prior callback work.
   An isolated uncertain gap has a bounded allowance without clearing history;
   repeated cheap-JS gaps remain evidence of possible compositor/GPU pressure.

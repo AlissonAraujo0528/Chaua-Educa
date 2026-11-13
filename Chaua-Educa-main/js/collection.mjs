@@ -26,7 +26,7 @@ export function journalIllustration(id){
  if(fact.photo){
   const photo=JOURNAL_PHOTOS[fact.photo],image=document.createElement('img');image.src=photo.src;image.alt=photo.alt;
   image.loading='lazy';image.decoding='async';image.width=800;image.height=600;art.append(image);
-  const credit=document.createElement('figcaption'),link=document.createElement('a');link.href=photo.page;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Foto: Duncan Rawlinson · CC BY 2.0 ↗';link.title=PHOTO_CREDIT;credit.append(link);art.append(credit);
+  const credit=document.createElement('figcaption'),link=document.createElement('a');link.href=photo.page;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Duncan Rawlinson · CC BY 2.0 · Ave em cativeiro ↗';link.title=PHOTO_CREDIT;credit.append(link);art.append(credit);
  }else{
   const kicker=document.createElement('span');kicker.textContent=fact.kicker;
   const value=document.createElement('strong');value.textContent=fact.value;
