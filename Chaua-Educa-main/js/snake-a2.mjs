@@ -1,4 +1,5 @@
 import {SNAKE_TIMING} from './animals.mjs';
+import { activeProbe } from './perf-hooks.mjs';
 import {shapesHitRect} from './collision.mjs';
 import {SNAKE_A2_MASKS} from './snake-a2-masks.mjs';
 
@@ -73,10 +74,18 @@ export function snakeA2FruitHasClearance(wood,x,y,radius=62){
 
 export function placeA2Fruit(snakes,x,y,minimumY,maximumY,previous=[]){
  if(minimumY>maximumY)return null;
- const fits=(cx,cy)=>cy>=minimumY&&cy<=maximumY&&
-  snakes.every(wood=>snakeA2FruitHasClearance(wood,cx,cy))&&
-  !previous.some(p=>Math.abs(p.x-cx)<56&&Math.abs(p.y-cy)<50);
- if(fits(x,y))return {x,y};
+ const probe=activeProbe;
+ let candidates=0;
+ const fits=(cx,cy)=>{
+  candidates++;
+  return cy>=minimumY&&cy<=maximumY&&
+   snakes.every(wood=>snakeA2FruitHasClearance(wood,cx,cy))&&
+   !previous.some(p=>Math.abs(p.x-cx)<56&&Math.abs(p.y-cy)<50);
+ };
+ if(fits(x,y)){
+  if(probe)probe.event('snake:fruitPlacement',{candidates,originalPositionAccepted:true});
+  return {x,y};
+ }
  let best=null,score=Infinity;
  // Prefer a tiny vertical shift within the existing corridor. A horizontal
  // adjustment is a fallback, so the difficulty and fruit routes are retained.
@@ -92,6 +101,7 @@ export function placeA2Fruit(snakes,x,y,minimumY,maximumY,previous=[]){
   const cx=x+dx,cy=Math.max(minimumY,Math.min(y,maximumY));
   if(fits(cx,cy)){best={x:cx,y:cy};break;}
  }
+ if(probe)probe.event('snake:fruitPlacement',{candidates,originalPositionAccepted:false,found:!!best});
  return best;
 }
 const allVisibleFramesMask=buildVisibleFootprint();
@@ -173,7 +183,15 @@ export function drawSnakeA2(c,s,factor,reduced=false){
  const flip=snakeA2NeedsMirror(pose);
  c.save();
  if(flip)c.scale(-1,1);
+ const probe=activeProbe;
+ const first=probe&&!probe.firstDraws.has('snake:'+pose.key);
+ const measure=probe&&(first||probe.deep);
+ const drawAt=measure?probe.begin(first?'snake.firstDrawCpu':'snake.drawCpu'):0;
  c.drawImage(image,sx,sy,cell,cell,-anchorX*factor,-anchorY*factor,cell*factor,cell*factor);
+ if(measure){
+  const duration=probe.end(first?'snake.firstDrawCpu':'snake.drawCpu',drawAt,{sheet:pose.key});
+  if(first)probe.firstDraw('snake:'+pose.key,duration);
+ }
  c.restore();
  return true;
 }

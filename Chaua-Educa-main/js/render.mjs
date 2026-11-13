@@ -2,6 +2,7 @@ import {breeze,treeBend,winterAmount} from './living-motion.mjs';
 import {drawForestLife} from './forest-life.mjs';
 import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
+import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterBreathSettings,drawSnowShedding} from './winter-vfx.mjs';
 import {drawSnakeA2,preloadSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
@@ -1132,8 +1133,11 @@ export class Renderer {
         const fog = journeyFog(game, game.tutorial);
         const wind = journeyWind(game, game.mode, game.tutorial);
         const snow = winterAmount(game);
+        const probe=activeProbe;
+        const backgroundAt=probe?probe.begin('render.background'):0;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4),
             rain, storm, fog, wind, game.tutorial?null:game, game.speed||250);
+        if(probe)probe.end('render.background',backgroundAt);
         const baseView = this.getViewport();
         // Follow the player only on screens that cannot fit the full world at
         // the improved sprite scale. The camera does not touch gameplay math.
@@ -1173,11 +1177,13 @@ export class Renderer {
             top:view.worldTop-(view.y+Math.abs(shakeY)+64)/s,
             bottom:view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s
         };
+        const treesAt=probe&&probe.deep?probe.begin('render.trees'):0;
         for (const e of game.entities) {
             if (e.kind === 'wood' && (this.drawOffscreenEntitiesForTest === true ||
                 !Number.isFinite(e.x) || (e.x >= view.worldLeft - 320 &&
                 e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced, renderBounds);
         }
+        if(probe&&probe.deep)probe.end('render.trees',treesAt);
         c.restore();
         c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY); c.scale(s, s);
@@ -1276,6 +1282,7 @@ export class Renderer {
                 if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low');
             } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, rain);
         }
+        const auraAt=probe&&probe.deep?probe.begin('render.shieldAura'):0;
         if (game.shield || game.invincible > 0) {
             const r = 68;
             c.save();
@@ -1313,6 +1320,7 @@ export class Renderer {
             }
             c.restore();
         }
+        if(probe&&probe.deep&&auraAt)probe.end('render.shieldAura',auraAt,{active:!!(game.shield||game.invincible>0)});
 
         if(game.refuge) {
             const support=320+birdFoot(1.04);
@@ -1327,6 +1335,7 @@ export class Renderer {
                 ACTION_TIMINGS.parrotRecoil))
             : (game.state === 'ended' && !game.won ? 1 : 0);
         const contact=woodContactPosition(game,impactProg,reduced);
+        const birdAt=probe&&probe.deep?probe.begin('render.bird'):0;
         drawBird(c, {
             x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
             angle: game.angle, wing: reduced ? .2 : game.wing, time: (game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime,
@@ -1337,6 +1346,8 @@ export class Renderer {
             stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won,
             snow, rain, low:this.decoration==='low'
         });
+        if(probe&&probe.deep)probe.end('render.bird',birdAt);
+        const particlesAt=probe&&probe.deep?probe.begin('render.particles'):0;
         if (!reduced) {
             const pList = game.particles;
             const pLimit = this.decoration==='low'?Math.min(32,pList.length):pList.length;
@@ -1414,6 +1425,7 @@ export class Renderer {
                 else leaf(c,p.x,p.y,8,p.life*5,p.color,p.color);
             }
         }
+        if(probe&&probe.deep)probe.end('render.particles',particlesAt,{count:game.particles.length});
         c.globalAlpha = 1;
         if(game.popups.length) {
             c.font='800 18px Nunito';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#254a35';
