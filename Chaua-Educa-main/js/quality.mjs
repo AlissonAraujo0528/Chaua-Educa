@@ -13,6 +13,14 @@ export function canvasResolution(width,height,deviceRatio=1,resolution='high'){
  return {dpr,width:Math.max(1,Math.floor(w*dpr)),height:Math.max(1,Math.floor(h*dpr))};
 }
 const SAMPLE_WINDOW=2, SLOW_FRAME=1/42, SLOW_SHARE=.35, EPSILON=1e-9;
+// A RAF interval belongs to the PREVIOUS callback. A single unexplained gap
+// gets a bounded allowance, never a reset of the rolling slowdown evidence.
+const EXTERNAL_GAP_SECONDS=.09, LIGHT_RAF_MS=8;
+export function identicalCanvasBudgets(width,height,dpr){
+ const high=canvasResolution(width,height,dpr,'high');
+ const low=canvasResolution(width,height,dpr,'low');
+ return high.width===low.width && high.height===low.height;
+}
 // A bounded rolling window counts time spent in slow frames, including active
 // stalls. Fast frames cannot erase recurring slowdown; one stall is insufficient.
 export class VisualQuality {
@@ -20,7 +28,7 @@ export class VisualQuality {
   this.samples=new Float64Array(1024);this.slowSamples=new Uint8Array(1024);
   this.setMode(mode);
  }
- setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.resetSamples();}
+ setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.ignoredSchedulingGaps=0;this.previousWorkMs=undefined;this.gapAllowance=1;this.healthySeconds=0;this.resetSamples();}
  // Low-cost frames cannot establish that the high-cost profile is sustainable.
  // Reassess only at a new flight or an explicit setting change, never mid-flight.
  beginFlight(){const previous=this.level;this.setMode(this.mode);return this.level!==previous;}
@@ -41,9 +49,20 @@ export class VisualQuality {
    if(this.samples[this.head]<=EPSILON){this.head=(this.head+1)%this.samples.length;this.count--;}
   }
  }
- sample(seconds,active=true){
-  if(!active || !Number.isFinite(seconds) || seconds<=0){this.resetSamples();return false;}
+ sample(seconds,active=true,frameWorkMs=undefined){
+  if(!active || !Number.isFinite(seconds) || seconds<=0){this.resetSamples();this.previousWorkMs=undefined;this.gapAllowance=1;this.healthySeconds=0;return false;}
   if(this.mode!=='auto')return false;
+  const priorWork=this.previousWorkMs;
+  this.previousWorkMs=frameWorkMs;
+  if(seconds<=SLOW_FRAME){this.healthySeconds+=seconds;if(this.healthySeconds>=2)this.gapAllowance=1;}
+  else this.healthySeconds=0;
+  if(Number.isFinite(priorWork) && seconds>=EXTERNAL_GAP_SECONDS && priorWork<=LIGHT_RAF_MS && this.gapAllowance>0){
+   if(this.level==='high')this.ignoredSchedulingGaps++;
+   this.gapAllowance=0;
+   // Record a healthy tick so existing samples age normally; repeating long
+   // intervals remain eligible even if JavaScript is cheap (GPU is unmeasured).
+   seconds=1/60;
+  }
   // Match the flight clock's cap, so a single suspended frame cannot dominate.
   seconds=Math.min(seconds,.25);
   if(this.level==='high'){

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {drawJourneyRain,drawForegroundRain,drawRainRipples,drawSurfaceRainImpacts,
  journeyRain,journeyStorm,getWeatherMode,setWeatherMode} from '../Chaua-Educa-main/js/weather.mjs';
-import {drawWetBarkSheen} from '../Chaua-Educa-main/js/tree-art.mjs';
+import {drawPackedSection} from '../Chaua-Educa-main/js/weather-art.mjs';
+import {images} from '../Chaua-Educa-main/js/assets.mjs';
 import {climateReferenceSeconds} from '../Chaua-Educa-main/js/climate-progress.mjs';
 
 function recordingContext(){
@@ -58,15 +59,12 @@ test('rain contact effects are small, local and absent in reduced-motion mode',(
  drawSurfaceRainImpacts(reduced.c,200,180,.75,3.4,12,true,true);
  assert.equal(reduced.trace.length,0);
 });
-test('wet tree glints stay thin and do not paint rectangular patches over authored sprites',()=>{
- const dry=recordingContext();
- drawWetBarkSheen(dry.c,100,190,82,0,2,3);
- assert.equal(dry.trace.length,0);
- const wet=recordingContext();
- drawWetBarkSheen(wet.c,100,190,82,.86,2,3);
- assert.equal(wet.trace.filter(x=>x[0]==='stroke').length,2);
- assert.equal(wet.trace.filter(x=>x[0]==='fillRect').length,0);
- assert.ok(wet.trace.every(x=>x[0]!=='rect'&&x[0]!=='fillRect'));
+test('wet overlays draw registered cropped artwork instead of rectangular fills',()=>{
+ const c=recordingContext();let draws=0;c.c.drawImage=()=>draws++;
+ images.set('runtime-wet-0',{});images.set('runtime-wet-1',{});
+ drawPackedSection(c.c,'wet','upper-0',0,0,512,512,0,0,200,200);
+ assert.equal(draws,1);assert.equal(c.trace.filter(x=>x[0]==='fillRect').length,0);
+ images.delete('runtime-wet-0');images.delete('runtime-wet-1');
 });
 test('rain occupies autumn, but not snow; no point value controls it',()=>{
  const old=getWeatherMode();

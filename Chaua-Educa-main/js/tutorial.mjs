@@ -21,7 +21,7 @@ export function resultAdvice(game){
   bottom:'Dê uma batida antes de chegar perto do chão. Segurar ajuda a recuperar altura.',
   hawk:'Observe o aviso do gavião e a faixa de passagem antes de mudar de altura.',
   snake:'A cobra ocupa o galho sinalizado. Procure o espaço livre, sem tentar atravessá-la.',
-  wood:'Alinhe-se com a abertura antes de alcançar o tronco. Frutas nas bordas são opcionais.',
+  wood:'Alinhe-se com a abertura antes de alcançar o tronco. Alimentos nas bordas são opcionais.',
   quiz:'Releia a explicação na Chauapédia. No Amigável, você pode errar e continuar aprendendo.',
  };
  return tips[game.endCause] || 'Experimente batidas curtas e solte para ajustar a altura. O treino de voo está disponível no início.';

@@ -10,7 +10,7 @@ const root=process.env.GAME_URL||'http://127.0.0.1:5501/',out=process.env.SCREEN
   await p.screenshot({path:path.join(out,`chauapedia-${viewport.width}.png`)});
   await p.locator('.journal-open:not([disabled])').first().click();await p.waitForTimeout(150);assert.equal(await p.locator('.journal-reading').isVisible(),true);assert.match(await p.locator('.journal-reading').innerText(),/Amazona/);await p.screenshot({path:path.join(out,`leitura-${viewport.width}.png`)});await p.locator('.journal-back').click();
   assert.equal(await p.locator('.journal-open:not([disabled])').first().evaluate(e=>e===document.activeElement),true);
-  await p.locator('#journal-food-tab').click();assert.equal(await p.locator('.journal-food').count(),7);assert.equal(await p.locator('#nature-items').isVisible(),false);await p.screenshot({path:path.join(out,`alimentos-${viewport.width}.png`)});
+  await p.locator('#journal-food-tab').click();assert.equal(await p.locator('.journal-food').count(),12);assert.equal(await p.locator('#nature-items').isVisible(),false);await p.screenshot({path:path.join(out,`alimentos-${viewport.width}.png`)});
   await p.locator('#journal-nature-tab').click();await p.keyboard.press('ArrowRight');assert.equal(await p.locator('#journal-food-tab').getAttribute('aria-selected'),'true');await p.locator('#collection-dialog .close-dialog').click();
   for(const [open,dialog]of [['#open-guide','#guide-dialog'],['#open-settings','#settings-dialog']]){
    await p.locator(open).click();const x=p.locator(`${dialog} .icon-btn`);await x.click({timeout:2000});assert.equal(await p.locator(dialog).isVisible(),false);

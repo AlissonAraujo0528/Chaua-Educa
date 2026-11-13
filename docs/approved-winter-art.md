@@ -1,45 +1,23 @@
-# Approved winter artwork integration
+# Approved winter artwork — current integration
 
-The new user-supplied art has been prepared as lossless transparent WebPs, with
-**original v7/v9 wood pixels retained beneath alpha-only snow masks**. This
-branch first updates the tree drawing geometry without changing the physical
-collision bounds or removing upper-tree snow shedding.
+The authored winter WebPs are installed and required by CI. Original v7/v9
+wood remains unchanged beneath the transparent authored snow masks. No ZIP,
+manual asset installation or prompt is needed to play the published game.
 
-## Artwork delivery
+- Active tree cover: eight transparent progressive overlays and two final
+  `trees-{upper,lower}-snow-04.webp` atlases.
+- Active variants: `assets/v10/tree-variants-snow.webp`.
+- The six authored shedding times are now cropped in `assets/runtime/weather-fx-*`
+  with exact cell offsets in `js/runtime-art-data.mjs`.
+- JPEG authoring inputs live in `art-source/winter/`, outside the published app.
+- Removed intermediate full snowy atlases and standalone shedding files must
+  not be restored as runtime fallbacks.
 
-The final replacement WebPs and the four original source JPEGs are supplied
-together in the Chauá approved winter art package in the conversation.
-The repository cannot accept that binary attachment through the available
-GitHub text-only editing connection. **Do not claim new art is installed just
-because this code change passes CI.**
+Rebuild with `python scripts/build_approved_winter_art.py` and
+`python scripts/build_runtime_art.py`. Dependencies are in
+`scripts/requirements-art.txt`. Review hashes and visual results before commit.
+The manual workflow produces review artifacts and never pushes over artwork.
 
-To install the package, unpack it at the repository root (matching its
-`Chaua-Educa-main/assets/...` directory structure), review
-`alignment-metadata.json`, and run:
-
-```sh
-npm test
-python scripts/dev-server.py
-# in another terminal
-node tests/browser-visual.cjs
-node tests/browser-background.cjs
-npm run test:winter-art
-```
-
-The superseded wood base atlases and all six
-`trees-upper-shedding-00..05.webp` must be preserved. The overlay stages
-`01..04` and terminal `snow-04` must derive from exactly the same alpha
-mask. The four-season atlas stays 1672×941 with the original quadrant order.
-
-No automatic overwrite of authored art is performed by CI.
-
-The new-art browser test is intentionally **not** in required CI until the replacement WebP binaries are installed on the branch. A green CI before that installation verifies runtime compatibility, **not** the visual appearance of the new artwork.
-
-To deterministically regenerate the delivered art after copying the source JPEGs to `assets/Seasons/Winter/sources/`, run:
-
-```sh
-python -m pip install -r scripts/requirements-art.txt
-python scripts/build_approved_winter_art.py
-```
-
-Review differences before committing. The script always composites the authored snow on the unchanged original v7/v9 bark. This is an explicit, manual art-generation command, not a CI job that silently rewrites game assets.
+Required checks: `npm test`, `npm run test:winter-art`,
+`npm run test:surface-foods` and the complete CI. See
+[surface weather and food atlas implementation](surface-weather-foods.md).

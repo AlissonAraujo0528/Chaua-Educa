@@ -1,6 +1,7 @@
 import {getWeatherMode,journeyRain,journeyStorm} from './weather.mjs';
 import {seasonFromFlight} from './climate-timeline.mjs';
 import {drawSnowfall} from './winter-vfx.mjs';
+import {activeProbe} from './perf-hooks.mjs';
 
 export function journeySeason(game) {
  const wm = getWeatherMode();
@@ -19,10 +20,23 @@ export function journeySeason(game) {
 
 // Cache only the two visible frames at viewport resolution. Resizing or changing
 // quality releases the old surfaces; there is no per-frame atlas resampling.
+// Small incremental cache slices keep scene preparation off the critical path.
+// The budget is SOFT: a single Canvas draw can take longer than its allowance.
+// Visible missing surfaces use an urgent correctness fallback (telemetry recorded).
+const DEFAULT_PREWARM_SECONDS=18;
+const DEFAULT_SLICE_ROWS=24;
+const DEFAULT_BUDGET_MS=1.8;
 export class SeasonalBackdrop {
- constructor(){this.frames=new Map();this.key='';this.pending=null;this.prewarmEnabled=true;this.onTelemetry=null;}
+ constructor({prewarmSeconds=DEFAULT_PREWARM_SECONDS,sliceRows=DEFAULT_SLICE_ROWS,
+  budgetMs=DEFAULT_BUDGET_MS,now=()=>performance.now()}={}){
+  this.frames=new Map();this.key='';this.pending=null;this.prewarmEnabled=true;this.onTelemetry=null;
+  this.prewarmSeconds=Math.max(0,prewarmSeconds);
+  this.sliceRows=Math.max(1,Math.floor(sliceRows));
+  this.budgetMs=Math.max(.1,budgetMs);
+  this.now=now;
+ }
  prepare(atlas,w,h,dpr,game){
-  const state=journeySeason(game), margin=26;
+  const state=journeySeason(game),margin=26;
   const key=`${w}:${h}:${dpr}`;
   if(this.key!==key || this.atlas!==atlas){
    this.onTelemetry?.('cache-reset',{width:w,height:h,dpr});
@@ -31,48 +45,72 @@ export class SeasonalBackdrop {
    this.pending=null;this.frames.clear();this.key=key;this.atlas=atlas;
   }
   const needed=new Set(state.mix===1?[state.to]:[state.from,state.to]);
-  // A Game.visual(alpha) view inherits mode, seed and tutorial through its
-  // prototype. Object spread silently DROPS them, making prewarm predict the
-  // next season using the wrong flight reference and seed.
-  const ahead={elapsed:(game.elapsed||0)+10,mode:game.mode,
+  // Visual interpolation retains Game state on its prototype; copy explicit
+  // mode and seed when looking ahead, or the predicted season can be wrong.
+  const ahead={elapsed:(game.elapsed||0)+this.prewarmSeconds,mode:game.mode,
    seed:game.seed,tutorial:game.tutorial};
-  const upcoming=journeySeason(ahead).to;
-  if(this.prewarmEnabled && state.mix===1)needed.add(upcoming);
+  if(this.prewarmEnabled && state.mix===1)needed.add(journeySeason(ahead).to);
   for(const [id,surface] of this.frames)if(!needed.has(id)){
    surface.width=0;surface.height=0;this.frames.delete(id);
   }
   if(this.pending&&!needed.has(this.pending.id)){
    this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
   }
-  for(const id of needed)if(!this.frames.has(id)){
-   if(this.pending&&this.pending.id!==id){this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;}
+  // Shared per-frame budget covers all speculative surfaces, not each one
+  // independently; visible surfaces take priority regardless of budget.
+  const budgetStart=this.now();
+  for(const id of needed){
+   if(this.frames.has(id))continue;
+   if(this.pending&&this.pending.id!==id){
+    this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
+   }
    if(!this.pending){
-    const pw=Math.ceil((w+margin*2)*dpr),ph=Math.ceil(h*dpr);
+    const pw=Math.max(1,Math.ceil((w+margin*2)*dpr)),ph=Math.max(1,Math.ceil(h*dpr));
     const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
     surface.width=pw;surface.height=ph;
-    this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0,startMs:this.onTelemetry?performance.now():0};
+    this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0,
+     startMs:this.onTelemetry?this.now():0,sliceCount:0,drawMs:0};
     this.onTelemetry?.('surface-start',{seasonId:id,urgent:id===state.from||id===state.to});
    }
    const p=this.pending;
-   const visible=id===state.from&&state.mix<1 || id===state.to&&state.mix>0;
-   const end=visible?p.surface.height:Math.min(p.surface.height,p.row+96);
+   const visible=(id===state.from&&state.mix<1)||(id===state.to&&state.mix>0);
+   if(visible && p.row<p.surface.height)
+    this.onTelemetry?.('surface-urgent',{seasonId:id,remainingRows:p.surface.height-p.row});
    const sw=atlas.naturalWidth/2,sh=Math.floor(atlas.naturalHeight/2),sy=id<2?0:atlas.naturalHeight-sh;
    const scale=Math.max((w+margin*2)/sw,h/sh)*1.08;
-   p.ctx.save();p.ctx.setTransform(1,0,0,1,0,0);
-   p.ctx.beginPath();p.ctx.rect(0,p.row,p.surface.width,end-p.row);p.ctx.clip();
-   p.ctx.setTransform(dpr,0,0,dpr,0,0);
-   p.ctx.drawImage(atlas,(id%2)*sw,sy,sw,sh,(w+margin*2-sw*scale)/2,(h-sh*scale)/2,sw*scale,sh*scale);
-   p.ctx.restore();p.row=end;
-   if(end===p.surface.height){
-    this.frames.set(id,p.surface);
-    this.onTelemetry?.('surface-ready',{seasonId:id,buildMs:this.onTelemetry?Math.round((performance.now()-p.startMs)*100)/100:null});
-    this.pending=null;
+   // Even if the budget is exhausted, do one forward-progress slice on the
+   // speculative target; measuring time after every slice prevents a long loop.
+   let processed=0;
+   while(p.row<p.surface.height && (visible || !processed || this.now()-budgetStart<this.budgetMs)){
+    const firstRow=p.row;
+    const end=visible?p.surface.height:Math.min(p.surface.height,p.row+this.sliceRows);
+    const probe=activeProbe,sliceAt=probe?probe.begin('render.seasonalSlice'):0;
+    const started=this.now();
+    p.ctx.save();p.ctx.setTransform(1,0,0,1,0,0);
+    p.ctx.beginPath();p.ctx.rect(0,firstRow,p.surface.width,end-firstRow);p.ctx.clip();
+    p.ctx.setTransform(dpr,0,0,dpr,0,0);
+    p.ctx.drawImage(atlas,(id%2)*sw,sy,sw,sh,(w+margin*2-sw*scale)/2,(h-sh*scale)/2,sw*scale,sh*scale);
+    p.ctx.restore();
+    const cpuMs=this.now()-started;
+    p.row=end;p.sliceCount++;p.drawMs+=cpuMs;processed++;
+    if(probe)probe.end('render.seasonalSlice',sliceAt,{seasonId:id,rows:end-firstRow,urgent:visible});
+    if(p.row===p.surface.height){
+     this.frames.set(id,p.surface);
+     this.onTelemetry?.('surface-ready',{seasonId:id,
+      buildMs:this.onTelemetry?Math.round((this.now()-p.startMs)*100)/100:null,
+      drawMs:Math.round(p.drawMs*100)/100,slices:p.sliceCount});
+     this.pending=null;
+     break;
+    }
    }
   }
   return state;
  }
  draw(c,atlas,w,h,dpr,time,game,reduced){
+  const probe=activeProbe,prepAt=probe?probe.begin('render.seasonalPrepare'):0;
   const state=this.prepare(atlas,w,h,dpr,game),margin=26;
+  if(probe)probe.end('render.seasonalPrepare',prepAt);
+  const blitAt=probe?probe.begin('render.seasonalBlit'):0;
   const drift=reduced?0:Math.sin(time*.035)*24;
   c.save();c.setTransform(1,0,0,1,0,0);
   c.globalAlpha=1;
@@ -82,6 +120,7 @@ export class SeasonalBackdrop {
    c.drawImage(this.frames.get(state.to),Math.round((drift-margin)*dpr),0);
   }
   c.restore();
+  if(probe)probe.end('render.seasonalBlit',blitAt);
  }
 }
 

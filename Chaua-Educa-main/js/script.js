@@ -8,7 +8,7 @@ import { FlightInput } from './input.mjs';
 import { isMobileFlightDevice, requestFlightLandscape, releaseFlightLandscape } from './flight-orientation.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
-import { FRUITS } from './fruits.mjs';
+import { FOODS } from './foods.mjs';
 import DB from './database.js';
 import { Game, FlightClock, HEIGHT, STAGES, VICTORY_SCORE } from './engine.mjs';
 import { Renderer, drawBird } from './render.mjs';
@@ -20,6 +20,7 @@ const app = $('#app');
 const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
 app.classList.toggle('mobile-device', mobileDevice);
 document.documentElement.classList.toggle('mobile-device', mobileDevice);
+if(mobileDevice) $('.home-links').append($('#open-credits'));
 const renderer = new Renderer($('#forest'));
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 function applyVisualQuality() {
@@ -91,10 +92,11 @@ const clock = new FlightClock(game);
 const flightInput = new FlightInput(game, held => $('#flap-button').classList.toggle('is-held', held));
 
 function resize() {
+    const resizeProbe=activeProbe,resizeAt=resizeProbe?resizeProbe.begin('ui.resize'):0;
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
-    const orientation=renderer.w>renderer.h?'landscape':'portrait';
+    const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         clearInputs(); game.pause(); clock.reset(); syncUI();
     }
@@ -102,15 +104,41 @@ function resize() {
     const view = renderer.getViewport();
     game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
     game.viewLeft = Math.floor(view.worldLeft);
+    if(resizeProbe)resizeProbe.end('ui.resize',resizeAt);
 }
-new ResizeObserver(resize).observe(app);
+const layoutObserver=new ResizeObserver(resize);
+layoutObserver.observe(app);
+layoutObserver.observe($('#forest'));
 window.addEventListener('resize', resize);
+// Dynamic browser bars and the software keyboard can resize the visible area
+// without changing the layout viewport (notably on iOS). Never resize on pinch zoom.
+function syncMobileViewport() {
+    if(!mobileDevice)return;
+    const vv=window.visualViewport;
+    if(vv&&Math.abs(vv.scale-1)>.05)return;
+    const height=Math.round(vv?.height||innerHeight);
+    const value=`${height}px`;
+    if(app.style.getPropertyValue('--app-height')!==value)app.style.setProperty('--app-height',value);
+    const typing=document.activeElement?.matches('input:not([type=radio]):not([type=range]),textarea');
+    app.classList.toggle('keyboard-open',!!typing&&height<innerHeight*.8);
+}
+window.visualViewport?.addEventListener('resize',syncMobileViewport);
+window.addEventListener('resize',syncMobileViewport);
+document.addEventListener('focusin',syncMobileViewport);
+document.addEventListener('focusout',()=>queueMicrotask(syncMobileViewport));
+syncMobileViewport();
 
 function clearInputs() { flightInput.clear(); }
 function hold(source) { flightInput.press(source); }
 function release(source) { flightInput.release(source); }
 function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
-function openDialog(id) { const dialog = $(id); if (!dialog.open) dialog.showModal(); }
+function openDialog(id) {
+    const dialog=$(id);
+    if(dialog.open)return;
+    const probe=activeProbe,at=probe?probe.begin('ui.dialogOpen'):0;
+    dialog.showModal();
+    if(probe)probe.end('ui.dialogOpen',at,{dialog:id});
+}
 
 // Start only after the optional browser orientation request. This prevents
 // the normal resize-on-rotation safeguard from pausing the countdown itself.
@@ -118,6 +146,7 @@ async function launchFlight(training = false) {
     training = training === true;
     if(openingFlight || !assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     openingFlight = true;
+    if(mobileDevice)document.activeElement?.blur();
     const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
     try {
         if(mobile) await requestFlightLandscape(app, document, screen);
@@ -134,10 +163,14 @@ function start(training = false) {
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     closeDialogs(); clearInputs();
     cancelAnimationFrame(resultAnimation);
-    app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
-    flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
+    // Reassess the quality profile before the layout-changing in-flight class.
+    // Otherwise the renderer may synchronously measure DOM during this transition.
     if(quality.beginFlight())applyVisualQuality();
-    resize();
+    app.classList.add('in-flight'); document.documentElement.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
+    flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
+    // The new in-flight layout is observed after browser layout by the
+    // app/canvas ResizeObserver. A synchronous resize here forced style/layout
+    // immediately after changing classes and hiding the home screen.
     if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
     app.classList.toggle('training',training);
     previousState = ''; clock.reset(); lastTime = 0;
@@ -152,9 +185,9 @@ function home() {
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
     releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
-    app.classList.remove('in-flight','training'); updateTrainingButton();
+    app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();
 
-    resize(); $('#inputPlayer').focus({ preventScroll: true });
+    resize(); if(!mobileDevice)$('#inputPlayer').focus({ preventScroll: true });
 }
 
 // Install menu controls exactly ONCE per page load, not whenever home() runs.
@@ -310,14 +343,20 @@ function result() {
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
     $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}% do caminho · ${STAGES[game.stage]}`;
     $('#new-record').hidden = !record || game.score === 0;
-    $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Frutas ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
+    $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Alimentos ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
     $('#storage-note').textContent = DB.storageAvailable ? 'Seu recorde fica salvo neste navegador.' : 'Armazenamento indisponível: recorde mantido apenas nesta sessão.';
-    const birdCanvas = document.createElement('canvas'); birdCanvas.width = 300; birdCanvas.height = 210;
-    const bc = birdCanvas.getContext('2d'); bc.scale(2, 2); drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
-    $('#result-bird').replaceChildren(birdCanvas);
+    // Reuse the same raster surface across flights; keep the authored result art.
+    const birdProbe=activeProbe,birdAt=birdProbe?birdProbe.begin('ui.resultBird'):0;
+    const birdCanvas = $('#result-bird canvas');
+    const bc = birdCanvas.getContext('2d');
+    bc.setTransform(1,0,0,1,0,0);
+    bc.clearRect(0,0,birdCanvas.width,birdCanvas.height);
+    bc.setTransform(2,0,0,2,0,0);
+    drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
+    if(birdProbe)birdProbe.end('ui.resultBird',birdAt);
     openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); $('#result-dialog').scrollTop=0;
-    $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} frutos, ${game.correct} respostas corretas. ${game.reason}`;
+    $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} alimentos, ${game.correct} respostas corretas. ${game.reason}`;
     const begin = performance.now(), target = game.score;
     function count(now) {
         const fraction = reducedMotion.matches ? 1 : Math.min(1, (now - begin) / 650);
@@ -418,6 +457,9 @@ function syncUI() {
 }
 
 function frame(time) {
+    // Include update, UI, audio and drawing work within the RAF callback.
+    // This elapsed JS wall time is diagnostic, not a GPU timing measurement.
+    const frameWorkStart=performance.now();
     const probe=activeProbe;
     if(probe)probe.beginFrame(time,game.stage);
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
@@ -431,11 +473,11 @@ function frame(time) {
         syncUI();lastHudTime=time;
         if(probe)probe.end('ui.sync',hudAt);
     }
-    if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
     forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){
+        quality.sample(delta,false);
         if(probe)probe.endFrame();
         requestAnimationFrame(frame);return;
     }
@@ -455,6 +497,8 @@ function frame(time) {
         if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
+    const activeFlight=document.hasFocus()&&game.state==='playing';
+    if(quality.sample(delta,activeFlight,performance.now()-frameWorkStart))applyVisualQuality();
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -463,7 +507,7 @@ function showCollection() {
     const unlocked = DB.unlocked();
     const discovered = DB.discoveredEntries();
     renderCollection($('#nature-items'),discovered,{foods:unlocked,foodContainer:$('#collection-items'),detailContainer:$('#journal-detail')});
-    $('#collection-progress').textContent=`${discovered.length} de ${ENTRIES.length} temas descobertos · ${unlocked.length} de ${FRUITS.length} alimentos registrados`;
+    $('#collection-progress').textContent=`${discovered.length} de ${ENTRIES.length} temas descobertos · ${unlocked.length} de ${FOODS.length} alimentos registrados`;
     setJournalTab('nature');
     openDialog('#collection-dialog');
 }

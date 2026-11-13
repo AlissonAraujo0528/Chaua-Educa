@@ -88,3 +88,12 @@ test('camera easing has equal results at different refresh rates',()=>{
  const run=hz=>{let top=0;for(let i=0;i<hz;i++)top=advanceFlightCamera(view,320,top,1/hz);return top;};
  assert.ok(Math.abs(run(60)-run(144))<1e-8);
 });
+
+test('short mobile landscape fits the full flight height and retains a readable bird',()=>{
+ for(const [width,height] of [[568,320],[667,375],[844,390],[932,430]]){
+  const v=flightViewport(width,height,{left:34,right:20,bottom:21});
+  assert.ok(v.worldHeight>=639.99,'landscape must not crop approaching ground/canopy');
+  assert.ok(113*v.scale>=30,'authored parrot width fell below 30 CSS pixels');
+  assert.ok(v.y+v.h<=height-21-56+.01,'flight overlaps bottom touch controls');
+ }
+});

@@ -42,7 +42,7 @@ test('prewarm uses prototype-inherited seed/mode from the ACTUAL Game.visual(alp
  const previous=getWeatherMode();t.after(()=>setWeatherMode(previous));
  setWeatherMode('auto');
  const g=new Game({seed:217});
- g.mode='tranquilo';g.elapsed=300;g.state='playing';g.snapshot();
+ g.mode='tranquilo';g.elapsed=290;g.state='playing';g.snapshot();
  const interpolated=g.visual(1);
  assert.equal(interpolated.mode,'tranquilo');
  assert.equal(interpolated.seed,217);
@@ -50,9 +50,11 @@ test('prewarm uses prototype-inherited seed/mode from the ACTUAL Game.visual(alp
  assert.equal(Object.hasOwn(interpolated,'seed'),false);
  const atlas={naturalWidth:1672,naturalHeight:941};
  const cache=new SeasonalBackdrop();
- const correctState=journeySeason({mode:g.mode,seed:g.seed,elapsed:310,distance:28000});
+ const correctState=journeySeason({mode:g.mode,seed:g.seed,elapsed:308,distance:28000});
  assert.equal(correctState.to,1,'expect summer before autumn boundary');
- for(let i=0;i<14;i++)cache.prepare(atlas,950,600,1,interpolated);
+ // The incremental scheduler uses 24-row slices and a SOFT time budget;
+ // allow enough calls to complete the cache on slow CI machines.
+ for(let i=0;i<80;i++)cache.prepare(atlas,950,600,1,interpolated);
  assert.ok(cache.frames.has(1),'summer source missing');
  assert.ok(!cache.frames.has(2),'wrong-mode prewarm accidentally loaded autumn');
  assert.ok(cache.frames.size<=2);

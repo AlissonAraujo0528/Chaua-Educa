@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image
 
 ROOT=Path(__file__).resolve().parent.parent/'Chaua-Educa-main/assets'
-SRC=ROOT/'Seasons/Winter/sources'
+SRC=Path(__file__).resolve().parent.parent/'art-source/winter'
 
 def source_cells(path):
     image=Image.open(path).convert('RGB')

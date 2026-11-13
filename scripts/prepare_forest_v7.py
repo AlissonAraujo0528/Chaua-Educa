@@ -8,7 +8,7 @@ import json
 import numpy as np
 from PIL import Image
 from scipy.ndimage import label,binary_dilation
-ROOT=Path(__file__).resolve().parents[1];SRC=ROOT/'Chaua-Educa-main/assets/v7-source';OUT=ROOT/'Chaua-Educa-main/assets/v7';OUT.mkdir(exist_ok=True)
+ROOT=Path(__file__).resolve().parents[1];SRC=ROOT/'art-source/trees';OUT=ROOT/'Chaua-Educa-main/assets/v7';OUT.mkdir(exist_ok=True)
 def extract(name,count):
  a=np.array(Image.open((SRC/name).with_suffix('.webp')).convert('RGBA'));labs,n=label(a[:,:,3]>100);counts=np.bincount(labs.ravel());counts[0]=0
  ids=sorted(counts.argsort()[-count:],key=lambda k:(np.where(labs==k)[0].mean()//(a.shape[0]/(4 if count==16 else 2)),np.where(labs==k)[1].mean()))

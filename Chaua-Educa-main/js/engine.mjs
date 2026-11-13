@@ -6,11 +6,12 @@ import { JOURNEY, JOURNEY_LENGTH, ARRIVAL_SECONDS, journeyStage } from './journe
 import { offerPower, POWER_BALANCE } from './powers.mjs';
 import { advanceHawk, advanceSnake } from './animals.mjs';
 import { planEncounter, seededRandom } from './encounters.mjs';
-import { FRUITS } from './fruits.mjs';
+import { FOODS } from './foods.mjs';
 import { physicsWind } from './weather.mjs';
 import { activeProbe } from './perf-hooks.mjs';
 import { QUESTIONS } from './questions.mjs';
 import { ACTION_TIMINGS } from './action-states.mjs';
+import {createSurfaceWeather,advanceSurfaceWeather} from './surface-weather.mjs';
 
 export const WIDTH = 960;
 export const HEIGHT = 640;
@@ -200,13 +201,13 @@ export class Game {
         this.encounterRandom = this.randomOverride ?? seededRandom(this.seed);
         this.powerRandom = this.randomOverride ?? seededRandom(this.seed ^ 0x85ebca6b);
         Object.assign(this, {
-            tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
+            surfaceWeather:createSurfaceWeather(), tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
             scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:8,nextShield:14,nextFeather:24,nextPepper:36},
             mode, state: 'menu', elapsed: 0, sceneTime: 0, distance: 0, score: 0, fruits: 0, correct: 0,
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
             flapCooldown: 0, pendingTap: 0, stamina: 1, wing: 0, flapImpulse: 0, angle: 0, y: HEIGHT * .48,
             vy: 0, countdown: 2.4, entities: [], particles: [], popups: [], collectPulse: 0, powerFade: 0, nextSpawn: 1.5,
-            sequence: 0, lastGap: 320, lastPattern: null, encounterHistory: [], question: null, questionPool: [],
+            sequence: 0, foodSequence:0, lastGap: 320, lastPattern: null, encounterHistory: [], question: null, questionPool: [],
             answerResult: null, quizPending: false, nextQuizAt: QUIZ_INTERVAL, reviewIds: [], reason: '', stage: 0, nextId: 1, hit: null, impactRemaining: 0, shakeTime: 0, shakeDuration: 0, shakeIntensity: 0,
         });
         this.snapshot();
@@ -429,7 +430,7 @@ export class Game {
                 this.onEvent({type:'route-complete',points:POWER_BALANCE.routeBonus*multiplier});
             }
         }
-        this.onEvent({ type: 'fruit', fruit: FRUITS[entity.variety ?? 0].id });
+        this.onEvent({ type: 'fruit', fruit: FOODS[entity.variety ?? 0].id });
         this.collectPulse=.26;
         this.fruitBurst(entity.x, entity.y, entity.variety ?? 0, multiplier);
         this.quizPending = true; // One pending discovery, regardless of fruit count.
@@ -698,7 +699,7 @@ export class Game {
             }
             placedFruits.push({x:fx,y:fy});
             this.entities.push({ id: this.nextId++, kind:'fruit', x:fx, y:fy,
-                variety:(n+index)%FRUITS.length, route:n, optional:!hawkAlone&&plan.optional });
+                variety:this.foodSequence++%FOODS.length, route:n, optional:!hawkAlone&&plan.optional });
         }
         if(placedFruits.length>1)this.routes.set(n,{total:placedFruits.length,collected:0,awarded:false,failed:false});
         const firstFruit = placedFruits[0];
@@ -751,6 +752,7 @@ export class Game {
         }
         if (this.state !== 'playing') return;
         this.elapsed += dt;
+        advanceSurfaceWeather(this,dt);
         const speed = this.speed;
         if(!this.tutorial)this.distance = Math.min(JOURNEY_LENGTH,this.distance+speed*dt);
         const nextStage=journeyStage(this.distance);

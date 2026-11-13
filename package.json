@@ -3,7 +3,7 @@
   "version": "2.5.0",
   "private": true,
   "type": "module",
-  "description": "Uma aventura educativa do papagaio-chauá pela Mata Atlântica.",
+  "description": "Uma aventura educativa do papagaio-chau\u00e1 pela Mata Atl\u00e2ntica.",
   "scripts": {
     "start": "python scripts/dev-server.py",
     "build": "sass --no-source-map Chaua-Educa-main/scss/style.scss Chaua-Educa-main/css/style.css",
@@ -27,13 +27,16 @@
     "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs",
     "test:perf-probe": "node tests/browser-perf-probe.cjs",
     "test:perf-forensics": "node tests/browser-perf-forensics.cjs",
+    "test:perf-experiments": "node tests/browser-perf-experiments.cjs",
     "test:winter-art": "node tests/browser-approved-winter.cjs",
     "test:pages-path": "node tests/browser-github-pages.cjs",
     "test:auto-visual": "node scripts/capture-auto-visual.cjs",
     "test:snake-raster-parity": "node tests/browser-snake-raster-parity.cjs",
     "benchmark:snake-a2": "node scripts/benchmark-snake-a2.cjs",
     "benchmark:render-parts": "node scripts/benchmark-render-parts.cjs",
-    "benchmark:background-passes": "node scripts/benchmark-background-passes.cjs"
+    "benchmark:background-passes": "node scripts/benchmark-background-passes.cjs",
+    "test:surface-foods": "node tests/browser-surface-foods.cjs",
+    "art:build": "python scripts/build_runtime_art.py"
   },
   "engines": {
     "node": ">=22"
