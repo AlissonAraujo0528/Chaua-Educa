@@ -34,3 +34,12 @@ mask. The four-season atlas stays 1672×941 with the original quadrant order.
 No automatic overwrite of authored art is performed by CI.
 
 The new-art browser test is intentionally **not** in required CI until the replacement WebP binaries are installed on the branch. A green CI before that installation verifies runtime compatibility, **not** the visual appearance of the new artwork.
+
+To deterministically regenerate the delivered art after copying the source JPEGs to `assets/Seasons/Winter/sources/`, run:
+
+```sh
+python -m pip install -r scripts/requirements-art.txt
+python scripts/build_approved_winter_art.py
+```
+
+Review differences before committing. The script always composites the authored snow on the unchanged original v7/v9 bark. This is an explicit, manual art-generation command, not a CI job that silently rewrites game assets.
