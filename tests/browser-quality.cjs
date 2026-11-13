@@ -52,10 +52,23 @@ const {chromium}=require('playwright');
   await mode('low');await step([1/60],780);
   assert.equal((await state()).width,390);assert.equal((await state()).stored,'low');
   assert.equal((await state()).decoration,'low','Manual Low must retain its existing reduced decoration');
-  await mode('auto');await step([.12,1/60],40);
-  assert.equal((await state()).width,390,'recurring active stalls above 100 ms must count');
-  assert.equal((await state()).decoration,'high','Automatic must restore full effects after Manual Low');
+  await mode('auto');
+  await page.evaluate(async()=>{
+   const {Renderer}=await import('/js/render.mjs');
+   window.qualityOriginalDraw=Renderer.prototype.game;
+   Renderer.prototype.game=function(){window.activeRenderer=this;};
+  });
+  await step([.12,1/60],40);
+  assert.equal((await state()).width,780,'external long RAF gaps with negligible render work must not downgrade');
+  await page.evaluate(async()=>{
+   const {Renderer}=await import('/js/render.mjs'),draw=window.qualityOriginalDraw;
+   Renderer.prototype.game=function(...args){const result=draw.apply(this,args);const begin=performance.now();while(performance.now()-begin<12){}return result;};
+  });
+  await step([1/60,1/30],100);
+  assert.equal((await state()).width,390,'sustained expensive game frames must still downgrade');
+  assert.equal((await state()).decoration,'high','Auto keeps full decoration when pixel reduction is effective');
   assert.equal((await state()).stored,'auto');
+  await page.evaluate(async()=>{const {Renderer}=await import('/js/render.mjs');Renderer.prototype.game=window.qualityOriginalDraw;});
   const restart=async()=>{
    await page.locator('#pause-button').click();
    await page.locator('#pause-dialog .back-home').click();
@@ -69,6 +82,27 @@ const {chromium}=require('playwright');
   assert.deepEqual(errors,[]);
   console.log('Automatic quality: real frame loop, renderer, manual settings, pause and reduced motion passed.');
   await page.close();
+  // On a DPR=1 canvas, dropping only maxDpr would be an invisible no-op.
+  const pixel=await browser.newPage({viewport:{width:1366,height:768},deviceScaleFactor:1});
+  await pixel.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
+  const equalBudget=await pixel.evaluate(async()=>{
+   const {Renderer}=await import('/js/render.mjs');
+   const original=Renderer.prototype.setAutomaticQuality;
+   Renderer.prototype.setAutomaticQuality=function(level){window.autoQualityRenderer=this;return original.call(this,level);};
+   const selector=document.querySelector('#quality-mode');
+   selector.value='auto';selector.dispatchEvent(new Event('change',{bubbles:true}));
+   const r=window.autoQualityRenderer;
+   r.setAutomaticQuality('high');
+   const high={width:r.canvas.width,height:r.canvas.height,decoration:r.decoration};
+   r.setAutomaticQuality('low');
+   const low={width:r.canvas.width,height:r.canvas.height,decoration:r.decoration};
+   return {high,low};
+  });
+  assert.equal(equalBudget.high.width,equalBudget.low.width);
+  assert.equal(equalBudget.high.height,equalBudget.low.height);
+  assert.equal(equalBudget.high.decoration,'high');
+  assert.equal(equalBudget.low.decoration,'low','auto low must reduce decoration when pixels cannot change');
+  await pixel.close();
   // Native scheduling + real rendering. Deliberately expensive High reproduces
   // profile-dependent load on fast CI machines; this is not a hardware FPS claim.
   const live=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:2}),liveErrors=[];
