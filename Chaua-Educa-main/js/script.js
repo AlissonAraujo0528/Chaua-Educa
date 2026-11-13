@@ -438,6 +438,9 @@ function syncUI() {
 }
 
 function frame(time) {
+    // Include update, UI, audio and drawing work within the RAF callback.
+    // This elapsed JS wall time is diagnostic, not a GPU timing measurement.
+    const frameWorkStart=performance.now();
     const probe=activeProbe;
     if(probe)probe.beginFrame(time,game.stage);
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
@@ -451,11 +454,11 @@ function frame(time) {
         syncUI();lastHudTime=time;
         if(probe)probe.end('ui.sync',hudAt);
     }
-    if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
     forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){
+        quality.sample(delta,false);
         if(probe)probe.endFrame();
         requestAnimationFrame(frame);return;
     }
@@ -475,6 +478,8 @@ function frame(time) {
         if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
+    const activeFlight=document.hasFocus()&&game.state==='playing';
+    if(quality.sample(delta,activeFlight,performance.now()-frameWorkStart))applyVisualQuality();
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
