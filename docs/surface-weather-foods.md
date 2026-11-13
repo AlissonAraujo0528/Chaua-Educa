@@ -55,3 +55,27 @@ their generators updated. Recover retired versions through Git history.
 
 Native-device FPS has to be measured with the same seed, viewport and duration
 before and after this branch. CI/synthetic clocks are not a guarantee of 60 FPS.
+
+
+## Rain and snow on animals
+
+Contact positions are measured offline from each unchanged authored flight/A2
+frame (`scripts/build_animal_weather.py`, `animal-contact-data.mjs`), including
+mirrored A2 strike poses and deliberate v6 flight/landing poses. Bird contacts
+use rear wings/back; snake contacts use lower coils, away from eyes and mouths.
+Impact/star poses suppress contact overlays. Tiny snow dusting follows global
+deposition; wingbeats/botes/dives shake it off and it rebuilds over time.
+
+Wet beads reuse the existing packed water atlas. Attached contacts follow the
+sprite's actual canvas transform. Released droplets/crystals are converted
+once into world coordinates, scroll with the flight, and fall under gravity.
+No animal atlas, hitbox, physics RNG, runtime pixel readback or per-frame image
+allocation is added. Former fixed frost and body-relative spray loops were
+removed. The renderer owns at most 16 contact records and 24 detached particles
+(8 in Low); reduced motion keeps static surface details without moving particles.
+Pause/quiz use the frozen scene clock, and a new run resets the effect state.
+
+`tests/animal-weather.test.mjs` verifies release, mirroring, world gravity,
+pause/reset and budgets. `tests/browser-animal-weather.cjs` checks all 216
+anchors against real opaque artwork, exercises production pose selection and
+captures 32 rain/snow poses in `animal-weather/contact-poses.png`.

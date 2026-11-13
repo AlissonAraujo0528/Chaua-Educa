@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {images} from '../Chaua-Educa-main/js/assets.mjs';
 import {TREE_WIDTH} from '../Chaua-Educa-main/js/forest-geometry.mjs';
 import {drawLivingTrunk} from '../Chaua-Educa-main/js/tree-art.mjs';
-import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterOverlayStages}
+import {drawSnowfall,drawSnowContact,winterOverlayStages}
  from '../Chaua-Educa-main/js/winter-vfx.mjs';
 import {drawSeasonParticles,journeySeason} from '../Chaua-Educa-main/js/seasons.mjs';
 import {drawForestLife} from '../Chaua-Educa-main/js/forest-life.mjs';
@@ -128,22 +128,6 @@ test('the upper tree snow overlay touches only the exposed branch cap, never its
  assert.ok(upper.calls.some(x=>x.type==='image'&&x.args[0]===original),'the authored base tree must remain');
 });
 
-test('frost on authored bird, snake and hawk adds only subtle lines, never a new head or bitmap',()=>{
- for(const type of ['chaua','snake','hawk']){
-  const full=mock();drawAnimalFrost(full.c,type,1,1.04,false);
-  assert.ok(full.calls.some(x=>x.type==='stroke'),type+' lacks frost');
-  assert.ok(full.calls.every(x=>x.type!=='image'&&x.type!=='fillRect'),'do not paint new anatomy');
-  const low=mock();drawAnimalFrost(low.c,type,.12,1.04,true);
-  assert.equal(low.calls.length,0);
-  const reduced=mock();drawAnimalFrost(reduced.c,type,1,1.04,true);
-  assert.ok(reduced.calls.some(x=>x.type==='stroke'),'static frost remains for reduced motion');
- }
- const cap=mock();drawSnowContact(cap.c,220,310,1,23.5,2,false,false);
- assert.ok(cap.calls.some(x=>x.type==='arc'));
- const reduced=mock();drawSnowContact(reduced.c,220,310,1,23.5,2,true,true);
- assert.equal(reduced.calls.length,0);
-});
-
 test('forest atmosphere no longer emits duplicate snowfall particles',()=>{
  const old=getWeatherMode();
  try{
@@ -165,14 +149,4 @@ test('upper branch crystals fall down while lower-cap crystals settle on top',()
  assert.equal(f.length,4);
  assert.ok(f.every(y=>y>=320&&y<=335),'upper tree snow must descend with gravity');
  assert.ok(s.every(y=>y<=320),'lower cap snow should not originate below its surface');
-});
-
-
-test('hawk snow stays on the upper silhouette, not floating above its authored wings',()=>{
- const {c,calls}=mock();
- drawAnimalFrost(c,'hawk',1,1,false);
- const strokes=calls.filter(x=>x.type==='moveTo');
- assert.ok(strokes.length>=4,'hawk upper contour has no frost detail');
- assert.ok(strokes.every(x=>x.args[1]>=-30&&x.args[1]<2),
-  'frost is detached from original flying wing/head surface');
 });
