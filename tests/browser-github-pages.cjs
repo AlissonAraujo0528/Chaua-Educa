@@ -17,8 +17,17 @@ const url = process.env.PAGES_PREVIEW_URL ||
   });
   await page.goto(url,{waitUntil:'networkidle',timeout:45000});
   assert.equal(new URL(page.url()).pathname,'/Chaua-Educa/Chaua-Educa-main/');
-  await page.locator('#btnStart:not([disabled])').waitFor({timeout:25000});
+  // Gameplay correctly requires a player name (at least 3 characters)
+  // before enabling "Vamos voar". Previous test timed out before filling it.
   await page.locator('#start-training:not([disabled])').waitFor({timeout:25000});
+  await page.locator('#inputPlayer').fill('Teste Pages');
+  try {
+   await page.locator('#btnStart:not([disabled])').waitFor({timeout:12000});
+  } catch(error) {
+   const status=await page.locator('#asset-status').textContent().catch(()=>null);
+   throw new Error('GitHub Pages button never enabled after valid name; asset-status='+status+
+    '; pageerrors='+JSON.stringify(errors)+'; networkErrors='+JSON.stringify(badResponses),{cause:error});
+  }
   assert.deepEqual(errors,[],'JavaScript error on GitHub Pages subpath');
   assert.deepEqual(badResponses,[],'Missing assets or modules on GitHub Pages subpath');
   const loaded=await page.evaluate(async()=>{
@@ -37,7 +46,6 @@ const url = process.env.PAGES_PREVIEW_URL ||
   assert.ok(loaded.images>15,'Images must load from relative paths');
   assert.equal(loaded.seasonal,true);
   assert.equal(loaded.requiredArt,true,'All four required action atlases must be ready');
-  await page.locator('#inputPlayer').fill('Teste Pages');
   await page.locator('#btnStart').click();
   await page.waitForFunction(()=>document.querySelector('#app')?.dataset.state==='playing',{timeout:15000});
   await page.waitForTimeout(1000);
