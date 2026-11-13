@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {winterBreathSettings,drawSnowShedding}
+import {winterBreathSettings}
  from '../Chaua-Educa-main/js/winter-vfx.mjs';
 import {drawAnimalBreath} from '../Chaua-Educa-main/js/render.mjs';
 import {images} from '../Chaua-Educa-main/js/assets.mjs';
@@ -48,23 +48,4 @@ test('vapour exclusively samples existing four-frame clay-breath WebP',t=>{
  assert.ok(low.draws.filter(x=>x[0]==='img').length<=1);
  const noWinter=mock();drawAnimalBreath(noWinter.c,44,0,0,.5);
  assert.equal(noWinter.draws.length,0);
-});
-
-test('dislodged snow is tiny, deterministic, and suppressed when no action or winter',()=>{
- for(const kind of species){
-  const none=mock();
-  drawSnowShedding(none.c,kind,0,5,.8);
-  assert.equal(none.draws.length,0);
-  drawSnowShedding(none.c,kind,1,5,.1);
-  assert.equal(none.draws.length,0);
-  drawSnowShedding(none.c,kind,1,5,.8,{reduced:true});
-  assert.equal(none.draws.length,0);
-  const high=mock(),repeat=mock(),low=mock();
-  drawSnowShedding(high.c,kind,1,5.2,.8,{seed:42});
-  drawSnowShedding(repeat.c,kind,1,5.2,.8,{seed:42});
-  drawSnowShedding(low.c,kind,1,5.2,.8,{seed:42,low:true});
-  assert.deepEqual(high.draws,repeat.draws);
-  assert.equal(high.draws.filter(x=>x[0]==='arc').length,5);
-  assert.equal(low.draws.filter(x=>x[0]==='arc').length,2);
- }
 });

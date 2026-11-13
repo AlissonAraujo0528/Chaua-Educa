@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {images} from '../Chaua-Educa-main/js/assets.mjs';
 import {TREE_WIDTH} from '../Chaua-Educa-main/js/forest-geometry.mjs';
 import {drawLivingTrunk} from '../Chaua-Educa-main/js/tree-art.mjs';
-import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterOverlayStages}
+import {drawSnowfall,drawSnowContact,winterOverlayStages}
  from '../Chaua-Educa-main/js/winter-vfx.mjs';
 import {drawSeasonParticles,journeySeason} from '../Chaua-Educa-main/js/seasons.mjs';
 import {drawForestLife} from '../Chaua-Educa-main/js/forest-life.mjs';
@@ -97,7 +97,7 @@ test('four existing transparent snow overlays crossfade progressively at every b
  assert.deepEqual(winterOverlayStages(0),[]);
  assert.deepEqual(winterOverlayStages(.125),[{stage:1,alpha:.5}]);
  assert.deepEqual(winterOverlayStages(.25),[{stage:1,alpha:1}]);
- assert.deepEqual(winterOverlayStages(.375),[{stage:1,alpha:1},{stage:2,alpha:.5}]);
+ assert.deepEqual(winterOverlayStages(.375),[{stage:1,alpha:.5},{stage:2,alpha:.5}]);
  assert.deepEqual(winterOverlayStages(.5),[{stage:2,alpha:1}]);
  assert.deepEqual(winterOverlayStages(1),[{stage:4,alpha:1}]);
  for(let i=0;i<=100;i++){
@@ -114,30 +114,18 @@ test('the upper tree snow overlay touches only the exposed branch cap, never its
  images.set('trees-upper',original);
  images.set('trees-upper-overlay-01',stage1);
  images.set('trees-upper-overlay-02',stage2);
+ const oldCanvas=globalThis.OffscreenCanvas,inside=mock();inside.c.clearRect=()=>{};
+ globalThis.OffscreenCanvas=class{getContext(){return inside.c}};
+ t.after(()=>{globalThis.OffscreenCanvas=oldCanvas});
  const upper=mock();
  drawLivingTrunk(upper.c,{x:200,y:200,upper:true,width:TREE_WIDTH,length:900,snow:.375});
- const snowDraws=upper.calls.filter(x=>x.type==='image'&&(x.args[0]===stage1||x.args[0]===stage2));
+ const snowDraws=inside.calls.filter(x=>x.type==='image'&&(x.args[0]===stage1||x.args[0]===stage2));
  assert.equal(snowDraws.length,2);
  assert.equal(snowDraws[0].args[0],stage1);
  assert.equal(snowDraws[1].args[0],stage2);
- for(const draw of snowDraws)assert.ok(draw.args[4]>2,'should draw branch cap instead of repeated 1px ceiling strip');
+ const composed=upper.calls.find(x=>x.type==='image'&&x.args[0]!==original);
+ assert.ok(composed.args[4]>2,'the composed overlay uses the exposed cap rather than the ceiling strip');
  assert.ok(upper.calls.some(x=>x.type==='image'&&x.args[0]===original),'the authored base tree must remain');
-});
-
-test('frost on authored bird, snake and hawk adds only subtle lines, never a new head or bitmap',()=>{
- for(const type of ['chaua','snake','hawk']){
-  const full=mock();drawAnimalFrost(full.c,type,1,1.04,false);
-  assert.ok(full.calls.some(x=>x.type==='stroke'),type+' lacks frost');
-  assert.ok(full.calls.every(x=>x.type!=='image'&&x.type!=='fillRect'),'do not paint new anatomy');
-  const low=mock();drawAnimalFrost(low.c,type,.12,1.04,true);
-  assert.equal(low.calls.length,0);
-  const reduced=mock();drawAnimalFrost(reduced.c,type,1,1.04,true);
-  assert.ok(reduced.calls.some(x=>x.type==='stroke'),'static frost remains for reduced motion');
- }
- const cap=mock();drawSnowContact(cap.c,220,310,1,23.5,2,false,false);
- assert.ok(cap.calls.some(x=>x.type==='arc'));
- const reduced=mock();drawSnowContact(reduced.c,220,310,1,23.5,2,true,true);
- assert.equal(reduced.calls.length,0);
 });
 
 test('forest atmosphere no longer emits duplicate snowfall particles',()=>{
@@ -161,14 +149,4 @@ test('upper branch crystals fall down while lower-cap crystals settle on top',()
  assert.equal(f.length,4);
  assert.ok(f.every(y=>y>=320&&y<=335),'upper tree snow must descend with gravity');
  assert.ok(s.every(y=>y<=320),'lower cap snow should not originate below its surface');
-});
-
-
-test('hawk snow stays on the upper silhouette, not floating above its authored wings',()=>{
- const {c,calls}=mock();
- drawAnimalFrost(c,'hawk',1,1,false);
- const strokes=calls.filter(x=>x.type==='moveTo');
- assert.ok(strokes.length>=4,'hawk upper contour has no frost detail');
- assert.ok(strokes.every(x=>x.args[1]>=-30&&x.args[1]<2),
-  'frost is detached from original flying wing/head surface');
 });

@@ -36,7 +36,7 @@ fs.mkdirSync(out,{recursive:true});
     ['late-autumn',.60,'auto'],
     ['snow-entry',.675,'auto'],
     ['snow-transition',.695,'auto'],
-    ['winter-full',.78,'auto'],
+    ['winter-accumulating',.78,'auto'],
     ['winter-late',.96,'auto'],
     ['manual-winter',.10,'winter'],
     ['reduced-winter',.84,'auto']
@@ -49,10 +49,15 @@ fs.mkdirSync(out,{recursive:true});
       import('/js/living-motion.mjs'),import('/js/seasons.mjs')
      ]);
      setWeatherMode(mode);
-     game.elapsed=climateReferenceSeconds(game.mode,game.seed)*progress;
+     const {createSurfaceWeather,advanceSurfaceWeather,surfaceSnow}=await import('/js/surface-weather.mjs');
+     const target=climateReferenceSeconds(game.mode,game.seed)*progress;
+     const onset=.65*climateReferenceSeconds(game.mode,game.seed);
+     game.elapsed=mode==='winter'?target:Math.min(target,onset);
+     game.surfaceWeather=createSurfaceWeather();
+     while(game.elapsed<target){const dt=Math.min(1/120,target-game.elapsed);game.elapsed+=dt;advanceSurfaceWeather(game,dt);}
      game.sceneTime=35.4;
      renderer.game(game,reduced);
-     return {rain:journeyRain(game),snow:winterAmount(game),
+     return {rain:journeyRain(game),snow:winterAmount(game),cover:surfaceSnow(game),
       season:journeySeason(game),score:game.score,distance:game.distance,
       cached:renderer.seasonalBackdrop?.frames.size||0,
       width:renderer.w,height:renderer.h};
@@ -66,10 +71,13 @@ fs.mkdirSync(out,{recursive:true});
      assert.ok(details.snow>last,'snow should intensify');
      last=details.snow;
     }
-    if(name==='winter-full'||name==='winter-late'||name==='manual-winter'){
+    if(name==='winter-accumulating'||name==='winter-late'||name==='manual-winter'){
      assert.equal(details.snow,1);
      assert.equal(details.rain,0);
     }
+    if(name==='manual-winter')assert.equal(details.cover,0,'manual winter starts without instant full cover');
+    if(name==='winter-accumulating')assert.ok(details.cover>0&&details.cover<1,'cover keeps accumulating after the backdrop reaches full winter');
+    if(name==='winter-late')assert.equal(details.cover,1);
     await page.screenshot({path:path.join(out,w+'x'+h+'-'+name+'.png')});
     console.log('WINTER_V3_SCENE '+JSON.stringify({viewport:[w,h],name,...details}));
    }

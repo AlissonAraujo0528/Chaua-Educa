@@ -1,3 +1,4 @@
+import {FOOD_IDS} from './foods.mjs';
 import { normalizeProgress, advanceProgress } from './missions.mjs';
 import { activeProbe } from './perf-hooks.mjs';
 import { ENTRIES, INITIAL_ENTRIES } from './collection.mjs';
@@ -63,14 +64,22 @@ export default class DB {
     static unlocked() {
         const old = this.readObject('chaua-educa-v2', {});
         const current = this.readObject('chaua-floresta-collection', []);
-        return [...new Set([...(Array.isArray(old?.unlocked) ? old.unlocked : []), ...(Array.isArray(current) ? current : [])].filter(id => ['Goiaba','Semente','Manga','Mamao','Coquinho','Banana','Milho'].includes(id)))];
+        // Versioned, non-destructive migration: retired discoveries remain in
+        // the original save, but cannot unlock a different new food or artwork.
+        if(this.readObject('chaua-food-catalog-version',0)!==2){
+            this.memory.set('chaua-food-catalog-version',2);
+            try{this._writeJSON('chaua-food-catalog-version',2);}
+            catch{this.storageAvailable=false;}
+        }
+        return [...new Set([...(Array.isArray(old?.unlocked) ? old.unlocked : []), ...(Array.isArray(current) ? current : [])].filter(id => FOOD_IDS.has(id)))];
     }
 
     static unlock(id) {
         // Avoid synchronously re-writing an already persisted fruit.
         const stored=this.readObject('chaua-floresta-collection',[]);
         if(Array.isArray(stored)&&stored.includes(id))return;
-        const data = [...new Set([...this.unlocked(), id])];
+        if(!FOOD_IDS.has(id))return;
+        const data = [...new Set([...(Array.isArray(stored)?stored:[]),...this.unlocked(), id])];
         this.memory.set('chaua-floresta-collection',data);
         try { this._writeJSON('chaua-floresta-collection',data); }
         catch { this.storageAvailable = false; }

@@ -30,9 +30,10 @@ const {chromium}=require('playwright');
     }
     output.push({kind,same,changed,ceiling,icicle});
    }
+   const {RUNTIME_ART}=await import('/js/runtime-art-data.mjs');
    const season=pixels('season-backgrounds');
    return {output,background:[season.w,season.h],
-    shedding:[0,1,2,3,4,5].every(i=>images.has(`trees-upper-shedding-0${i}`))};
+    shedding:[0,1,2,3,4,5].every(i=>Object.keys(RUNTIME_ART.fx.frames).some(k=>k.startsWith(`snow-${i}-`)))};
   });
   assert.deepEqual(results.background,[1672,941]);
   assert.equal(results.shedding,true);

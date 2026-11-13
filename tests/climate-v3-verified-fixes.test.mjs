@@ -48,8 +48,7 @@ test('unused winter textures stop loading, but all authored overlays and sheddin
   assert.ok(ASSET_PATHS[`trees-${kind}-snow-04`]);
   for(const i of [1,2,3,4])assert.ok(ASSET_PATHS[`trees-${kind}-overlay-0${i}`]);
  }
- for(let i=0;i<6;i++)assert.ok(ASSET_PATHS[`trees-upper-shedding-0${i}`],
-  'do not silently remove still-used winter falloff textures');
+ assert.ok(ASSET_PATHS['runtime-fx-0'],'packed shedding remains required');
 });
 
 test('snow in variant trunks is painted on lower exposed cap once, not tiled along bark or inverted onto ceiling',t=>{

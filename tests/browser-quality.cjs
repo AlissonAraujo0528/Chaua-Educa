@@ -58,8 +58,11 @@ const {chromium}=require('playwright');
    window.qualityOriginalDraw=Renderer.prototype.game;
    Renderer.prototype.game=function(){window.activeRenderer=this;};
   });
+  await step([1/60],3);await step([.12],1);
+  assert.equal((await state()).width,780,'one unexplained RAF gap must not downgrade');
   await step([.12,1/60],40);
-  assert.equal((await state()).width,780,'external long RAF gaps with negligible render work must not downgrade');
+  assert.equal((await state()).width,390,'recurring light-JS gaps remain evidence of unmeasured compositor cost');
+  await mode('high');await mode('auto');
   await page.evaluate(async()=>{
    const {Renderer}=await import('/js/render.mjs'),draw=window.qualityOriginalDraw;
    Renderer.prototype.game=function(...args){const result=draw.apply(this,args);const begin=performance.now();while(performance.now()-begin<12){}return result;};

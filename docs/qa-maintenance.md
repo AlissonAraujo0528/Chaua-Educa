@@ -9,7 +9,7 @@ Esta página documenta o pipeline de qualidade atual. Experimentos anteriores co
 | `ci.yml` | Pull requests, push na `main`, manual | Testes unitários, Chromium, física/colisão A2, máscara-pixel, arte real, quatro estações, responsividade e jornadas |
 | `qa-extended.yml` | Pull requests e manual | Firefox, WebKit, Chromium e spritesheets reais do Chauá e gavião |
 | `qa-diagnostics.yml` | Somente manual | Renderização, voo longo, resolução/DPR, floresta, transições, culling e arte |
-| `generate-winter-sprites.yml` | Somente manual | Geração experimental da neve em runner descartável; publica artefato, **nunca faz push** |
+| `generate-winter-sprites.yml` | Somente manual | Reprodução oficial da arte em runner descartável; publica artefato, **nunca faz push** |
 
 Os 26 workflows de experimentos ligados a branches históricas foram substituídos por ferramentas manuais reutilizáveis. Benchmarks válidos permanecem no diretório `scripts/`, não duplicados em dezenas de workflows.
 

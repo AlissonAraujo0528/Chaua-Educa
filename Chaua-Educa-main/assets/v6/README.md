@@ -1,6 +1,6 @@
 # Animações v6
 
-Artes criadas com o gerador integrado de imagens, usando as referências originais do jogo. Três atlases WebP sem perdas, 1536 × 1536, grade 4 × 4, células 384 × 384, com transparência e margens entre quadros. Ordem de leitura: esquerda para direita, de cima para baixo. O jogo carrega apenas os atlases; os PNGs em `sources/` preservam a saída original para nova preparação.
+Artes criadas com o gerador integrado de imagens, usando as referências originais do jogo. Dois atlases WebP sem perdas, 1536 × 1536, grade 4 × 4, células 384 × 384, com transparência e margens entre quadros. Ordem de leitura: esquerda para direita, de cima para baixo. O jogo carrega apenas os atlases; os PNGs em `art-source/characters/` preservam a saída original para nova preparação.
 
 | Atlas | Quadros (índices a partir de zero) |
 | --- | --- |
@@ -22,4 +22,6 @@ python3 scripts/prepare_sprite_atlases.py Chaua-Educa-main/assets/v6/sources
 
 O script extrai os 16 componentes principais, remove resíduos de transparência externos, registra as poses, verifica margens e codifica WebP sem perdas. Não gera nem redesenha personagens. Direção de arte e resumo dos prompts: [PROMPTS.md](PROMPTS.md).
 
-**Nota 2026-11:** `prepare_sprite_atlases.py` passou a gerar somente Chauá e gavião. O `snake-source.png` permanece como fonte autoral arquivada; o atlas v6 da cobra não faz parte do jogo atual.
+**Atualização:** o gerador produz somente Chauá e gavião, a partir de
+`art-source/characters/`. A fonte histórica da cobra foi removida; as únicas
+folhas ativas da Cobra A2 ficam em `public/snake/`.

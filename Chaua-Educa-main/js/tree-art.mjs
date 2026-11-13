@@ -1,41 +1,8 @@
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
+import {drawPackedSection} from './weather-art.mjs';
 import {winterOverlayStages} from './winter-vfx.mjs';
-
-// Tiny local highlights follow the existing bark, without painting a large
-// rectangular light patch or modifying any authored tree atlas.
-export function drawWetBarkSheen(c,x,y,width,wet,time=0,seed=0){
- if(wet<=0||width<=0)return;
- c.save();
- c.lineCap='round';
- c.lineWidth=Math.max(.75,Math.min(2.2,width*.019));
- c.strokeStyle='#a4cad3';
- c.globalAlpha=Math.min(.32,wet*.28);
- c.beginPath();
- const left=x+width*.20+(seed%3)*width*.025;
- c.moveTo(left,y+3);
- c.quadraticCurveTo(left+width*.045,y+21,left+width*.026,y+51);
- c.stroke();
- c.globalAlpha=wet*.13;
- c.lineWidth=Math.max(.6,width*.008);
- c.beginPath();
- c.moveTo(x+width*.66,y+14);
- c.quadraticCurveTo(x+width*.64,y+27,x+width*.65,y+35);
- c.stroke();
- // A falling bead releases periodically from the cap; zero allocations
- // and no new silhouette, facial feature, limb, or head is ever drawn.
- const cycle=((time*1.15+seed*.37)%1+1)%1;
- if(cycle>.67){
-  const phase=(cycle-.67)/.33;
-  c.globalAlpha=wet*(1-phase)*.22;
-  c.fillStyle='#add4db';
-  c.beginPath();
-  c.ellipse(left+width*.026,y+51+phase*26,1.1,1.7,0,0,Math.PI*2);
-  c.fill();
- }
- c.restore();
-}
 
 
 // Source sprites retain their authored proportions. Only an undecorated bark
@@ -70,37 +37,26 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  }
 
  // Restrained wet detail on existing bark, near the visible trunk cap.
- if(rain>0)drawWetBarkSheen(c,coreLeft,upper?join-70:py+8,width,rain,time,variant);
+ if(rain>0){c.save();c.globalAlpha=rain*.42;
+  drawPackedSection(c,'wet',`${kind}-${((variant%4)+4)%4}`,cx,upper?splice:cy,cw,(upper?f.endY:splice)-(upper?splice:cy),px,upper?join:py,cw*s,((upper?f.endY:splice)-(upper?splice:cy))*s);c.restore();}
 
  // Crossfade between the EXISTING four transparent snowfall WebP layers.
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
  if(snow>0&&!fullSnow){
-  for(const {stage,alpha} of winterOverlayStages(snow)){
-   const overlay=images.get(`trees-${kind}-overlay-0${stage}`);
-   if(!overlay || alpha<=0)continue;
-   c.save();c.globalAlpha=Math.min(1,alpha);
-   if(upper){
-    c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,
-      px,join,cw*s,(snowyTipEnd-splice)*s);
-   }else{
-    c.drawImage(overlay,sx+cx,sy,cw,splice,
-      px,y-f.anchor[1]*s,cw*s,splice*s);
-   }
-   c.restore();
+  const overlay=snowOverlay(kind,snow);
+  if(overlay){
+   if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
+   else c.drawImage(overlay,sx+cx,sy,cw,splice,px,y-f.anchor[1]*s,cw*s,splice*s);
   }
  }
 
  // Ambient snow flurries shedding gently from upper tree branches in winter
  if (upper && snow > 0.15) {
   const shedFrame = Math.floor((time * 3 + variant * 1.5) % 6);
-  const shedImg = images.get(`trees-upper-shedding-0${shedFrame}`);
-  if (shedImg) {
-   c.save?.();
-   if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, (snow - 0.15) * 1.25);
-   c.drawImage(shedImg, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
-   c.restore?.();
-  }
+  c.save();c.globalAlpha=Math.min(1,(snow-.15)*1.25);
+  drawPackedSection(c,'fx',`snow-${shedFrame}-${((variant%4)+4)%4}`,cx,splice,cw,f.endY-splice,px,join,cw*s,(f.endY-splice)*s);
+  c.restore();
  }
 }
 
@@ -147,14 +103,14 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
 
   // Material highlight remains local to the cap; the WebP silhouette stays intact.
   if(rain>0&&breakAge===undefined)
-   drawWetBarkSheen(c,-TREE_WIDTH/2,16,TREE_WIDTH,rain,time,index);
+   {c.save();c.globalAlpha=rain*.42;drawPackedSection(c,'wet',`variants-${index}`,0,TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,left,0,TREE_CELL*scale,join);c.restore();}
 
   // Snow variant transition
   if (snow > 0 && breakAge === undefined) {
    const snowImage = images.get('tree-variants-snow');
    if (snowImage) {
     c.save();
-    c.globalAlpha = Math.min(1, snow * 1.15);
+    c.globalAlpha = Math.min(1, snow);
     // Keep the original snowy cut face, but do not tile the snowy bark
     // strip all the way to the ceiling: repeating it made vertical stripes.
     // Upper trunks are turned upside down. Mirroring this white cut-face
@@ -290,4 +246,30 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
  const rootX = r.x + footX - (perch[0] - f.anchor[0]) * s;
  const top = support - 4 - (perch[1] - f.anchor[1]) * s;
  drawLivingTrunk(c, {x: rootX, y: top, width, length: 900, variant: 3, time, snow, rain});
+}
+
+const snowMixBuffers=new Map();
+export function prepareTreeWeather(){for(const kind of ['lower','upper'])snowOverlay(kind,0);}
+function snowOverlay(kind,amount){
+ amount=Math.round(amount*256)/256;
+ const level=Math.min(4,Math.max(0,amount*4)),base=Math.floor(level),fraction=level-base;
+ const a=base?images.get(`trees-${kind}-overlay-0${base}`):null;
+ const b=images.get(`trees-${kind}-overlay-0${Math.min(4,base+1)}`);
+ if(!b)return a;
+ let buffer=snowMixBuffers.get(kind);
+ if(!buffer){
+  const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(1024,1024):typeof document!=='undefined'?document.createElement('canvas'):null;
+  if(!canvas)return b;
+  canvas.width=1024;canvas.height=1024;buffer={canvas,c:canvas.getContext('2d'),amount:-1};snowMixBuffers.set(kind,buffer);
+ }
+ // The environmental cover advances once per simulation tick; all trunks reuse it.
+ if(buffer.amount!==amount){
+  const c=buffer.c;c.clearRect(0,0,1024,1024);c.globalCompositeOperation='lighter';
+  for(const {stage,alpha} of winterOverlayStages(amount)){
+   const image=images.get(`trees-${kind}-overlay-0${stage}`);
+   if(image){c.globalAlpha=alpha;c.drawImage(image,0,0);}
+  }
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';buffer.amount=amount;
+ }
+ return buffer.canvas;
 }

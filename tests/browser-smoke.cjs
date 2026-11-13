@@ -211,7 +211,7 @@ async function begin(page, name = 'Guardião da mata') {
                 assert.equal(await touch.locator('.power-bar').evaluate(bar=>[...bar.children].every(chip=>{
                     const r=chip.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth;
                 })),true);
-                assert.equal(await touch.locator('.orientation-hint').evaluate(hint=>hint.getBoundingClientRect().top>=document.querySelector('.power-bar').getBoundingClientRect().bottom),true);
+                assert.equal(await touch.locator('.orientation-hint').evaluate(hint=>getComputedStyle(hint).display==='none'||hint.getBoundingClientRect().top>=document.querySelector('.power-bar').getBoundingClientRect().bottom),true);
                 await touch.locator('#pause-button').tap();await touch.locator('#pause-dialog .back-home').tap();
             }
         }
