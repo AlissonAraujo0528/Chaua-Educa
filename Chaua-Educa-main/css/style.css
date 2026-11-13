@@ -2335,6 +2335,10 @@ dialog[open]::backdrop {
   line-height: 1.4;
 }
 
+.journal-visual:not(:has(img)) {
+  padding-top: 56px;
+}
+
 .visual-conservacao {
   background: #f3dba5;
 }
@@ -2484,6 +2488,43 @@ dialog[open]::backdrop {
 }
 
 /* Flight panels use distinct hierarchy while retaining native dialog focus/scroll. */
+.panel-heading {
+  position: relative;
+  isolation: isolate;
+  display: flow-root;
+  margin-bottom: 24px;
+}
+
+.panel-heading::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -44px -44px -12px;
+  background: radial-gradient(ellipse at top right, #466f46, #173f34 72%);
+}
+
+.panel-heading h2 {
+  color: #fffbed;
+}
+
+.panel-heading .eyebrow {
+  color: #cbd9a9;
+  justify-content: center;
+}
+
+.panel-heading .panel-subtitle, .panel-heading #result-mode {
+  color: #d7e5cb;
+}
+
+.panel-heading #result-mode {
+  margin: 12px 0;
+}
+
+#ranking-dialog .close-dialog, #missions-dialog .close-dialog {
+  z-index: 2;
+  background: #fffbed;
+}
+
 .panel-subtitle {
   color: #6e8064;
   font-size: 14px;
@@ -2605,8 +2646,24 @@ dialog[open]::backdrop {
   font-weight: 900;
 }
 
+#missions-dialog article progress {
+  appearance: none;
+  background: #e1e8d3;
+}
+
+#missions-dialog article progress::-webkit-progress-bar {
+  background: #e1e8d3;
+}
+
+#missions-dialog article progress::-webkit-progress-value {
+  background: #658749;
+}
+
+#missions-dialog article progress::-moz-progress-bar {
+  background: #658749;
+}
+
 #guide-dialog .guide-grid {
-  counter-reset: chapter;
   gap: 20px;
 }
 

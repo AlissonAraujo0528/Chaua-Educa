@@ -22,6 +22,8 @@ const engine=process.env.UI_BROWSER||'chromium';
      const art=await page.locator(dialog).evaluate(d=>({canvases:d.querySelectorAll('canvas').length,paths:[...d.querySelectorAll('img')].map(im=>im.getAttribute('src')),text:d.textContent}));
      assert.equal(art.canvases,0,'encyclopedia must not repaint gameplay sprites');
      assert.ok(art.paths.length>=2&&art.paths.every(p=>p.startsWith('assets/journal/')));
+     const overlap=await page.locator('.journal-art').evaluateAll(arts=>arts.filter(a=>!a.querySelector('img')).some(a=>a.querySelector('.journal-visual > span').getBoundingClientRect().top<a.querySelector('.journal-state').getBoundingClientRect().bottom));
+     assert.equal(overlap,false,'discovery badge overlaps factual heading');
      assert.ok(art.text.includes('Vulnerável')&&art.text.includes('2026')&&art.text.includes('CC BY 2.0'));
      await page.locator('#journal-food-tab').click();assert.equal(await page.locator('#collection-items canvas').count(),0);assert.equal(await page.locator('#collection-items .journal-food').count(),12);
      await page.locator('#journal-nature-tab').click();

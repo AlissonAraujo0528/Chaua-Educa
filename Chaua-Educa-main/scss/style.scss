@@ -1800,6 +1800,7 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 .journal-visual:has(img) { padding:0; min-height:0; background:#153c32; }
 .journal-visual img { display:block; width:100%; height:230px; object-fit:cover; object-position:55% 25%; }
 .journal-visual figcaption { padding:8px 12px; font-size:9px; color:#f8f2d5; line-height:1.4; }
+.journal-visual:not(:has(img)) { padding-top:56px; }
 .visual-conservacao { background:#f3dba5; }
 .visual-fantasia { background:#e8dfc9; }
 .visual-arvores { background:#c4d8b2; }
@@ -1826,6 +1827,13 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 .journal-credits summary { padding:10px 0; cursor:pointer; font-weight:800; }
 .journal-credits a { text-decoration:underline; }
 /* Flight panels use distinct hierarchy while retaining native dialog focus/scroll. */
+.panel-heading { position:relative; isolation:isolate; display:flow-root; margin-bottom:24px; }
+.panel-heading::before { content:''; position:absolute; z-index:-1; inset:-44px -44px -12px; background:radial-gradient(ellipse at top right,#466f46,#173f34 72%); }
+.panel-heading h2 { color:#fffbed; }
+.panel-heading .eyebrow { color:#cbd9a9; justify-content:center; }
+.panel-heading .panel-subtitle,.panel-heading #result-mode { color:#d7e5cb; }
+.panel-heading #result-mode { margin:12px 0; }
+#ranking-dialog .close-dialog,#missions-dialog .close-dialog { z-index:2; background:#fffbed; }
 .panel-subtitle { color:#6e8064; font-size:14px; line-height:1.6; margin:10px 0 24px; }
 #ranking-dialog { max-width:min(760px,calc(100vw - 24px)); }
 #ranking-dialog .ranking { background:radial-gradient(ellipse at top left,#e2eacc 0,transparent 60%),#fffbed; }
@@ -1846,7 +1854,11 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 #missions-dialog article small { display:block; color:#466641; font-size:11px; font-weight:800; }
 #missions-dialog .mission-complete { background:linear-gradient(145deg,#ecf2dc,#f9f2da); border-color:#b6c694; }
 #missions-dialog .mission-complete::before { content:'✓'; position:absolute; top:14px; right:14px; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:#477347; color:#fffbed; font-weight:900; }
-#guide-dialog .guide-grid { counter-reset:chapter; gap:20px; }
+#missions-dialog article progress { appearance:none; background:#e1e8d3; }
+#missions-dialog article progress::-webkit-progress-bar { background:#e1e8d3; }
+#missions-dialog article progress::-webkit-progress-value { background:#658749; }
+#missions-dialog article progress::-moz-progress-bar { background:#658749; }
+#guide-dialog .guide-grid { gap:20px; }
 #guide-dialog .guide-grid article { border-radius:18px; padding:20px; background:linear-gradient(145deg,#e6ecd5,#f8f5e7); border:1px solid #d5dfc1; }
 #guide-dialog h3 { margin:8px 0 12px; }
 #guide-dialog .guide-grid p { line-height:1.8; }
