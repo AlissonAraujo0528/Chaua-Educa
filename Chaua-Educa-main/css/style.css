@@ -845,6 +845,7 @@ dialog::backdrop {
 }
 
 .dialog-inner {
+  --panel-gutter: 42px;
   padding: 42px 42px 32px;
   position: relative;
 }
@@ -1509,6 +1510,7 @@ dd {
     width: max-content;
   }
   .dialog-inner {
+    --panel-gutter: 25px;
     padding: 40px 25px 25px;
   }
   h2 {
@@ -2499,7 +2501,7 @@ dialog[open]::backdrop {
   content: "";
   position: absolute;
   z-index: -1;
-  inset: -44px -44px -12px;
+  inset: -44px calc(-1 * var(--panel-gutter)) -12px;
   background: radial-gradient(ellipse at top right, #466f46, #173f34 72%);
 }
 

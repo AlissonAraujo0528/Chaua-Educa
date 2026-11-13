@@ -844,6 +844,7 @@ dialog::backdrop {
 }
 
 .dialog-inner {
+  --panel-gutter: 42px;
   padding: 42px 42px 32px;
   position: relative;
 }
@@ -1508,6 +1509,7 @@ dd {
     width: max-content;
   }
   .dialog-inner {
+    --panel-gutter: 25px;
     padding: 40px 25px 25px;
   }
   h2 {
@@ -1828,7 +1830,7 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 .journal-credits a { text-decoration:underline; }
 /* Flight panels use distinct hierarchy while retaining native dialog focus/scroll. */
 .panel-heading { position:relative; isolation:isolate; display:flow-root; margin-bottom:24px; }
-.panel-heading::before { content:''; position:absolute; z-index:-1; inset:-44px -44px -12px; background:radial-gradient(ellipse at top right,#466f46,#173f34 72%); }
+.panel-heading::before { content:''; position:absolute; z-index:-1; inset:-44px calc(-1 * var(--panel-gutter)) -12px; background:radial-gradient(ellipse at top right,#466f46,#173f34 72%); }
 .panel-heading h2 { color:#fffbed; }
 .panel-heading .eyebrow { color:#cbd9a9; justify-content:center; }
 .panel-heading .panel-subtitle,.panel-heading #result-mode { color:#d7e5cb; }

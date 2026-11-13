@@ -33,6 +33,7 @@ const engine=process.env.UI_BROWSER||'chromium';
      await page.locator('.journal-back').click();await page.locator(dialog).evaluate(d=>d.scrollTop=0);
     }
     await page.locator(dialog).screenshot({path:`test-results/editorial-ui/${engine}-${viewport.width}-${name}.png`});
+    assert.ok(await page.locator(dialog).evaluate(d=>d.scrollWidth<=d.clientWidth+1),'Dialog scrolls horizontally: '+dialog);
     const box=await page.locator(dialog).boundingBox();assert.ok(box.x>=-1&&box.y>=-1&&box.x+box.width<=viewport.width+1&&box.y+box.height<=viewport.height+1);
     await page.locator(dialog).evaluate(d=>d.close());
    }
