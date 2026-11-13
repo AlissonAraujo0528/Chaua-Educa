@@ -30,7 +30,14 @@ const out='test-results/mobile-home';fs.mkdirSync(out,{recursive:true});
     assert.ok(r.x>=-1&&r.y>=-1&&r.right<=width+1&&r.bottom<=height+1,'Unreachable menu action '+JSON.stringify({width,height,r}));
     if(r.s!=='#inputPlayer')assert.ok(r.h>=43,'Touch target too short '+JSON.stringify(r));
    }
-   await page.mouse.wheel(0,500);assert.equal((await measure()).scrollY,0);
+   // Mobile WebKit does not implement Playwright's mouse wheel. Verify its
+   // scroll root programmatically; keep an actual wheel attempt on Chromium/Firefox.
+   if(engine==='webkit'){
+    await page.evaluate(()=>{window.scrollTo(0,500);document.scrollingElement.scrollTop=500;});
+   } else {
+    await page.mouse.wheel(0,500);
+   }
+   assert.equal((await measure()).scrollY,0,'Page scrolled despite viewport lock');
    await page.screenshot({path:path.join(out,`${engine}-${width}x${height}-menu.png`)});
    // Reproduce a visual-viewport-only keyboard resize; no CSS layout resize.
    if(width===390){
