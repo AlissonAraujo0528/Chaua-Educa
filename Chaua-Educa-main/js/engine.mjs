@@ -8,6 +8,7 @@ import { advanceHawk, advanceSnake } from './animals.mjs';
 import { planEncounter, seededRandom } from './encounters.mjs';
 import { FRUITS } from './fruits.mjs';
 import { physicsWind } from './weather.mjs';
+import { activeProbe } from './perf-hooks.mjs';
 import { QUESTIONS } from './questions.mjs';
 import { ACTION_TIMINGS } from './action-states.mjs';
 
@@ -416,6 +417,7 @@ export class Game {
         entity.collected = true;
         if (entity.kind !== 'fruit') return this.power(entity.kind);
         const multiplier = this.scoreMultiplier;
+        if(activeProbe)activeProbe.event('fruit:collect',{gameSeconds:Math.round(this.elapsed*100)/100,stage:this.stage,variety:entity.variety});
         this.fruits++;
         this.addScore(3, multiplier, 'fruit');
         const route=this.routes.get(entity.route);
@@ -459,6 +461,7 @@ export class Game {
     }
 
     fruitBurst(x, y, variety, multiplier = 1) {
+        const probe=activeProbe,burstAt=probe?probe.begin('vfx.fruitBurst'):0;
         const PALETTES = [
             ['#e0536c', '#f58ea1', '#85bb57', '#ffe894'],
             ['#d4a366', '#a16e38', '#ffe596', '#7bb850'],
@@ -514,6 +517,7 @@ export class Game {
                 size: 3
             });
         }
+        if(probe)probe.end('vfx.fruitBurst',burstAt,{particlesCreated:20});
     }
 
     burst(x, y, color, count) {
@@ -657,7 +661,12 @@ export class Game {
                 wood.decorSide = wood.fragileSide === 'bottom' ? 'top' : 'bottom';
                 wood.decorKind = Math.floor(n / 3) % 2 ? 'moss' : 'vine';
             }
-            if (hasSnake) wood.snake = {kind:'snake',branch:variant==='branch',phase:'watching',retreat:false};
+            if (hasSnake) {
+                wood.snake = {kind:'snake',branch:variant==='branch',phase:'watching',retreat:false};
+                if(activeProbe)activeProbe.event('snake:spawn',{
+                    gameSeconds:Math.round(this.elapsed*100)/100,id:wood.id,positionX:Math.round(x),
+                    branch:variant==='branch'});
+            }
             this.entities.push(wood);
         }
         const fruits=hawkAlone?[{x:15,y:center}]:plan.fruits;
@@ -681,7 +690,9 @@ export class Game {
                 }
             }
             if (nearbySnakes.some(wood => !snakeA2FruitHasClearance(wood,fx,fy))) {
+                const probe=activeProbe,placeAt=probe?probe.begin('snake.placeFruit'):0;
                 const placed = placeA2Fruit(nearbySnakes,fx,fy,corridorTop,corridorBottom,placedFruits);
+                if(probe)probe.end('snake.placeFruit',placeAt,{nearbySnakes:nearbySnakes.length});
                 if (!placed) continue;
                 fx=placed.x;fy=placed.y;
             }
@@ -777,7 +788,11 @@ export class Game {
             if (this.state !== 'playing') return;
         }
         this.nextSpawn -= dt;
-        if (this.nextSpawn <= 0 && !this.quizDue && this.score<VICTORY_SCORE) this.spawn();
+        if (this.nextSpawn <= 0 && !this.quizDue && this.score<VICTORY_SCORE) {
+            const probe=activeProbe,spawnAt=probe?probe.begin('engine.spawn'):0;
+            this.spawn();
+            if(probe)probe.end('engine.spawn',spawnAt);
+        }
 
         // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
         let cachedPlayerBody = null;

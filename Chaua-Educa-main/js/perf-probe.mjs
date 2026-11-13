@@ -3,6 +3,8 @@
 import {getWeatherMode} from './weather.mjs';
 import {journeySeason} from './seasons.mjs';
 import {winterAmount} from './living-motion.mjs';
+import {ForensicRecorder} from './perf-forensics.mjs';
+import {setActiveProbe} from './perf-hooks.mjs';
 
 const MAX_FRAMES=45_000;
 const MAX_DETAILS=150;
@@ -39,10 +41,19 @@ export function mountPerformanceProbe({game,quality,renderer}){
  const start=document.createElement('button');start.type='button';start.textContent='Iniciar';
  const stop=document.createElement('button');stop.type='button';stop.textContent='Baixar relatório';stop.disabled=true;
  for(const button of [start,stop])button.style.cssText='font:inherit;border:1px solid #b6dec7;border-radius:5px;background:#ecfff2;color:#173a2b;padding:5px 8px;cursor:pointer;';
- panel.append(label,start,stop);document.body.append(panel);
+ const level=document.createElement('select');
+ level.id='chaua-perf-level';
+ level.setAttribute('aria-label','Detalhamento da telemetria');
+ for(const [value,title] of [['normal','Leve'],['deep','Profundo']]){
+  const option=document.createElement('option');option.value=value;option.textContent=title;level.append(option);
+ }
+ level.value=new URLSearchParams(location.search).get('perf-level')==='deep'?'deep':'normal';
+ level.style.cssText='font:inherit;border-radius:5px;padding:5px;';
+ panel.append(label,level,start,stop);document.body.append(panel);
  let active=false,startTime=0,previous=0,lastUI=0,hasPlayed=false,nextClimate=0;
  let samples=[],changes=[],stutters=[],transitions=[],climateTimeline=[];
  let slowCount=0,severeCount=0,lastProfile='',lastSeason='',lastWeather='',lastStage=null,lastReport=null;
+ const forensics=new ForensicRecorder();
  const profile=()=>quality.mode+'/'+quality.level+'/'+renderer.resolution+'/'+renderer.decoration;
  const addTransition=e=>{if(transitions.length<MAX_DETAILS)transitions.push(e);};
  const snapshot=(reason)=>{
@@ -52,8 +63,11 @@ export function mountPerformanceProbe({game,quality,renderer}){
    weather:getWeatherMode(),from:SEASON_NAMES[season.from],to:SEASON_NAMES[season.to],
    mix:round(season.mix,3),snow:round(winterAmount(game),3)});
  };
- const logBackdrop=(event,details={})=>addTransition({type:'seasonal-backdrop-'+event,
-  atSeconds:round((performance.now()-startTime)/1000),...details});
+ const logBackdrop=(event,details={})=>{
+  addTransition({type:'seasonal-backdrop-'+event,
+    atSeconds:round((performance.now()-startTime)/1000),...details});
+  forensics.event('seasonal-backdrop-'+event,details);
+ };
  const download=payload=>{
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');
@@ -64,6 +78,8 @@ export function mountPerformanceProbe({game,quality,renderer}){
  function finish(reason,downloadNow=false){
   if(!active){if(downloadNow&&lastReport)download(lastReport);return;}
   active=false;previous=0;
+  setActiveProbe(null);
+  forensics.stopBrowserObservers();
   if(renderer.seasonalBackdrop)renderer.seasonalBackdrop.onTelemetry=null;
   snapshot('flight-end:'+reason);
   const stages={},byProfile={},windows={};
@@ -86,12 +102,16 @@ export function mountPerformanceProbe({game,quality,renderer}){
    byStage:Object.fromEntries(Object.entries(stages).map(([key,v])=>[key,summarizeFrames(v)])),
    byProfile:Object.fromEntries(Object.entries(byProfile).map(([key,v])=>[key,summarizeFrames(v)])),
    byTenSecondWindow:Object.fromEntries(Object.entries(windows).map(([key,v])=>[key,summarizeFrames(v)])),
-   profileChanges:changes,stutters,transitions,climateTimeline
+   profileChanges:changes,stutters,transitions,climateTimeline,
+   diagnosticLevel:forensics.deep?'deep':'normal',
+   // Causality is NEVER inferred merely from proximity. Long Animation Frames
+   // and measured operation timings are provided as separate evidence.
+   forensics:forensics.report(stutters)
   };
   // Diagnostic data stays local; browsers may require a user gesture
   // to actually download after death, victory or interruption.
   window.__CHAUA_LAST_LOG__=lastReport;
-  start.disabled=false;stop.disabled=false;
+  start.disabled=false;stop.disabled=false;level.disabled=false;
   label.textContent='Concluído ('+reason+') · '+(lastReport.summary.fps??'—')+' FPS · baixar JSON';
   if(downloadNow)download(lastReport);
  }
@@ -125,7 +145,10 @@ export function mountPerformanceProbe({game,quality,renderer}){
       stutters.push({frame:samples.length,atSeconds:round((now-startTime)/1000),
        gameSeconds:round(game.elapsed||0),frameMs:round(dt),stage:game.stage,
        pendingBackdrop:renderer.seasonalBackdrop?.pending?.id??null,
+       heapUsedMb:Number.isFinite(performance.memory?.usedJSHeapSize)?
+         round(performance.memory.usedJSHeapSize/1048576,1):null,
        entities:{wood,hawk,snake,particles:game.particles?.length||0}});
+      forensics.rememberStutter(samples.length);
      }
     }
    }
@@ -138,6 +161,10 @@ export function mountPerformanceProbe({game,quality,renderer}){
  start.addEventListener('click',()=>{
   if(active)return;
   active=true;hasPlayed=false;startTime=performance.now();previous=0;lastUI=0;nextClimate=0;
+  forensics.clear();forensics.startedAt=startTime;
+  forensics.deep=level.value==='deep';level.disabled=true;
+  forensics.game=game;forensics.startBrowserObservers();
+  setActiveProbe(forensics);
   samples=[];changes=[];stutters=[];transitions=[];climateTimeline=[];
   slowCount=0;severeCount=0;lastProfile='';lastSeason='';lastWeather='';lastStage=null;lastReport=null;
   start.disabled=true;stop.disabled=false;
