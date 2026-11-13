@@ -1108,12 +1108,19 @@ export class Renderer {
     game(game, reduced, visualTime = 0) {
         this.base(false);
         if(game.state==='countdown'){
-            this.prepareSky(BACKGROUND_PALETTE[2]);
-            const forest=images.get('forest');
-            if(forest){
-                this.prepareScaledForest(forest);
-                this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
-                this.ensureTransitionBackdrop();
+            // The active season backdrop replaces the opaque original forest.
+            // Prewarm it rather than rebuilding large unused v3 forest caches.
+            const seasonal=!game.tutorial&&images.get('season-backgrounds');
+            if(seasonal){
+                this.seasonalBackdrop?.prepare(seasonal,this.w,this.h,this.dpr,game);
+            }else{
+                this.prepareSky(BACKGROUND_PALETTE[2]);
+                const forest=images.get('forest');
+                if(forest){
+                    this.prepareScaledForest(forest);
+                    this.prepareFragmentedBackdrop(forest,BACKGROUND_PALETTE[0],0,1);
+                    this.ensureTransitionBackdrop();
+                }
             }
         }
         const c = this.c;

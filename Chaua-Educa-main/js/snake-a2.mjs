@@ -130,24 +130,27 @@ export function snakeA2Pose(s={},reduced=false){
  }
 }
 export function preloadSnakeA2(){
- // Headless physics/tests use the same versioned masks; only rendering needs Image.
+ // Offline collision masks do not require an Image in headless tests.
  if(typeof Image==='undefined')return Promise.resolve();
  if(loading)return loading;
- loading=Promise.all(Object.entries(PATHS).map(([key,path])=>new Promise((resolve,reject)=>{
-  const image=new Image();
-  const url=new URL(path,import.meta.url).href;
-  image.onload=()=>{
-   if(image.naturalWidth!==SNAKE_A2_GRID.columns*SNAKE_A2_GRID.cell||
-      image.naturalHeight!==SNAKE_A2_GRID.rows*SNAKE_A2_GRID.cell){
-    reject(new Error(`Sprite A2 inválido (${key}): dimensões inesperadas.`));return;
-   }
-   images.set(key,image);resolve();
-  };
-  image.onerror=()=>reject(new Error(`Não foi possível carregar a cobra A2: ${url}`));
-  image.src=url;
- }))).then(()=>{
+ loading=Promise.all(Object.entries(PATHS).map(async([key,path])=>{
+  const image=new Image(),url=new URL(path,import.meta.url).href;
+  await new Promise((resolve,reject)=>{
+   image.onload=resolve;
+   image.onerror=()=>reject(new Error(`Não foi possível carregar a cobra A2: ${url}`));
+   image.src=url;
+  });
+  if(image.naturalWidth!==SNAKE_A2_GRID.columns*SNAKE_A2_GRID.cell||
+     image.naturalHeight!==SNAKE_A2_GRID.rows*SNAKE_A2_GRID.cell)
+   throw new Error(`Sprite A2 inválido (${key}): dimensões inesperadas.`);
+  if(typeof image.decode==='function'){
+   try{await image.decode();}
+   catch(error){throw new Error(`Não foi possível decodificar cobra A2 (${key})`,{cause:error});}
+  }
+  images.set(key,image);
+ })).then(()=>{
   if(images.size!==3)throw new Error('A cobra A2 não está pronta.');
- }).catch(error=>{images.clear();throw error;});
+ }).catch(error=>{images.clear();loading=null;throw error;});
  return loading;
 }
 export function isSnakeA2Ready(){return images.size===3;}
