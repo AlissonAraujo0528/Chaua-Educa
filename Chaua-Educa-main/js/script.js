@@ -91,6 +91,7 @@ const clock = new FlightClock(game);
 const flightInput = new FlightInput(game, held => $('#flap-button').classList.toggle('is-held', held));
 
 function resize() {
+    const resizeProbe=activeProbe,resizeAt=resizeProbe?resizeProbe.begin('ui.resize'):0;
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
@@ -102,15 +103,24 @@ function resize() {
     const view = renderer.getViewport();
     game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
     game.viewLeft = Math.floor(view.worldLeft);
+    if(resizeProbe)resizeProbe.end('ui.resize',resizeAt);
 }
-new ResizeObserver(resize).observe(app);
+const layoutObserver=new ResizeObserver(resize);
+layoutObserver.observe(app);
+layoutObserver.observe($('#forest'));
 window.addEventListener('resize', resize);
 
 function clearInputs() { flightInput.clear(); }
 function hold(source) { flightInput.press(source); }
 function release(source) { flightInput.release(source); }
 function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
-function openDialog(id) { const dialog = $(id); if (!dialog.open) dialog.showModal(); }
+function openDialog(id) {
+    const dialog=$(id);
+    if(dialog.open)return;
+    const probe=activeProbe,at=probe?probe.begin('ui.dialogOpen'):0;
+    dialog.showModal();
+    if(probe)probe.end('ui.dialogOpen',at,{dialog:id});
+}
 
 // Start only after the optional browser orientation request. This prevents
 // the normal resize-on-rotation safeguard from pausing the countdown itself.
@@ -137,7 +147,9 @@ function start(training = false) {
     app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
     if(quality.beginFlight())applyVisualQuality();
-    resize();
+    // The new in-flight layout is observed after browser layout by the
+    // app/canvas ResizeObserver. A synchronous resize here forced style/layout
+    // immediately after changing classes and hiding the home screen.
     if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
     app.classList.toggle('training',training);
     previousState = ''; clock.reset(); lastTime = 0;
@@ -313,9 +325,15 @@ function result() {
     $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Frutas ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
     $('#storage-note').textContent = DB.storageAvailable ? 'Seu recorde fica salvo neste navegador.' : 'Armazenamento indisponível: recorde mantido apenas nesta sessão.';
-    const birdCanvas = document.createElement('canvas'); birdCanvas.width = 300; birdCanvas.height = 210;
-    const bc = birdCanvas.getContext('2d'); bc.scale(2, 2); drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
-    $('#result-bird').replaceChildren(birdCanvas);
+    // Reuse the same raster surface across flights; keep the authored result art.
+    const birdProbe=activeProbe,birdAt=birdProbe?birdProbe.begin('ui.resultBird'):0;
+    const birdCanvas = $('#result-bird canvas');
+    const bc = birdCanvas.getContext('2d');
+    bc.setTransform(1,0,0,1,0,0);
+    bc.clearRect(0,0,birdCanvas.width,birdCanvas.height);
+    bc.setTransform(2,0,0,2,0,0);
+    drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
+    if(birdProbe)birdProbe.end('ui.resultBird',birdAt);
     openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); $('#result-dialog').scrollTop=0;
     $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} frutos, ${game.correct} respostas corretas. ${game.reason}`;
     const begin = performance.now(), target = game.score;
