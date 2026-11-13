@@ -50,6 +50,7 @@ jobs:
           npm run test:auto-visual
           npm run test:perf-probe
           npm run test:perf-forensics
+          npm run test:perf-experiments
           npm run test:snake-continuity
           npm run test:snake
           node tests/browser-required-action-assets.cjs

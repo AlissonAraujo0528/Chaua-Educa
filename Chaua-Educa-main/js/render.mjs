@@ -4,7 +4,7 @@ import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterBreathSettings,drawSnowShedding} from './winter-vfx.mjs';
-import {drawSnakeA2,preloadSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
+import {drawSnakeA2,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree} from './tree-art.mjs';
@@ -13,7 +13,7 @@ import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import {predictedHawkY} from './animals.mjs';
-import { canvasResolution } from './quality.mjs';
+import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
@@ -637,6 +637,11 @@ export class Renderer {
         this.quality = 'high';
         this.resolution = 'high';
         this.decoration = 'high';
+        this.automaticProfile = false;
+        // A/B experiment only: ?snakeWarmup=1. The baseline stays unchanged.
+        this.snakeWarmupEnabled = typeof location !== 'undefined' &&
+            new URLSearchParams(location.search).get('snakeWarmup') === '1';
+        this.snakeWarmupIndex = 0;
         this.canvas = canvas;
         this.c = canvas.getContext('2d');
         this.fruitImages = [];
@@ -687,15 +692,19 @@ export class Renderer {
     }
     setQuality(level) {
         const next=level==='low'?'low':'high';
+        this.automaticProfile=false;
         this.quality=next;
         this.setVisualProfile({resolution:next,decoration:next});
     }
-    // Auto changes only the pixel budget; the living forest retains its effects.
-    // Explicit High/Low presets still set both axes through setQuality().
+    // Auto preserves all living-forest effects when lowering resolution actually
+    // saves pixels. On DPR=1 / budget-capped canvases where resolution is a
+    // no-op, adjust decoration instead of pretending the downgrade helped.
     setAutomaticQuality(level) {
         const next=level==='low'?'low':'high';
+        this.automaticProfile=true;
         this.quality=next;
-        this.setVisualProfile({resolution:next,decoration:'high'});
+        const noPixelGain=next==='low'&&identicalCanvasBudgets(this.w,this.h,window.devicePixelRatio);
+        this.setVisualProfile({resolution:next,decoration:noPixelGain?'low':'high'});
     }
     setVisualProfile({resolution=this.resolution,decoration=this.decoration}={}) {
         const nextResolution=resolution==='low'?'low':'high';
@@ -723,6 +732,9 @@ export class Renderer {
         const r = this.canvas.getBoundingClientRect();
         this.w = r.width; this.h = r.height;
         this.cachedView = null;
+        // Orientation/resize may change whether a resolution drop saves pixels.
+        if(this.automaticProfile && this.quality==='low')
+            this.decoration=identicalCanvasBudgets(this.w,this.h,window.devicePixelRatio)?'low':'high';
         const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.resolution);
         this.dpr=size.dpr;
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
@@ -998,7 +1010,10 @@ export class Renderer {
         }
         if(seasonal){
             this.seasonalBackdrop ??= new SeasonalBackdrop();
+            const backdropProbe=activeProbe;
+            const backdropAt=backdropProbe?backdropProbe.begin('render.seasonalBackdrop'):0;
             this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
+            if(backdropProbe)backdropProbe.end('render.seasonalBackdrop',backdropAt);
         }
         if (!images.has('forest') && !seasonal) {
             if(this.decoration!=='low') {
@@ -1108,6 +1123,18 @@ export class Renderer {
 
     game(game, reduced, visualTime = 0) {
         this.base(false);
+        if(game.state==='countdown' && this.snakeWarmupEnabled && this.snakeWarmupIndex<3){
+            // One sheet per countdown frame; the opaque backdrop immediately
+            // covers this tiny translucent draw inside the visible main canvas.
+            const sheet=['idle','attack','stunned'][this.snakeWarmupIndex];
+            const warmProbe=activeProbe, warmAt=warmProbe?warmProbe.begin('snake.warmupMs'):0;
+            const warmed=warmupSnakeA2(this.c,sheet);
+            if(warmProbe)warmProbe.end('snake.warmupMs',warmAt,{sheet,success:warmed});
+            if(warmed){
+                this.snakeWarmupIndex++;
+                if(warmProbe)warmProbe.event('snake-warmup',{sheet,gameSeconds:game.elapsed});
+            }
+        }
         if(game.state==='countdown'){
             // The active season backdrop replaces the opaque original forest.
             // Prewarm it rather than rebuilding large unused v3 forest caches.
