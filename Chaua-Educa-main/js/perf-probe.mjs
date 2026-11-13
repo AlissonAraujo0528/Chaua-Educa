@@ -105,7 +105,10 @@ export function mountPerformanceProbe({game,quality,renderer}){
    profileChanges:changes,stutters,transitions,climateTimeline,
    diagnosticLevel:forensics.deep?'deep':'normal',
    experiments:{snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
-    snakeSheetsWarmed:renderer.snakeWarmupIndex||0},
+    snakeSheetsWarmed:renderer.snakeWarmupIndex||0,
+    seasonalSliceRows:renderer.seasonalBackdrop?.sliceRows??null,
+    seasonalBudgetMs:renderer.seasonalBackdrop?.budgetMs??null,
+    ignoredLongLightWorkGaps:quality.ignoredSchedulingGaps??0},
    // Causality is NEVER inferred merely from proximity. Long Animation Frames
    // and measured operation timings are provided as separate evidence.
    forensics:forensics.report(stutters)
