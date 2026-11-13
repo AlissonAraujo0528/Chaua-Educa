@@ -23,6 +23,7 @@ python scripts/dev-server.py
 # in another terminal
 node tests/browser-visual.cjs
 node tests/browser-background.cjs
+npm run test:winter-art
 ```
 
 The superseded wood base atlases and all six
@@ -31,3 +32,5 @@ The superseded wood base atlases and all six
 mask. The four-season atlas stays 1672×941 with the original quadrant order.
 
 No automatic overwrite of authored art is performed by CI.
+
+The new-art browser test is intentionally **not** in required CI until the replacement WebP binaries are installed on the branch. A green CI before that installation verifies runtime compatibility, **not** the visual appearance of the new artwork.

@@ -26,6 +26,7 @@
     "benchmark:resolution": "node scripts/benchmark-resolution-ladder.cjs",
     "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs",
     "test:perf-probe": "node tests/browser-perf-probe.cjs",
+    "test:winter-art": "node tests/browser-approved-winter.cjs",
     "test:auto-visual": "node scripts/capture-auto-visual.cjs",
     "test:snake-raster-parity": "node tests/browser-snake-raster-parity.cjs",
     "benchmark:snake-a2": "node scripts/benchmark-snake-a2.cjs",
