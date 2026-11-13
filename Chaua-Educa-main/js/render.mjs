@@ -4,7 +4,7 @@ import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawAnimalFrost,drawSnowContact,winterBreathSettings,drawSnowShedding} from './winter-vfx.mjs';
-import {drawSnakeA2,preloadSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
+import {drawSnakeA2,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree} from './tree-art.mjs';
@@ -637,6 +637,10 @@ export class Renderer {
         this.quality = 'high';
         this.resolution = 'high';
         this.decoration = 'high';
+        // A/B experiment only: ?snakeWarmup=1. The baseline stays unchanged.
+        this.snakeWarmupEnabled = typeof location !== 'undefined' &&
+            new URLSearchParams(location.search).get('snakeWarmup') === '1';
+        this.snakeWarmupIndex = 0;
         this.canvas = canvas;
         this.c = canvas.getContext('2d');
         this.fruitImages = [];
@@ -998,7 +1002,10 @@ export class Renderer {
         }
         if(seasonal){
             this.seasonalBackdrop ??= new SeasonalBackdrop();
+            const backdropProbe=activeProbe;
+            const backdropAt=backdropProbe?backdropProbe.begin('render.seasonalBackdrop'):0;
             this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
+            if(backdropProbe)backdropProbe.end('render.seasonalBackdrop',backdropAt);
         }
         if (!images.has('forest') && !seasonal) {
             if(this.decoration!=='low') {
@@ -1108,6 +1115,18 @@ export class Renderer {
 
     game(game, reduced, visualTime = 0) {
         this.base(false);
+        if(game.state==='countdown' && this.snakeWarmupEnabled && this.snakeWarmupIndex<3){
+            // One sheet per countdown frame; the opaque backdrop immediately
+            // covers this tiny translucent draw inside the visible main canvas.
+            const sheet=['idle','attack','stunned'][this.snakeWarmupIndex];
+            const warmProbe=activeProbe, warmAt=warmProbe?warmProbe.begin('snake.warmupMs'):0;
+            const warmed=warmupSnakeA2(this.c,sheet);
+            if(warmProbe)warmProbe.end('snake.warmupMs',warmAt,{sheet,success:warmed});
+            if(warmed){
+                this.snakeWarmupIndex++;
+                if(warmProbe)warmProbe.event('snake-warmup',{sheet,gameSeconds:game.elapsed});
+            }
+        }
         if(game.state==='countdown'){
             // The active season backdrop replaces the opaque original forest.
             // Prewarm it rather than rebuilding large unused v3 forest caches.
