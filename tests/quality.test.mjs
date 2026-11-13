@@ -134,3 +134,30 @@ test('graphics quality cannot change fixed-step flight or encounter planning',()
  };
  assert.deepEqual(run('low'),run('high'));assert.deepEqual(run('auto'),run('high'));
 });
+
+test('long gaps with light game work are not treated as costly game rendering',()=>{
+ const q=new VisualQuality();
+ for(let i=0;i<75;i++){q.sample(.12,true,2);q.sample(1/60,true,2);}
+ assert.equal(q.level,'high');
+ assert.equal(q.ignoredSchedulingGaps,75);
+ // A fresh flight resets diagnostics, not just the rolling sample window.
+ assert.equal(q.beginFlight(),false);
+ assert.equal(q.ignoredSchedulingGaps,0);
+ for(let i=0;i<75;i++)q.sample(1/30,true,13);
+ assert.equal(q.level,'low','sustained measured game work must still trigger downgrade');
+});
+
+test('moderate long frames remain eligible even if JS work is light (GPU not measured)',()=>{
+ const q=new VisualQuality();
+ for(let i=0;i<75;i++)q.sample(1/30,true,2);
+ assert.equal(q.level,'low');
+ assert.equal(q.ignoredSchedulingGaps,0);
+});
+
+test('identical high/low pixel budgets are detected by actual dimensions',async()=>{
+ const {identicalCanvasBudgets}=await import('../Chaua-Educa-main/js/quality.mjs');
+ assert.equal(identicalCanvasBudgets(1366,641,1),true);
+ assert.equal(identicalCanvasBudgets(1366,641,1.25),false);
+ assert.equal(identicalCanvasBudgets(390,844,2),false);
+ assert.equal(identicalCanvasBudgets(3840,2160,4),true);
+});
