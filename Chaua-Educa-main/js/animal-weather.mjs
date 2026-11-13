@@ -66,7 +66,7 @@ export class AnimalWeather {
   for(const [id,s] of this.actors)if(time-s.seen>1.5)this.actors.delete(id);
  }
  actor(c,{id,pose,moving=false,hidden=false}){
-  if(!this.enabled||hidden)return;
+  if(!this.enabled||hidden||this.snow<=.015&&this.wet<=.015&&(this.reduced||this.snowfall<=.1))return;
   const points=animalContactPoints(pose);
   if(!points.length)return;
   let state=this.actors.get(id);

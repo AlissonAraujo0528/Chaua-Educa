@@ -48,18 +48,18 @@ fs.mkdirSync(out,{recursive:true});
      }
      return chosen;
     };
-    const draw=(kind,time,snow)=>{
+    const draw=(kind,time,snow,cold=snow)=>{
      ctx.clearRect(0,0,canvas.width,canvas.height);
      ctx.fillStyle='#294a54';ctx.fillRect(0,0,canvas.width,canvas.height);
      const before=breathDraws;
      if(kind==='chaua')
-       drawBird(ctx,{x:450,y:275,scale:1.9,time,wing:.30,snow,vy:0,flapImpulse:0});
+       drawBird(ctx,{x:450,y:275,scale:1.9,time,wing:.30,snow,cold,vy:0,flapImpulse:0});
      if(kind==='snake')
        renderer.snake({id:0,kind:'wood',x:390,top:120,bottom:410,
-        snake:{kind:'snake',phase:'watching',age:2}},false,snow,0,time);
+        snake:{kind:'snake',phase:'watching',age:2}},false,snow,0,time,false,cold);
      if(kind==='hawk')
        renderer.hawk({id:0,kind:'hawk',x:440,y:275,phase:'crossing',warning:0,
-        dive:false,retreat:false},time,false,false,0,false,snow,0);
+        dive:false,retreat:false},time,false,false,0,false,snow,0,false,cold);
      return breathDraws-before;
     };
     const rows=[];
@@ -69,7 +69,8 @@ fs.mkdirSync(out,{recursive:true});
       const frozen=canvas.toDataURL('image/png');
       const dry=draw(kind,time,0);
       const noWinter=canvas.toDataURL('image/png');
-      rows.push({kind,time,cold,dry,frameCold:frozen,frameDry:noWinter});
+      const beforeDeposition=draw(kind,time,0,1);
+      rows.push({kind,time,cold,dry,beforeDeposition,frameCold:frozen,frameDry:noWinter});
     }
     return rows;
    });
@@ -77,6 +78,7 @@ fs.mkdirSync(out,{recursive:true});
     assert.ok(row.cold>=1 && row.cold<=2,
      row.kind+' did not use existing breath animation in winter');
     assert.equal(row.dry,0,row.kind+' shows breath outside winter');
+    assert.ok(row.beforeDeposition>=1&&row.beforeDeposition<=2,row.kind+' loses cold breath before snow deposition');
     for(const state of ['frameCold','frameDry']){
      const image=Buffer.from(row[state].split(',')[1],'base64');
      const file=path.join(out,viewport.width+'-'+row.kind+

@@ -68,3 +68,13 @@ test('first snow contacts precede deposition, while reduced motion stays static'
  const reduced=context();drawAnimalSurface(reduced,points,{snow:0,snowfall:1,time:0,reduced:true});
  assert.equal(reduced.calls.length,0);
 });
+test('dry frames create no contact records; a predator entering in a dive releases once',()=>{
+ const fx=new AnimalWeather(),c=context();
+ run(fx,c,0,{snow:0,wet:0});assert.equal(fx.actors.size,0);fx.draw(c);
+ fx.begin(c,{time:.1,seed:42,snow:1});
+ fx.actor(c,{id:'hawk',pose:{sheet:'hawk',frame:8,rect:[-100,-100,200,200]},moving:true});
+ assert.equal(fx.particles.length,3);fx.draw(c);
+ fx.begin(c,{time:.2,seed:42,snow:1});
+ fx.actor(c,{id:'hawk',pose:{sheet:'hawk',frame:8,rect:[-100,-100,200,200]},moving:true});
+ assert.equal(fx.particles.length,3);
+});
