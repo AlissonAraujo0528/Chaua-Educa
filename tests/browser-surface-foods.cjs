@@ -9,7 +9,6 @@ const root=process.env.GAME_URL||'http://127.0.0.1:5501/';
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(root,{waitUntil:'networkidle'});await page.locator('#start-training:not([disabled])').waitFor();
   const result=await page.evaluate(async()=>{
-   const {game}=await import('/js/script.js');game.state='paused';
    const {FOODS}=await import('/js/foods.mjs'),{drawFood}=await import('/js/food-art.mjs');
    const {drawLivingTrunk}=await import('/js/tree-art.mjs');
    const canvas=document.createElement('canvas');canvas.id='surface-proof';canvas.width=768;canvas.height=1440;

@@ -324,7 +324,7 @@ function result() {
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
     $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(Math.min(1,game.score/VICTORY_SCORE)*100)}% do caminho · ${STAGES[game.stage]}`;
     $('#new-record').hidden = !record || game.score === 0;
-    $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Frutas ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
+    $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Alimentos ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
     $('#storage-note').textContent = DB.storageAvailable ? 'Seu recorde fica salvo neste navegador.' : 'Armazenamento indisponível: recorde mantido apenas nesta sessão.';
     // Reuse the same raster surface across flights; keep the authored result art.
@@ -337,7 +337,7 @@ function result() {
     drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
     if(birdProbe)birdProbe.end('ui.resultBird',birdAt);
     openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); $('#result-dialog').scrollTop=0;
-    $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} frutos, ${game.correct} respostas corretas. ${game.reason}`;
+    $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} alimentos, ${game.correct} respostas corretas. ${game.reason}`;
     const begin = performance.now(), target = game.score;
     function count(now) {
         const fraction = reducedMotion.matches ? 1 : Math.min(1, (now - begin) / 650);

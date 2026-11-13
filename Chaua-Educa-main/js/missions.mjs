@@ -6,7 +6,7 @@ export const MISSIONS = Object.freeze([
  {id:'variety',title:'Olhar curioso',description:'Encontre 3 tipos diferentes de coletáveis.',target:3,metric:'varieties'},
  {id:'learner',title:'Aprender é descobrir',description:'Responda a 4 perguntas diferentes. Errar também conta.',target:4,metric:'questions'},
  {id:'explorer',title:'Além das copas',description:'Alcance o trecho Mata fragmentada em um voo.',target:2,metric:'stage'},
- {id:'trail',title:'Caminhos da mata',description:'Complete 3 trilhas de frutas sem contato, em qualquer número de voos.',target:3,metric:'routes'},
+ {id:'trail',title:'Caminhos da mata',description:'Complete 3 trilhas de alimentos sem contato, em qualquer número de voos.',target:3,metric:'routes'},
  {id:'flock',title:'De volta ao bando',description:'Conclua a jornada até o refúgio uma vez.',target:1,metric:'arrivals'},
 ]);
 const count=(value,max)=>Number.isFinite(value)?Math.max(0,Math.min(max,Math.floor(value))):0;
