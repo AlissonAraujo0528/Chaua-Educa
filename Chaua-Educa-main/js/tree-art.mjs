@@ -53,15 +53,20 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  const coreLeft = x + (f.core[0] - f.anchor[0]) * s;
  const stripLeft = f.core[0], stripWidth = f.core[1] - f.core[0];
  const splice = upper ? f.spliceY : f.spliceY - 1;
+ // Snow icicles may extend past original alpha bounds. Visual clip only.
+ const snowyTipEnd=upper&&snow>0?Math.max(f.endY,Math.min(512,f.endY+30)):f.endY;
  const join = y + (splice - f.anchor[1]) * s;
  if (upper) {
   const start = y - length;
   if (join > start) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
-  c.drawImage(image, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
+  c.drawImage(image, sx + cx, sy + splice, cw, snowyTipEnd - splice, px, join, cw * s, (snowyTipEnd - splice) * s);
  } else {
   const end = y + length;
   if (end > join) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
-  c.drawImage(image, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
+  // Preserve the snow dome above the bare wood's y=20 content bound.
+  const capTop=snow>0?0:cy;
+  c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
+   px,y+(capTop-f.anchor[1])*s,cw*s,(splice-capTop)*s);
  }
 
  // Restrained wet detail on existing bark, near the visible trunk cap.
@@ -76,11 +81,11 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
    if(!overlay || alpha<=0)continue;
    c.save();c.globalAlpha=Math.min(1,alpha);
    if(upper){
-    c.drawImage(overlay,sx+cx,sy+splice,cw,f.endY-splice,
-      px,join,cw*s,(f.endY-splice)*s);
+    c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,
+      px,join,cw*s,(snowyTipEnd-splice)*s);
    }else{
-    c.drawImage(overlay,sx+cx,sy+cy,cw,splice-cy,
-      px,py,cw*s,(splice-cy)*s);
+    c.drawImage(overlay,sx+cx,sy,cw,splice,
+      px,y-f.anchor[1]*s,cw*s,splice*s);
    }
    c.restore();
   }
@@ -156,8 +161,9 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
     // onto their underside would make snow adhere against gravity, so
     // falling crystals are handled separately by drawSnowContact().
     if (!upper) {
-     c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
-      left, 0, TREE_CELL * scale, join);
+     // Include the first 8px of cap snow while keeping the original wood anchor.
+     c.drawImage(snowImage,sx,sy,TREE_CELL,splice,
+      left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
     }
     c.restore();
    }
