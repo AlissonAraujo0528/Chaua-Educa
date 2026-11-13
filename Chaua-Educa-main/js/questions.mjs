@@ -1,4 +1,4 @@
-export const CONTENT_REVIEWED = "2026-10-18";
+export const CONTENT_REVIEWED = "2026-11-13";
 export const SOURCES = {
   inma: {label: "INMA · Chauá e ipê do Rio Doce (2025)", url: "https://www.gov.br/inma/pt-br/assuntos/noticias/papagaio-ameacado-ajuda-cientistas-a-descobrir-nova-populacao-de-ipe-raro-no-rio-doce"},
   game: {label: "Chauá Educa · elementos fictícios e regras do jogo", url: "#collection-dialog"},
@@ -204,7 +204,7 @@ export const QUESTIONS = [
   {
     "id": "cardapio",
     "topic": "Jogo e natureza",
-    "text": "Os sete itens coletáveis formam um guia de alimentação para aves reais.",
+    "text": "Os alimentos coletáveis formam um guia completo de alimentação para aves reais.",
     "answer": false,
     "explanation": "São representações lúdicas; não são uma dieta recomendada.",
     "source": "game",

@@ -2326,14 +2326,14 @@ dialog[open]::backdrop {
   border: 1px solid #dce2d0;
 }
 
-.journal-food img {
+.journal-food .food-thumbnail {
   width: 84px;
   height: 84px;
   object-fit: contain;
   flex-shrink: 0;
 }
 
-.journal-food.is-locked img {
+.journal-food.is-locked .food-thumbnail {
   opacity: 0.45;
   filter: grayscale(1);
 }
@@ -2435,7 +2435,7 @@ dialog[open]::backdrop {
     padding: 16px;
     gap: 14px;
   }
-  .journal-food img {
+  .journal-food .food-thumbnail {
     width: 65px;
     height: 65px;
   }

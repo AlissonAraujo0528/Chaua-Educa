@@ -1,4 +1,4 @@
-name: Preview winter sprite generation (manual only)
+name: Rebuild official artwork (manual only)
 on:
   workflow_dispatch:
 
@@ -15,10 +15,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install art-generation dependencies
-        run: python -m pip install pillow numpy
+        run: python -m pip install -r scripts/requirements-art.txt
       - name: Generate candidate winter images in disposable checkout
         run: |
-          python scripts/build_winter_sprites.py
+          python scripts/build_approved_winter_art.py
+          python scripts/build_runtime_art.py
           git diff --stat -- Chaua-Educa-main/assets/Seasons/Winter/
       - name: Download results for human review; NEVER push over official art
         uses: actions/upload-artifact@v6

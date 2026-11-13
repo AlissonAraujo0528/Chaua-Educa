@@ -8,7 +8,7 @@ import { FlightInput } from './input.mjs';
 import { isMobileFlightDevice, requestFlightLandscape, releaseFlightLandscape } from './flight-orientation.mjs';
 import { ForestAudio } from './audio.mjs';
 import { SOURCES } from './questions.mjs';
-import { FRUITS } from './fruits.mjs';
+import { FOODS } from './foods.mjs';
 import DB from './database.js';
 import { Game, FlightClock, HEIGHT, STAGES, VICTORY_SCORE } from './engine.mjs';
 import { Renderer, drawBird } from './render.mjs';
@@ -488,7 +488,7 @@ function showCollection() {
     const unlocked = DB.unlocked();
     const discovered = DB.discoveredEntries();
     renderCollection($('#nature-items'),discovered,{foods:unlocked,foodContainer:$('#collection-items'),detailContainer:$('#journal-detail')});
-    $('#collection-progress').textContent=`${discovered.length} de ${ENTRIES.length} temas descobertos · ${unlocked.length} de ${FRUITS.length} alimentos registrados`;
+    $('#collection-progress').textContent=`${discovered.length} de ${ENTRIES.length} temas descobertos · ${unlocked.length} de ${FOODS.length} alimentos registrados`;
     setJournalTab('nature');
     openDialog('#collection-dialog');
 }

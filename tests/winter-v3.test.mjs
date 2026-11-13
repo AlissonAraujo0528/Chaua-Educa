@@ -97,7 +97,7 @@ test('four existing transparent snow overlays crossfade progressively at every b
  assert.deepEqual(winterOverlayStages(0),[]);
  assert.deepEqual(winterOverlayStages(.125),[{stage:1,alpha:.5}]);
  assert.deepEqual(winterOverlayStages(.25),[{stage:1,alpha:1}]);
- assert.deepEqual(winterOverlayStages(.375),[{stage:1,alpha:1},{stage:2,alpha:.5}]);
+ assert.deepEqual(winterOverlayStages(.375),[{stage:1,alpha:.5},{stage:2,alpha:.5}]);
  assert.deepEqual(winterOverlayStages(.5),[{stage:2,alpha:1}]);
  assert.deepEqual(winterOverlayStages(1),[{stage:4,alpha:1}]);
  for(let i=0;i<=100;i++){
@@ -114,13 +114,17 @@ test('the upper tree snow overlay touches only the exposed branch cap, never its
  images.set('trees-upper',original);
  images.set('trees-upper-overlay-01',stage1);
  images.set('trees-upper-overlay-02',stage2);
+ const oldCanvas=globalThis.OffscreenCanvas,inside=mock();inside.c.clearRect=()=>{};
+ globalThis.OffscreenCanvas=class{getContext(){return inside.c}};
+ t.after(()=>{globalThis.OffscreenCanvas=oldCanvas});
  const upper=mock();
  drawLivingTrunk(upper.c,{x:200,y:200,upper:true,width:TREE_WIDTH,length:900,snow:.375});
- const snowDraws=upper.calls.filter(x=>x.type==='image'&&(x.args[0]===stage1||x.args[0]===stage2));
+ const snowDraws=inside.calls.filter(x=>x.type==='image'&&(x.args[0]===stage1||x.args[0]===stage2));
  assert.equal(snowDraws.length,2);
  assert.equal(snowDraws[0].args[0],stage1);
  assert.equal(snowDraws[1].args[0],stage2);
- for(const draw of snowDraws)assert.ok(draw.args[4]>2,'should draw branch cap instead of repeated 1px ceiling strip');
+ const composed=upper.calls.find(x=>x.type==='image'&&x.args[0]!==original);
+ assert.ok(composed.args[4]>2,'the composed overlay uses the exposed cap rather than the ceiling strip');
  assert.ok(upper.calls.some(x=>x.type==='image'&&x.args[0]===original),'the authored base tree must remain');
 });
 

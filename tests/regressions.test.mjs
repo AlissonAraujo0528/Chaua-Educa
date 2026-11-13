@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Game, FlightClock, STEP, WIDTH} from '../Chaua-Educa-main/js/engine.mjs';
-import {FRUITS} from '../Chaua-Educa-main/js/fruits.mjs';
+import {FOODS} from '../Chaua-Educa-main/js/foods.mjs';
 import DB from '../Chaua-Educa-main/js/database.js';
 
 test('viewport dimensions cannot change world, spawn distance or bird position',()=>{
@@ -28,10 +28,10 @@ test('tranquilo can learn from a wrong answer and safely resume',()=>{
  assert.equal(g.state,'countdown');assert.equal(g.correct,0);assert.equal(g.score,3);
  assert.ok(g.question.explanation.length>20);
 });
-test('all seven foods occur in the spawn sequence',()=>{
+test('all catalogue foods occur in the spawn sequence',()=>{
  const g=new Game({random:()=>.5}),found=new Set();
- for(let i=0;i<30;i++){g.entities=[];g.spawn();for(const e of g.entities)if(e.kind==='fruit')found.add(FRUITS[e.variety].id);}
- assert.equal(found.size,7);
+ for(let i=0;i<30;i++){g.entities=[];g.spawn();for(const e of g.entities)if(e.kind==='fruit')found.add(FOODS[e.variety].id);}
+ assert.equal(found.size,FOODS.length);
 });
 test('previous scores and discoveries remain accessible without rewriting old save',()=>{
  const original=JSON.stringify({version:2,scores:[{name:'Alisson',score:80,mode:'learn',ruleset:'forest-powers-1'}],unlocked:['Manga'],mistakes:['habitat']});

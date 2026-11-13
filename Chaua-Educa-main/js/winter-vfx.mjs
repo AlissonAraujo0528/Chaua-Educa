@@ -106,7 +106,7 @@ export function winterOverlayStages(intensity){
  const fraction=level-base;
  if(base>=4)return [{stage:4,alpha:1}];
  if(base===0)return fraction>.001?[{stage:1,alpha:fraction}]:[];
- return fraction>.001?[{stage:base,alpha:1},{stage:base+1,alpha:fraction}]:
+ return fraction>.001?[{stage:base,alpha:1-fraction},{stage:base+1,alpha:fraction}]:
   [{stage:base,alpha:1}];
 }
 

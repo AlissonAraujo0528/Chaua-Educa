@@ -28,7 +28,7 @@ test('wrong answers count as learning; the same question never counts twice',()=
 });
 test('all six missions have attainable goals, saturate and unlock final title',()=>{
  let p=normalizeProgress(null);
- for(let i=0;i<20;i++)p=advanceProgress(p,{type:'fruit',fruit:['Goiaba','Manga','Milho'][i%3]});
+ for(let i=0;i<20;i++)p=advanceProgress(p,{type:'fruit',fruit:['Goiaba','Manga','Caju'][i%3]});
  for(const q of QUESTIONS.slice(0,4))p=advanceProgress(p,{type:'correct',questionId:q.id});
  for(let i=0;i<10;i++)p=advanceProgress(p,{type:'route-complete'});
  p=advanceProgress(p,{type:'stage',stage:2});p=advanceProgress(p,{type:'stage',stage:1});

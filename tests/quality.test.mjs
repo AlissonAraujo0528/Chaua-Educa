@@ -135,16 +135,19 @@ test('graphics quality cannot change fixed-step flight or encounter planning',()
  assert.deepEqual(run('low'),run('high'));assert.deepEqual(run('auto'),run('high'));
 });
 
-test('long gaps with light game work are not treated as costly game rendering',()=>{
- const q=new VisualQuality();
+test('isolated unexplained gaps get a bounded allowance without erasing history',()=>{
+ const q=new VisualQuality();q.sample(1/60,true,2);q.sample(.12,true,2);
+ assert.equal(q.level,'high');assert.equal(q.ignoredSchedulingGaps,1);
  for(let i=0;i<75;i++){q.sample(.12,true,2);q.sample(1/60,true,2);}
- assert.equal(q.level,'high');
- assert.equal(q.ignoredSchedulingGaps,75);
- // A fresh flight resets diagnostics, not just the rolling sample window.
- assert.equal(q.beginFlight(),false);
- assert.equal(q.ignoredSchedulingGaps,0);
+ assert.equal(q.level,'low','recurring cheap-JS gaps may include unmeasured GPU cost');
+ q.beginFlight();assert.equal(q.ignoredSchedulingGaps,0);
  for(let i=0;i<75;i++)q.sample(1/30,true,13);
- assert.equal(q.level,'low','sustained measured game work must still trigger downgrade');
+ assert.equal(q.level,'low');
+});
+test('heavy previous callback followed by a light callback still downgrades',()=>{
+ const q=new VisualQuality();
+ for(let i=0;i<300;i++){q.sample(1/60,true,120);q.sample(.12,true,1);}
+ assert.equal(q.level,'low');assert.equal(q.ignoredSchedulingGaps,0);
 });
 
 test('moderate long frames remain eligible even if JS work is light (GPU not measured)',()=>{

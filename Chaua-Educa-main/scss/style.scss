@@ -1799,8 +1799,8 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 .journal-card.is-locked .journal-illustration { opacity: .65; filter: saturate(.65); }
 .journal-food-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .journal-food { display: flex; align-items: center; gap: 18px; padding: 20px; border-radius: 16px; background: #fffef7; border: 1px solid #dce2d0; }
-.journal-food img { width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; }
-.journal-food.is-locked img { opacity: .45; filter: grayscale(1); }
+.journal-food .food-thumbnail { width: 84px; height: 84px; object-fit: contain; flex-shrink: 0; }
+.journal-food.is-locked .food-thumbnail { opacity: .45; filter: grayscale(1); }
 .journal-food p { margin-bottom: 0; }
 .journal-detail { max-width: 760px; margin: 0 auto; }
 .journal-detail > .journal-illustration { border-radius: 18px; margin: 10px 0 26px; max-height: 330px; object-fit: cover; }
@@ -1823,7 +1823,7 @@ dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
   .journal-card h3 { font-size: 25px; }
   .journal-card p { font-size: 14px; }
   .journal-food { padding: 16px; gap: 14px; }
-  .journal-food img { width: 65px; height: 65px; }
+  .journal-food .food-thumbnail { width: 65px; height: 65px; }
   .journal-detail h3 { font-size: 30px; }
 }
 /* Close icons and content actions have different jobs and must not overlap. */

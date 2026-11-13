@@ -1,17 +1,18 @@
 import { QUESTIONS, SOURCES, CONTENT_REVIEWED } from './questions.mjs';
-import {FRUITS} from './fruits.mjs';
+import {FOODS} from './foods.mjs';
+import {drawFood,foodThumbnail} from './food-art.mjs';
 import {images} from './assets.mjs';
 import {SPRITES} from './sprite-data.mjs';
 
 export const JOURNAL_ART = {
- chaua:'assets/v6/chaua-atlas.webp',habitat:'assets/v3/forest.webp',alimentos:'assets/v3/fruit-Goiaba.webp',
+ chaua:'assets/v6/chaua-atlas.webp',habitat:'assets/v3/forest.webp',alimentos:'assets/runtime/foods.webp',
  arvores:'assets/v3/forest.webp',fauna:'assets/v6/hawk-atlas.webp',conservacao:'assets/v3/forest.webp',fantasia:'assets/v4/feather.webp'
 };
 
 export const ENTRIES = [
  {id:'chaua',title:'Conheça o chauá',category:'Ave',text:'Amazona rhodocorytha é o nome científico do papagaio-chauá. Ele vive na Mata Atlântica, no leste do Brasil.',source:'zoo',hint:'Disponível desde o início.'},
  {id:'habitat',title:'Uma floresta para viver',category:'Habitat',text:'A perda e a fragmentação da floresta ameaçam o chauá. Conservar os ambientes naturais é parte de sua proteção.',source:'icmbio',hint:'Chegue às Árvores antigas ou descubra uma pergunta sobre habitat.'},
- {id:'alimentos',title:'Além dos coletáveis',category:'Alimentação',text:'Há registros de chauás comendo pétalas de ipê. Os sete itens do jogo são símbolos: não representam uma dieta completa nem comprovam o consumo natural de cada alimento. Comer uma semente não garante que ela seja dispersa ou germine.',source:'inma',hint:'Recolha um alimento.'},
+ {id:'alimentos',title:'Além dos coletáveis',category:'Alimentação',text:'Há registros de chauás comendo pétalas de ipê. Os alimentos do jogo representam recursos citados para a espécie, incluindo frutos, sementes, brotos e pétalas. Não são uma dieta completa para aves reais. Comer uma semente não garante que ela seja dispersa ou germine.',source:'inma',hint:'Recolha um alimento.'},
  {id:'arvores',title:'Chauás revelam ipês',category:'Árvores e pesquisa',text:'Em Linhares (ES), acompanhar chauás ajudou a localizar Handroanthus riodocensis, um ipê raro. Aves e árvores podem ser estudadas em conjunto. O pouso no refúgio do jogo é uma representação, não uma descrição de ninho.',source:'inma',hint:'Chegue às Árvores antigas ou descubra uma pergunta sobre a pesquisa.'},
  {id:'fauna',title:'Animais, não vilões',category:'Fauna do jogo',text:'Cobras e gaviões são desafios nesta aventura. Os desenhos não identificam espécies, e suas investidas não comprovam predação do chauá na natureza. Você não precisa atingir animais para desbloquear descobertas.',source:'game',hint:'Disponível desde o início.'},
  {id:'conservacao',title:'Proteger aves e ambientes',category:'Conservação',text:'Combater o tráfico, preservar o habitat e promover educação ambiental são frentes de conservação. O PAN Papagaios encerrou seu ciclo; suas espécies ameaçadas passaram ao PAN Aves da Mata Atlântica.',source:'icmbio',hint:'Chegue à Mata fragmentada ou descubra uma pergunta sobre conservação.'},
@@ -34,7 +35,7 @@ function illustration(id){
  if(['habitat','arvores','conservacao'].includes(id)){
   const forest=images.get('forest');if(forest){const w=forest.naturalWidth,h=forest.naturalHeight,sourceW=h*480/280;c.drawImage(forest,Math.max(0,(w-sourceW)*(id==='arvores'?.7:.25)),0,Math.min(sourceW,w),h,0,0,480,280);}
  }else if(id==='fauna')sprite('hawk',8,235,150,1.4);
- else if(id==='alimentos')FRUITS.slice(0,3).forEach((f,i)=>{const im=images.get(`fruit-${f.id}`);if(im)c.drawImage(im,45+i*140,75,110,110);});
+ else if(id==='alimentos')FOODS.slice(0,3).forEach((f,i)=>{drawFood(c,f.slot,100+i*140,130,110,0,true);});
  else if(id==='fantasia')for(const [i,key]of ['shield','feather'].entries()){const im=images.get(key);if(im)c.drawImage(im,95+i*160,65,130,130);}
  else sprite('chaua',12,240,138,1.1);
  return canvas;
@@ -69,10 +70,10 @@ export function renderCollection(container,unlocked,{foods=[],foodContainer,deta
   if(discovered)button.addEventListener('click',()=>openDetail(entry,button));
   copy.append(category,title,text,button);card.append(art,copy);return card;
  }));
- if(foodContainer)foodContainer.replaceChildren(...FRUITS.map(f=>{
+ if(foodContainer)foodContainer.replaceChildren(...FOODS.map(f=>{
   const card=document.createElement('article');card.className='journal-food';const found=foods.includes(f.id);card.classList.toggle('is-locked',!found);
-  const img=document.createElement('img');img.src=`assets/v3/fruit-${f.id}.webp`;img.alt='';img.width=100;img.height=100;
+  const img=foodThumbnail(f);
   const title=document.createElement('h3');title.textContent=f.name;const text=document.createElement('p');text.textContent=found?f.description:'Recolha este item durante o voo para registrar sua descoberta.';
-  const state=document.createElement('span');state.className='journal-category';state.textContent=found?'Registrado':'Ainda não coletado';const copy=document.createElement('div');copy.append(state,title,text);card.append(img,copy);return card;
+  const state=document.createElement('span');state.className='journal-category';state.textContent=found?'Registrado':'Ainda não coletado';const copy=document.createElement('div');const source=document.createElement('a');source.href=f.source;source.target='_blank';source.rel='noopener noreferrer';source.textContent='Fonte sobre este alimento ↗';copy.append(state,title,text,source);card.append(img,copy);return card;
  }));
 }
