@@ -17,7 +17,9 @@ export function flightViewport(width,height,safe={}) {
     // Portrait needs at least 1.65s of visible predator approach at max speed.
     // Preserve its safe sightline rather than enlarging sprites at the cost of reaction time.
     const referenceWidth=portrait?720:960;
-    const referenceHeight=portrait?640:compact?500:notebook?520:640;
+    // A slightly tighter notebook camera enlarges actors without touching
+    // collision coordinates, and retains 500 world units of vertical sightline.
+    const referenceHeight=portrait?640:compact?500:notebook?500:640;
     const scale=Math.max(.01,Math.min(usableWidth/referenceWidth,usableHeight/referenceHeight));
     const worldLeft=portrait?130:0;
     const worldWidth=usableWidth/scale;
@@ -53,9 +55,9 @@ export function warningPosition(view,worldY){
         y:clamp(view.y+yy-18,view.y+4,view.y+view.h-40)};
 }
 
-// The A2 snake rises farther above the perch than the legacy mesh.
-export function snakeWarningPosition(view,wood,a2Ready=false){
-    const clearance=a2Ready?245:155;
+// A2 is the only snake. Warning clearance follows its official silhouette.
+export function snakeWarningPosition(view,wood){
+    const clearance=245;
     return {x:view.x+(wood.x-view.worldLeft)*view.scale-30,
         y:view.y+(wood.bottom-clearance-(view.worldTop||0))*view.scale};
 }

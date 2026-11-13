@@ -1,4 +1,4 @@
-# Optional: only for rebuilding the generated sprite atlases.
-numpy==2.3.5
-Pillow==12.3.0
-scipy==1.17.0
+# Used only to regenerate user-approved winter art from source JPEGs
+Pillow>=11
+numpy>=2
+opencv-python-headless>=4.10
