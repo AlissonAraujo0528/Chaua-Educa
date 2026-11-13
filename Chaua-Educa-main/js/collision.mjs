@@ -9,7 +9,14 @@ function bodyPart(x,y,dx,dy,rx,ry,angle){
  return ellipse(x+dx*Math.cos(angle)-dy*Math.sin(angle),y+dx*Math.sin(angle)+dy*Math.cos(angle),rx,ry,angle);
 }
 export function playerShapes(x,y,angle=0){return [bodyPart(x,y,-3,2,16,14,angle),bodyPart(x,y,15,-7,9,10,angle)];}
-export function hawkAngle(e){return e.dive?-Math.atan2(e.targetY-e.startY,e.startX-e.targetX):0;}
+export function hawkAngle(e){
+ if(e.dive)return -Math.atan2(e.targetY-e.startY,e.startX-e.targetX);
+ if(e.ascent){
+  const angle=-Math.atan2(e.targetY-e.startY,e.startX-e.targetX)*.65;
+  return Math.max(-.28,Math.min(.28,angle));
+ }
+ return 0;
+}
 export function hawkShapes(e){const a=hawkAngle(e);return hawkBodyParts(e).map(([dx,dy,rx,ry])=>bodyPart(e.x,e.y,dx,dy,rx,ry,a));}
 export function rectShape({x,y,w,h}){return [{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];}
 export function roundedShape(rect){return ellipse(rect.x+rect.w/2,rect.y+rect.h/2,rect.w/2,rect.h/2);}

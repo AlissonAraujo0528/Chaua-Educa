@@ -170,6 +170,10 @@ export class Game {
         effects.length=this.particles.length;
         for(let i=0;i<this.particles.length;i++){
             const src=this.particles[i],dst=effects[i]||{};
+            // Clear optional tags before reusing this slot: an expired feather
+            // must not turn the next leaf, chip or spark into another species.
+            dst.feather=false;dst.chip=false;dst.splinter=false;
+            dst.seed=false;dst.puff=false;dst.spark=false;dst.rotation=undefined;
             Object.assign(dst,src);
             dst.x=lerp(src.prevX??src.x,src.x);
             dst.y=lerp(src.prevY??src.y,src.y);

@@ -11,6 +11,7 @@ import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
+import {predictedHawkY} from './animals.mjs';
 import { canvasResolution } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
@@ -74,27 +75,41 @@ function perchedSprite(c,clip,factor){
     atlasFrame(c,'chaua',13,factor);c.restore();
 }
 
+// Pixels measured from the actual alpha silhouette of the four fatal frames
+// in public/parrot/animations/impact.webp (3x2 grid, 256px cells).
+// A failure to update these bounds when changing art is caught by regression
+// tests; these bounds affect ONLY the bird's rendered final contact placement.
+export const PARROT_IMPACT_BOUNDS=Object.freeze([
+ [37,73,224,196],[31,32,231,197],[38,35,225,204],[41,40,213,196]
+].map(box=>Object.freeze(box)));
 export function woodContactPosition(game,progress=0,reduced=false){
-    const rect=game.impactContact;
-    if(!rect||!['impact','ended'].includes(game.state)||game.won)return {x:game.x,y:game.y};
-    const pose=reduced?{x:0,y:0,angle:0}:impactPose(progress),angle=game.angle+pose.angle;
-    const clip=birdAnimation({wing:game.wing,defeated:true,impactProgress:progress,reduced});
-    const factor=27.7027*.74/SPRITES.chaua.landmarkWidth;
-    const cos=Math.cos(angle),sin=Math.sin(angle);
-    let maxX=-Infinity;
-    const f0=clip.frame,f1=clip.next;
-    for(let pass=0;pass<2;pass++){
-        const idx=pass===0?f0:f1;
-        if(pass===1&&f1===f0)break;
-        const [x,y,w,h]=SPRITES.chaua.frames[idx].content;
-        const x0=(x-192)*factor,x1=(x+w-192)*factor;
-        const y0=(y-192)*factor,y1=(y+h-192)*factor;
-        const p0=x0*cos-y0*sin+pose.x;if(p0>maxX)maxX=p0;
-        const p1=x1*cos-y0*sin+pose.x;if(p1>maxX)maxX=p1;
-        const p2=x0*cos-y1*sin+pose.x;if(p2>maxX)maxX=p2;
-        const p3=x1*cos-y1*sin+pose.x;if(p3>maxX)maxX=p3;
-    }
-    return {x:Math.min(game.x,rect.x-maxX-2),y:game.y};
+ const rect=game.impactContact;
+ if(!rect||!['impact','ended'].includes(game.state)||game.won)return {x:game.x,y:game.y};
+ const pose=reduced?{x:0,y:0,angle:0}:impactPose(progress);
+ const angle=game.angle+pose.angle,cos=Math.cos(angle),sin=Math.sin(angle);
+ let maxX=-Infinity;
+ const inspect=([left,top,right,bottom])=>{
+  for(const x of [left,right])for(const y of [top,bottom]){
+   const corner=x*cos-y*sin+pose.x;
+   if(corner>maxX)maxX=corner;
+  }
+ };
+ if(reduced){
+  // Reduced motion deliberately displays the authored v6 atlas, not the new
+  // impact sheet. Match the actual 1.04 draw scale instead of legacy .74.
+  const clip=birdAnimation({wing:game.wing,defeated:true,impactProgress:progress,reduced});
+  const factor=27.7027*1.04/SPRITES.chaua.landmarkWidth;
+  for(const idx of new Set([clip.frame,clip.next])){
+   const [x,y,w,h]=SPRITES.chaua.frames[idx].content;
+   inspect([(x-192)*factor,(y-192)*factor,(x+w-192)*factor,(y+h-192)*factor]);
+  }
+ }else{
+  const frame=parrotAction({defeated:true,impactProgress:progress})?.frame??3;
+  const [x,y,right,bottom]=PARROT_IMPACT_BOUNDS[frame];
+  const scale=154*1.04/256;
+  inspect([(x-128)*scale,(y-128)*scale,(right-128)*scale,(bottom-128)*scale]);
+ }
+ return {x:Math.min(game.x,rect.x-maxX-2),y:game.y};
 }
 
 function birdFoot(scale){
@@ -1414,7 +1429,9 @@ export class Renderer {
         // Natural viewport flight boundary
         const notices=[];
         for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
-            const p=warningPosition(view,e.startY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
+            const predictedY=Number.isFinite(e.startX)&&Number.isFinite(e.targetX)
+                ?predictedHawkY(e,game.x):e.y;
+            const p=warningPosition(view,predictedY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
         }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
             notices.push({...snakeWarningPosition(view,e),w:136,h:26,type:'snake',entity:e});
         }
@@ -1549,7 +1566,7 @@ export class Renderer {
         c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
         c.rotate(cAngle+dynamicAngle+(action?.angle||0));
         if(action){
-            const activeFrame=action.blend<0.5?action.frame:action.next;
+            const activeFrame=(action.blend??0)<.5?action.frame:(action.next??action.frame);
             // Required art missing? Throw explicitly; never switch to v6 mid-flight.
             drawActionSheet(c,action.sheet,activeFrame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
         }else{
@@ -1557,7 +1574,7 @@ export class Renderer {
             atlasAnimation(c,'hawk',clip,HAWK_ART.atlasScale,180);
         }
         if(snow>.12)drawAnimalFrost(c,'hawk',snow,1,reduced);
-        if(retreat&&!reduced)drawOrbitingStars(c,-35,-60,110,time);
+        if(retreat&&!reduced&&!action)drawOrbitingStars(c,-35,-60,110,time);
         // Release crystals once at the start of the dive or recoil, not
         // continuously through the entire predator's crossing animation.
         const span=(entity.startX||0)-(entity.targetX||0);
