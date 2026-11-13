@@ -65,6 +65,8 @@ jobs:
           node tests/browser-mobile-home-layout.cjs
           node tests/browser-responsive-camera.cjs
           node tests/browser-weather-trees.cjs
+          # Verify the new authored WebPs; do not green-light older placeholder assets.
+          npm run test:winter-art
           node tests/browser-season-parity.cjs
           node tests/browser-climate-v3.cjs
           node tests/browser-season-atlas-semantic.cjs
