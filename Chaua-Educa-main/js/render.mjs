@@ -13,7 +13,7 @@ import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation,placeWarnings} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import {predictedHawkY} from './animals.mjs';
-import { canvasResolution } from './quality.mjs';
+import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
 import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
@@ -637,6 +637,7 @@ export class Renderer {
         this.quality = 'high';
         this.resolution = 'high';
         this.decoration = 'high';
+        this.automaticProfile = false;
         // A/B experiment only: ?snakeWarmup=1. The baseline stays unchanged.
         this.snakeWarmupEnabled = typeof location !== 'undefined' &&
             new URLSearchParams(location.search).get('snakeWarmup') === '1';
@@ -691,15 +692,19 @@ export class Renderer {
     }
     setQuality(level) {
         const next=level==='low'?'low':'high';
+        this.automaticProfile=false;
         this.quality=next;
         this.setVisualProfile({resolution:next,decoration:next});
     }
-    // Auto changes only the pixel budget; the living forest retains its effects.
-    // Explicit High/Low presets still set both axes through setQuality().
+    // Auto preserves all living-forest effects when lowering resolution actually
+    // saves pixels. On DPR=1 / budget-capped canvases where resolution is a
+    // no-op, adjust decoration instead of pretending the downgrade helped.
     setAutomaticQuality(level) {
         const next=level==='low'?'low':'high';
+        this.automaticProfile=true;
         this.quality=next;
-        this.setVisualProfile({resolution:next,decoration:'high'});
+        const noPixelGain=next==='low'&&identicalCanvasBudgets(this.w,this.h,window.devicePixelRatio);
+        this.setVisualProfile({resolution:next,decoration:noPixelGain?'low':'high'});
     }
     setVisualProfile({resolution=this.resolution,decoration=this.decoration}={}) {
         const nextResolution=resolution==='low'?'low':'high';
@@ -727,6 +732,9 @@ export class Renderer {
         const r = this.canvas.getBoundingClientRect();
         this.w = r.width; this.h = r.height;
         this.cachedView = null;
+        // Orientation/resize may change whether a resolution drop saves pixels.
+        if(this.automaticProfile && this.quality==='low')
+            this.decoration=identicalCanvasBudgets(this.w,this.h,window.devicePixelRatio)?'low':'high';
         const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.resolution);
         this.dpr=size.dpr;
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
