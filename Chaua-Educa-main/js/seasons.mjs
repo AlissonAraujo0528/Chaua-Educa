@@ -20,11 +20,12 @@ export function journeySeason(game) {
 // Cache only the two visible frames at viewport resolution. Resizing or changing
 // quality releases the old surfaces; there is no per-frame atlas resampling.
 export class SeasonalBackdrop {
- constructor(){this.frames=new Map();this.key='';this.pending=null;this.prewarmEnabled=true;}
+ constructor(){this.frames=new Map();this.key='';this.pending=null;this.prewarmEnabled=true;this.onTelemetry=null;}
  prepare(atlas,w,h,dpr,game){
   const state=journeySeason(game), margin=26;
   const key=`${w}:${h}:${dpr}`;
   if(this.key!==key || this.atlas!==atlas){
+   this.onTelemetry?.('cache-reset',{width:w,height:h,dpr});
    for(const surface of this.frames.values()){surface.width=0;surface.height=0;}
    if(this.pending){this.pending.surface.width=0;this.pending.surface.height=0;}
    this.pending=null;this.frames.clear();this.key=key;this.atlas=atlas;
@@ -49,7 +50,8 @@ export class SeasonalBackdrop {
     const pw=Math.ceil((w+margin*2)*dpr),ph=Math.ceil(h*dpr);
     const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
     surface.width=pw;surface.height=ph;
-    this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0};
+    this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0,startMs:this.onTelemetry?performance.now():0};
+    this.onTelemetry?.('surface-start',{seasonId:id,urgent:id===state.from||id===state.to});
    }
    const p=this.pending;
    const visible=id===state.from&&state.mix<1 || id===state.to&&state.mix>0;
@@ -61,7 +63,11 @@ export class SeasonalBackdrop {
    p.ctx.setTransform(dpr,0,0,dpr,0,0);
    p.ctx.drawImage(atlas,(id%2)*sw,sy,sw,sh,(w+margin*2-sw*scale)/2,(h-sh*scale)/2,sw*scale,sh*scale);
    p.ctx.restore();p.row=end;
-   if(end===p.surface.height){this.frames.set(id,p.surface);this.pending=null;}
+   if(end===p.surface.height){
+    this.frames.set(id,p.surface);
+    this.onTelemetry?.('surface-ready',{seasonId:id,buildMs:this.onTelemetry?Math.round((performance.now()-p.startMs)*100)/100:null});
+    this.pending=null;
+   }
   }
   return state;
  }

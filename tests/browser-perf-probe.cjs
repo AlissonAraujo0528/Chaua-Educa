@@ -26,6 +26,12 @@ const root=(process.env.GAME_URL||'http://127.0.0.1:5501/').replace(/\/?$/,'/');
   assert.equal(report.mode,'auto');
   assert.ok(report.summary.frames>30,'collect native RAF intervals while playing');
   assert.ok(report.summary.frameP95Ms>0);
+  assert.ok(report.summary.onePercentLowFps>0);
+  assert.equal(report.endReason,'manual-stop');
+  assert.ok(Array.isArray(report.stutters));
+  assert.ok(report.climateTimeline.length>0);
+  assert.ok(report.transitions.some(e=>e.type==='season-change'));
+
   assert.ok(report.byStage['0']?.frames>0,'record gameplay stage');
   assert.ok(report.profileChanges?.length>0,'record graphics profile');
   assert.equal(report.samplesIncludeOnlyVisibleFocusedPlayingFrames,true);
