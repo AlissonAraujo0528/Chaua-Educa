@@ -1,4 +1,4 @@
-import {getWeatherMode} from './weather.mjs';
+import {getWeatherMode,journeyRain,journeyStorm} from './weather.mjs';
 import {seasonFromFlight} from './climate-timeline.mjs';
 import {drawSnowfall} from './winter-vfx.mjs';
 
@@ -89,9 +89,16 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0){
  drawSnowfall(c,w,h,time,weights[3],reduced,low,wind,false);
  if(!atlas)return;
  const count=low?7:14, cell=(atlas.naturalWidth||atlas.width)/2;
+ // Rain and storm are independent weather modes, not seasons. Suppress
+ // decorative petals/foliage under severe precipitation instead of silently
+ // remapping storm to winter or rain to autumn.
+ const rain=journeyRain(game,game.tutorial),storm=journeyStorm(game,game.mode,game.tutorial);
+ const r=Math.max(0,Math.min(1,(rain-.5)/.35));
+ const t=Math.max(0,Math.min(1,(storm-.3)/.5));
+ const suppression=Math.max(r*r*(3-2*r),t*t*(3-2*t));
  const layers=[
-  {row: 0, weight: weights[0]},
-  {row: 2, weight: weights[2]}
+  {row: 0, weight: weights[0]*(1-suppression)},
+  {row: 2, weight: weights[2]*(1-suppression*.85)}
  ];
  for(const {row, weight} of layers){
   if(weight<=0)continue;
