@@ -1,5 +1,16 @@
 name: Validate game
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   audit-source:
     runs-on: ubuntu-latest
@@ -15,6 +26,7 @@ jobs:
           if-no-files-found: error
   test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -22,7 +34,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/verify-all-9-spritesheets.cjs
+      - run: node scripts/verify-current-spritesheets.cjs
       - run: npm test
       - run: node scripts/calibrate-climate-journey.mjs
       - run: npm run build
@@ -39,11 +51,12 @@ jobs:
           npm run test:perf-probe
           npm run test:snake-continuity
           npm run test:snake
+          node tests/browser-required-action-assets.cjs
           npm run test:snake-raster-parity
           node tests/browser-v2-a2-integration.cjs
           node tests/browser-v2-a2-scenes.cjs
           node tests/browser-a2-collision-fruits.cjs
-          npm run benchmark:snake-mesh
+          npm run benchmark:snake-a2
           npm run test:reference-art
           npm run test:visual
           npm run test:immersion
@@ -52,6 +65,8 @@ jobs:
           node tests/browser-mobile-home-layout.cjs
           node tests/browser-responsive-camera.cjs
           node tests/browser-weather-trees.cjs
+          # Verify the new authored WebPs; do not green-light older placeholder assets.
+          npm run test:winter-art
           node tests/browser-season-parity.cjs
           node tests/browser-climate-v3.cjs
           node tests/browser-season-atlas-semantic.cjs
@@ -69,6 +84,15 @@ jobs:
           npm run test:hud
           PERF_SECONDS=6 npm run benchmark:hotspots
           npm run benchmark:render-parts
+      - name: Verify GitHub Pages under the actual repository URL prefix
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pages-preview"
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/pages-preview/Chaua-Educa"
+          python3 -m http.server 5502 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages-preview" > /tmp/chaua-pages-preview.log 2>&1 &
+          pages_pid=$!
+          trap 'kill "$pages_pid" 2>/dev/null' EXIT
+          npm run test:pages-path
       - name: Save automatic graphics visual comparisons
         if: always()
         uses: actions/upload-artifact@v6
@@ -86,5 +110,8 @@ jobs:
             test-results/climate-breath-v3/
             test-results/responsive-camera/
             test-results/v2-action-integration/
+            test-results/reference-art/
+            test-results/render-parts/
+            test-results/snake-strike/
             test-results/climate-calibration/
           if-no-files-found: ignore

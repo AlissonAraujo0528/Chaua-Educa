@@ -1,8 +1,9 @@
-import {SNAKE_TIMING} from './animals.mjs';
 // Visual-only state resolver: the 120 Hz simulation, hitboxes and scoring are unchanged.
 // Each state is derived from the simulation clock; no per-frame mutable timers.
 const clamp = value => Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
 const frame = (count, progress) => Math.min(count-1,Math.floor(clamp(progress)*count));
+// Recovery frames must never reuse the spiral-eyed, fatal knockout artwork.
+export const SHIELD_REBOUND_FRAMES=Object.freeze([0,1,4,5]);
 // The actual impact motion finishes quickly, then the authored final dazed
 // pose remains visible until the Game Over dialog. Shield recovery is separate.
 export const ACTION_TIMINGS = Object.freeze({
@@ -23,7 +24,7 @@ export function parrotAction(p = {}) {
      frame:Math.min(3,Math.floor(progress*4))};
  }
  if(Number.isFinite(p.shieldHitAge)&&p.shieldHitAge>=0&&p.shieldHitAge<ACTION_TIMINGS.shieldRebound)
-   return {state:'shield-rebound',sheet:'parrot-impact',frame:frame(6,p.shieldHitAge/ACTION_TIMINGS.shieldRebound)};
+   return {state:'shield-rebound',sheet:'parrot-impact',frame:SHIELD_REBOUND_FRAMES[frame(SHIELD_REBOUND_FRAMES.length,p.shieldHitAge/ACTION_TIMINGS.shieldRebound)]};
  const t=Number.isFinite(p.time)?p.time:0;
  const wing=Number.isFinite(p.wing)?p.wing:0;
  return {state:wing>0?'flapping':'gliding',sheet:'parrot-flight',
@@ -42,7 +43,7 @@ export function hawkAction(e={},time=0,reduced=false) {
      f=dazedFrames[Math.floor((t-.38)*4)%dazedFrames.length];
    }
    return {state:t<.12?'shield-impact':t<1.05?'stunned':'dazed-exit',
-      sheet:'hawk-stunned',frame:f,
+      sheet:'hawk-stunned',frame:f,next:f,blend:0,
       angle:Math.sin(t*14)*.12,
       offsetY:Math.sin(t*10)*3.2};
  }
@@ -53,25 +54,4 @@ export function hawkAction(e={},time=0,reduced=false) {
  const offsetY=Math.sin(phase)*3.8;
  const angle=Math.cos(phase)*0.045;
  return {state:'flight',sheet:'hawk-flight',frame:current,next:(current+1)%8,blend:fraction*fraction*(3-2*fraction),angle,offsetY};
-}
-export function snakeAction(s={},reduced=false) {
- if(reduced)return null;
- if(s.retreat){
-   if(!s.dazed)return null;
-   const t=Math.max(0,s.retreatTime||0);
-   let f;
-   if(t<.14) f=0;
-   else if(t<.38) f=1;
-   else {
-     const loop=[3,4,3,4];
-     f=loop[Math.floor((t-.38)*4)%loop.length];
-   }
-   return {state:t<.14?'shield-impact':'stunned',sheet:'snake-stunned',
-     frame:f};
- }
- if(s.phase==='watching'||s.phase==='warning')return {state:'alert',sheet:'snake-strike',frame:s.phase==='warning'?1:0};
- if(s.phase==='windup')return {state:'windup',sheet:'snake-strike',frame:2+frame(2,(s.phaseAge||0)/SNAKE_TIMING.windup)};
- if(s.phase==='striking')return {state:'strike',sheet:'snake-strike',frame:4};
- if(s.phase==='recovering')return {state:'recover',sheet:'snake-strike',frame:5};
- return {state:'idle',sheet:'snake-strike',frame:0};
 }

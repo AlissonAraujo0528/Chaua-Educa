@@ -1,10 +1,7 @@
-import { SNAKE_ART } from './geometry.mjs';
 import { FRUITS } from './fruits.mjs';
 // One cache for gameplay, menus and results. All files are local.
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
- ['snake-atlas','../assets/v7/snake-atlas.webp'],
- ['snake-wrap','../assets/v8/snake-wrap.webp'],
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
  // Keep only the authored full-winter atlas plus transparent transition
  // overlays. Remove 2 identical legacy copies and 6 unused intermediate
@@ -24,14 +21,25 @@ export const ASSET_PATHS = Object.fromEntries([
 export const images = new Map();
 let pending;
 export function loadAssets() {
- return pending ??= Promise.all(Object.entries(ASSET_PATHS).map(([key,path])=>new Promise((resolve,reject)=>{
-  const img=new Image(); img.onload=()=>{images.set(key,img);resolve(img);};
-  img.onerror=()=>reject(new Error(`Não foi possível carregar ${key}. Recarregue a página.`));
-  img.src=new URL(path,import.meta.url).href;
- })));
+ if(typeof Image==='undefined')return Promise.resolve([]);
+ if(pending)return pending;
+ pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
+  const img=new Image(),url=new URL(path,import.meta.url).href;
+  await new Promise((resolve,reject)=>{
+   img.onload=resolve;
+   img.onerror=()=>reject(new Error(`Não foi possível carregar ${key}: ${url}`));
+   img.src=url;
+  });
+  if(!img.naturalWidth||!img.naturalHeight)
+   throw new Error(`Imagem vazia ou inválida: ${key}`);
+  // onload may precede decoding; await it, but do NOT claim GPU texture
+  // residency: the browser may upload textures on first actual drawing.
+  if(typeof img.decode==='function'){
+   try{await img.decode();}
+   catch(error){throw new Error(`Não foi possível decodificar ${key}: ${url}`,{cause:error});}
+  }
+  images.set(key,img);
+  return img;
+ })).catch(error=>{images.clear();pending=null;throw error;});
+ return pending;
 }
-export const BIRD_ANCHORS = [[371.75/627,418.09/627],[353/627,418.2/627],[369.14/627,342.21/627],[356.94/627,342.31/627]];
-export const BIRD_SCALES = [139/140,1,139/138,139/138];
-export const TRUNKS = [{originX:.497,coreWidth:620},{originX:.503,coreWidth:600},{originX:.50,coreWidth:620}];
-export const SPECIAL = {snake:SNAKE_ART,hollow:{originX:.62,coreWidth:160}};
-export function flightPose(wing, reduced=false) { return reduced || wing<=0 ? 1 : [0,2,3,1][Math.min(3,Math.floor((1-wing)*4))]; }

@@ -1,4 +1,12 @@
 // Encounter phases use simulation time only. Paths never retarget the player.
+// Shared intercept algebra for both physics and the warning's predicted Y.
+export function hawkFlightProgress(e,x){
+ const span=e.startX-e.targetX;
+ return span>0?Math.max(0,Math.min(1,(e.startX-x)/span)):1;
+}
+export function predictedHawkY(e,x){
+ return e.startY+(e.targetY-e.startY)*hawkFlightProgress(e,x);
+}
 export function advanceHawk(e, dt, speed, playerX) {
     e.age = (e.age || 0) + dt;
     if (e.retreat) {
@@ -21,9 +29,7 @@ export function advanceHawk(e, dt, speed, playerX) {
     }
     const hawkBoost = e.boost !== undefined ? e.boost : 50;
     e.x -= (speed + hawkBoost) * dt;
-    const span=e.startX-e.targetX;
-    const progress=span>0?Math.max(0,Math.min(1,(e.startX-e.x)/span)):1;
-    e.y=e.startY+(e.targetY-e.startY)*progress;
+    e.y=predictedHawkY(e,e.x);
     e.phase=e.x+30<playerX-18?'leaving':'crossing';
     if(e.phase==='leaving')e.harmless=true;
 }

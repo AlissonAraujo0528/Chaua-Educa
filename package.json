@@ -26,9 +26,11 @@
     "benchmark:resolution": "node scripts/benchmark-resolution-ladder.cjs",
     "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs",
     "test:perf-probe": "node tests/browser-perf-probe.cjs",
+    "test:winter-art": "node tests/browser-approved-winter.cjs",
+    "test:pages-path": "node tests/browser-github-pages.cjs",
     "test:auto-visual": "node scripts/capture-auto-visual.cjs",
     "test:snake-raster-parity": "node tests/browser-snake-raster-parity.cjs",
-    "benchmark:snake-mesh": "node scripts/benchmark-snake-mesh-ab.cjs",
+    "benchmark:snake-a2": "node scripts/benchmark-snake-a2.cjs",
     "benchmark:render-parts": "node scripts/benchmark-render-parts.cjs",
     "benchmark:background-passes": "node scripts/benchmark-background-passes.cjs"
   },
