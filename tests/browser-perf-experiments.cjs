@@ -33,6 +33,9 @@ const root=base.endsWith('/')?base:base+'/';
    await page.locator('#result-dialog').waitFor({state:'visible'});
    const {marker,width,height}=await original.evaluate(node=>({marker:node.dataset.reused,width:node.width,height:node.height}));
    assert.deepEqual({marker,width,height},{marker:'yes',width:300,height:210},'result preserves the original canvas node');
+   // A modal dialog occupies the browser's top layer; close it before
+   // clicking the QA panel, which deliberately remains outside dialogs.
+   await page.locator('#result-dialog').evaluate(dialog=>dialog.close());
    const pending=page.waitForEvent('download');
    await panel.locator('button').last().click();
    const downloaded=await pending;
