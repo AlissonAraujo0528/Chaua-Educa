@@ -568,10 +568,10 @@ export function drawBird(c, {
     x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
     reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
     defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
-    shieldHitAge = null, snow = 0, rain = 0, low = false
+    shieldHitAge = null, snow = 0, rain = 0, low = false, cold = snow, weather = null
 }) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge,snow,rain,low});
+    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge,snow,rain,low,cold,weather});
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.

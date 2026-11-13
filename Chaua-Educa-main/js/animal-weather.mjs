@@ -72,7 +72,7 @@ export class AnimalWeather {
   let state=this.actors.get(id);
   if(!state){
    if(this.actors.size>=16)return;
-   state={seen:this.time,moving:!!moving,load:1,releaseAt:this.time+.8};this.actors.set(id,state);
+   state={seen:this.time,moving:false,load:1,releaseAt:this.time+.8};this.actors.set(id,state);
   }
   // Local dusting gradually returns after a shake; global season deposition
   // remains the ceiling, so no animal appears fully snowy at winter entry.

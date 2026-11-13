@@ -60,6 +60,7 @@ const fs=require('node:fs/promises');
    r.game(g,false);r.c=originalContext;
    return {anchors,seen:seen.map(x=>({id:x.id,sheet:x.pose.sheet,frame:x.pose.frame,mirror:x.pose.mirror})),particles:r.animalWeather.particles.length};
   });
+  console.log('Animal contact measurements',measured);
   assert.equal(measured.anchors,216);
   assert.ok(measured.seen.some(x=>x.id==='chaua'&&x.sheet==='parrot-flight'));
   assert.ok(measured.seen.some(x=>x.id==='snake:91'&&x.sheet==='snake-attack'&&x.mirror));
