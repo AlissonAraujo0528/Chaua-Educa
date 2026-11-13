@@ -45,6 +45,8 @@ jobs:
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-http.log 2>&1 &
           chaua_server_pid=$!
           trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
+          # Fail fast on full real-browser flight before lengthy visual benchmarks.
+          npm run test:journey
           node tests/browser-mobile-home-layout.cjs
           node tests/browser-animal-weather.cjs
           npm run test:surface-foods
@@ -80,7 +82,6 @@ jobs:
           node tests/browser-impact-v3.cjs
           node tests/browser-winter-breath-v3.cjs
           node scripts/benchmark-seasonal-flight.cjs
-          npm run test:journey
           npm run test:background
           node tests/browser-transition-fallback.cjs
           node scripts/benchmark-transition-temporal.cjs
