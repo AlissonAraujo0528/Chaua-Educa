@@ -164,6 +164,19 @@ export function preloadSnakeA2(){
  return loading;
 }
 export function isSnakeA2Ready(){return images.size===3;}
+// Experimental main-canvas first-use prewarm. Called only during countdown,
+// before the opaque scene is painted, and never counted as a gameplay first-draw.
+// This is NOT proof that the browser has uploaded the texture to the GPU.
+export function warmupSnakeA2(c,key){
+ const image=images.get(key);
+ if(!image||!c)return false;
+ c.save();
+ c.setTransform(1,0,0,1,0,0);
+ c.globalAlpha=.001;
+ c.drawImage(image,0,0,SNAKE_A2_GRID.cell,SNAKE_A2_GRID.cell,0,0,8,8);
+ c.restore();
+ return true;
+}
 export function snakeA2NeedsMirror(pose){
  return pose?.key==='attack'&&(pose.frame===4||pose.frame===5)
   ||pose?.key==='stunned'&&pose.frame===3;
