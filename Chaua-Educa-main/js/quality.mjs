@@ -29,7 +29,7 @@ export class VisualQuality {
   this.samples=new Float64Array(1024);this.slowSamples=new Uint8Array(1024);
   this.setMode(mode);
  }
- setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.resetSamples();}
+ setMode(mode){this.mode=QUALITY_MODES.includes(mode)?mode:'auto';this.level=this.mode==='low'?'low':'high';this.ignoredSchedulingGaps=0;this.resetSamples();}
  // Low-cost frames cannot establish that the high-cost profile is sustainable.
  // Reassess only at a new flight or an explicit setting change, never mid-flight.
  beginFlight(){const previous=this.level;this.setMode(this.mode);return this.level!==previous;}
@@ -58,6 +58,7 @@ export class VisualQuality {
   // If no work measurement is provided, retain historical sample semantics
   // for tests and callers using the two-argument API.
   if(Number.isFinite(frameWorkMs) && seconds>=EXTERNAL_GAP_SECONDS && frameWorkMs<=LIGHT_RAF_MS){
+   if(this.level==='high')this.ignoredSchedulingGaps++;
    this.resetSamples();
    return false;
   }
