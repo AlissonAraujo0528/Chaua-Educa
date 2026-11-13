@@ -144,9 +144,11 @@ function start(training = false) {
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     closeDialogs(); clearInputs();
     cancelAnimationFrame(resultAnimation);
+    // Reassess the quality profile before the layout-changing in-flight class.
+    // Otherwise the renderer may synchronously measure DOM during this transition.
+    if(quality.beginFlight())applyVisualQuality();
     app.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
-    if(quality.beginFlight())applyVisualQuality();
     // The new in-flight layout is observed after browser layout by the
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
