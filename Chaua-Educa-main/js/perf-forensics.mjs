@@ -25,6 +25,8 @@ export class ForensicRecorder {
   this.startedAt=this.now();this.events=[];this.operations=[];this.frames=[];
   this.longFrames=[];this.longTasks=[];this.counters=new Map();
   this.stutterFrames=new Map();
+  this.stutterOperations=new Map();
+  this.stutterEvents=new Map();
   this.firstDraws=new Set();this.currentFrame=null;this.observers=[];
  }
  event(name,details={}){
@@ -63,6 +65,10 @@ export class ForensicRecorder {
    this.stutterFrames.delete(this.stutterFrames.keys().next().value);
   }
   this.stutterFrames.set(frame,this.frames.slice(-6));
+  this.stutterOperations.set(frame,this.operations.slice(-30));
+  this.stutterEvents.set(frame,this.events.slice(-25));
+  while(this.stutterOperations.size>160)this.stutterOperations.delete(this.stutterOperations.keys().next().value);
+  while(this.stutterEvents.size>160)this.stutterEvents.delete(this.stutterEvents.keys().next().value);
  }
  firstDraw(name,durationMs){
   if(this.firstDraws.has(name))return;
@@ -116,11 +122,12 @@ export class ForensicRecorder {
    const begin=end-s.frameMs;
    const captured=this.stutterFrames.get(s.frame)||[];
    const frames=captured.length?captured:this.frames.filter(x=>overlaps(x.atMs,x.atMs+x.cpuMs,begin-40,end+40)).slice(-6);
-   const operations=this.operations.filter(x=>overlaps(x.atMs-x.ms,x.atMs,begin-35,end+35))
+   const operations=(this.stutterOperations.get(s.frame)||this.operations).filter(x=>overlaps(x.atMs-x.ms,x.atMs,begin-35,end+35))
     .sort((a,b)=>b.ms-a.ms).slice(0,15);
    const longFrames=this.longFrames.filter(x=>overlaps(x.atMs,x.atMs+x.durationMs,begin-35,end+35)).slice(-5);
    const longTasks=this.longTasks.filter(x=>overlaps(x.atMs,x.atMs+x.durationMs,begin-35,end+35)).slice(-5);
-   const recentEvents=this.events.filter(x=>x.atMs>=end-1500&&x.atMs<=end+50).slice(-16);
+   const recentEvents=(this.stutterEvents.get(s.frame)||this.events)
+    .filter(x=>x.atMs>=end-1500&&x.atMs<=end+50).slice(-16);
    // Do not turn a temporal correlation into a causal claim.
    const measured=operations.filter(x=>x.ms>=8);
    const note=measured.length?'measured-js-work-overlap':
@@ -141,7 +148,11 @@ export class ForensicRecorder {
     'The reported GPU/heap availability varies by browser and device; absent fields are not zeros.'
    ],
    capabilities:{longAnimationFrames:this.longFrames.length>0,longTasks:this.longTasks.length>0},
-   measuredOperations:aggregateOperations(this.operations),
+   // Aggregated counters include fast operations; the detailed sample list
+   // intentionally retains only noteworthy calls to reduce probe overhead.
+   measuredOperations:Object.fromEntries(Array.from(this.counters,([name,row])=>[name,{
+    ...row,totalMs:round(row.totalMs),maxMs:round(row.maxMs)
+   }])),
    measuredOperationSamples:this.operations,
    gameEvents:this.events,
    detailedRecentFrames:this.frames,
