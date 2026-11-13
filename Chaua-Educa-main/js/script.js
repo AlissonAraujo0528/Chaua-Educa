@@ -1,4 +1,5 @@
 import { VisualQuality } from './quality.mjs';
+import { activeProbe } from './perf-hooks.mjs';
 import { LESSONS, resultAdvice } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
@@ -50,7 +51,13 @@ function toast(text) {
 }
 
 export const game = new Game({ onEvent(event) {
-    sound(event.type);
+    const probe=activeProbe;
+    if(probe)probe.event('game:'+event.type,{
+      gameSeconds:Math.round(game.elapsed*100)/100,stage:game.stage,
+      fruit:event.type==='fruit'?event.fruit:undefined});
+    if(probe){
+      const t=probe.begin('audio.event');sound(event.type);probe.end('audio.event',t,{kind:event.type});
+    }else sound(event.type);
     if(event.type==='tutorial-step'){
         if(game.tutorial.step!==2)flightInput.clear();
         $('#screen-reader-status').textContent=LESSONS[game.tutorial.step]?.instruction || 'Treino concluído!';
@@ -74,7 +81,9 @@ export const game = new Game({ onEvent(event) {
         $('#score-bonus').textContent = `+${event.value}`; pointsUntil = game.elapsed + 1;
         if(!reducedMotion.matches) {
             const score=$('#score');score.getAnimations().forEach(a=>a.cancel());
+            const t=probe?probe.begin('ui.scoreAnimationSetup'):0;
             score.animate([{transform:'scale(1)'},{transform:'scale(1.16)',color:'#b48c32'},{transform:'scale(1)'}],{duration:240});
+            if(probe)probe.end('ui.scoreAnimationSetup',t);
         }
     }
 } });
@@ -409,23 +418,43 @@ function syncUI() {
 }
 
 function frame(time) {
+    const probe=activeProbe;
+    if(probe)probe.beginFrame(time,game.stage);
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
     lastTime = time;
     game.reducedMotion=reducedMotion.matches;
+    const clockAt=probe?probe.begin('engine.advance'):0;
     clock.advance(delta);
-    if(game.state!==previousState || time-lastHudTime>=80){syncUI();lastHudTime=time;}
+    if(probe)probe.end('engine.advance',clockAt);
+    if(game.state!==previousState || time-lastHudTime>=80){
+        const hudAt=probe?probe.begin('ui.sync'):0;
+        syncUI();lastHudTime=time;
+        if(probe)probe.end('ui.sync',hudAt);
+    }
     if(quality.sample(delta,!document.hidden&&document.hasFocus()&&game.state==='playing'))applyVisualQuality();
     forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
-    if(document.hidden){requestAnimationFrame(frame);return;}
-    if (game.state === 'menu') renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
-    else {
+    if(document.hidden){
+        if(probe)probe.endFrame();
+        requestAnimationFrame(frame);return;
+    }
+    if (game.state === 'menu'){
+        const homeAt=probe?probe.begin('render.home'):0;
+        renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
+        if(probe)probe.end('render.home',homeAt);
+    }else{
         const view = renderer.getViewport();
         game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
         game.viewLeft = Math.floor(view.worldLeft);
-        renderer.game(game.visual(clock.accumulator / (1 / 120)), reducedMotion.matches, time / 1000);
+        const visualAt=probe?probe.begin('engine.visual'):0;
+        const frameView=game.visual(clock.accumulator / (1 / 120));
+        if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
+        const drawAt=probe?probe.begin('render.game'):0;
+        renderer.game(frameView, reducedMotion.matches, time / 1000);
+        if(probe)probe.end('render.game',drawAt);
     }
+    if(probe)probe.endFrame();
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

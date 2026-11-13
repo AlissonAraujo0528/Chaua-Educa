@@ -1,15 +1,33 @@
 import { normalizeProgress, advanceProgress } from './missions.mjs';
+import { activeProbe } from './perf-hooks.mjs';
 import { ENTRIES, INITIAL_ENTRIES } from './collection.mjs';
 export const RULES_VERSION = 'floresta-v9';
 export default class DB {
     static dbName = `db-chaua-${RULES_VERSION}`;
     static storageAvailable = true;
     static memory = new Map();
+    // Keep persistence synchronous and reliable until profiling establishes
+    // whether these calls cause actual stutters. Measure without recording data
+    // values, player names or personal history.
+    static _readRaw(key) {
+        const probe=activeProbe,t=probe?probe.begin('storage.read'):0;
+        try{return localStorage.getItem(key);}
+        finally{if(probe)probe.end('storage.read',t,{key});}
+    }
+    static _writeJSON(key,data) {
+        const probe=activeProbe;
+        let t=probe?probe.begin('storage.serialize'):0;
+        const serialized=JSON.stringify(data);
+        if(probe)probe.end('storage.serialize',t,{key,bytes:serialized.length});
+        t=probe?probe.begin('storage.write'):0;
+        try{localStorage.setItem(key,serialized);}
+        finally{if(probe)probe.end('storage.write',t,{key,bytes:serialized.length});}
+    }
 
     static get(legacy = false) {
         const key = legacy ? 'db-chaua' : this.dbName;
         let rows;
-        try {rows=!this.storageAvailable&&this.memory.has(key)?this.memory.get(key):JSON.parse(localStorage.getItem(key)??'[]');}
+        try {rows=!this.storageAvailable&&this.memory.has(key)?this.memory.get(key):JSON.parse(this._readRaw(key)??'[]');}
         catch {this.storageAvailable=false;rows=this.memory.get(key)??[];}
         const valid=(Array.isArray(rows)?rows:[]).filter(p=>p&&typeof p.playerName==='string'&&Number.isFinite(p.score_val));
         if(legacy)return valid;
@@ -27,7 +45,7 @@ export default class DB {
 
     static readObject(key, fallback) {
         if (this.memory.has(key)) return this.memory.get(key);
-        try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback; }
+        try { return JSON.parse(this._readRaw(key) ?? 'null') ?? fallback; }
         catch { return fallback; }
     }
 
@@ -49,9 +67,12 @@ export default class DB {
     }
 
     static unlock(id) {
+        // Avoid synchronously re-writing an already persisted fruit.
+        const stored=this.readObject('chaua-floresta-collection',[]);
+        if(Array.isArray(stored)&&stored.includes(id))return;
         const data = [...new Set([...this.unlocked(), id])];
         this.memory.set('chaua-floresta-collection',data);
-        try { localStorage.setItem('chaua-floresta-collection',JSON.stringify(data)); }
+        try { this._writeJSON('chaua-floresta-collection',data); }
         catch { this.storageAvailable = false; }
     }
 
@@ -64,16 +85,18 @@ export default class DB {
     static discoverEntries(ids) {
         const valid=ids.filter(id=>ENTRIES.some(entry=>entry.id===id));
         if(!valid.length)return;
+        const stored=this.readObject('chaua-nature-discoveries',[]);
+        if(Array.isArray(stored)&&valid.every(id=>stored.includes(id)))return;
         const data=[...new Set([...this.discoveredEntries(),...valid])];
         this.memory.set('chaua-nature-discoveries',data);
-        try { localStorage.setItem('chaua-nature-discoveries',JSON.stringify(data)); }
+        try { this._writeJSON('chaua-nature-discoveries',data); }
         catch { this.storageAvailable=false; }
     }
 
     static tutorialCompleted(){return this.readObject('chaua-tutorial-v1',false)===true;}
     static completeTutorial(){
         this.memory.set('chaua-tutorial-v1',true);
-        try {localStorage.setItem('chaua-tutorial-v1','true');}
+        try {this._writeJSON('chaua-tutorial-v1',true);}
         catch {this.storageAvailable=false;}
     }
 
@@ -93,7 +116,7 @@ export default class DB {
         const records=(Array.isArray(stored)?stored:[]).filter(r=>r && typeof r.player==='string' && r.player!==name);
         records.push({player:name,progress});
         this.memory.set('chaua-missions-v1',records);
-        try {localStorage.setItem('chaua-missions-v1',JSON.stringify(records));}
+        try {this._writeJSON('chaua-missions-v1',records);}
         catch {this.storageAvailable=false;}
         return progress;
     }
@@ -112,7 +135,7 @@ export default class DB {
         if (!right) mistakes.push(id);
         records.push({player,mistakes});
         this.memory.set('chaua-discoveries',records);
-        try { localStorage.setItem('chaua-discoveries',JSON.stringify(records)); }
+        try { this._writeJSON('chaua-discoveries',records); }
         catch { this.storageAvailable=false; }
     }
 
@@ -124,7 +147,7 @@ export default class DB {
         else data.push({ playerName, score_val: score, mode });
         data.sort((a, b) => b.score_val - a.score_val);
         this.memory.set(this.dbName, data);
-        try { localStorage.setItem(this.dbName, JSON.stringify(data)); }
+        try { this._writeJSON(this.dbName,data); }
         catch { this.storageAvailable = false; }
         return record;
     }

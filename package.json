@@ -26,6 +26,7 @@
     "benchmark:resolution": "node scripts/benchmark-resolution-ladder.cjs",
     "benchmark:long-flight": "node scripts/benchmark-long-journey.cjs",
     "test:perf-probe": "node tests/browser-perf-probe.cjs",
+    "test:perf-forensics": "node tests/browser-perf-forensics.cjs",
     "test:winter-art": "node tests/browser-approved-winter.cjs",
     "test:pages-path": "node tests/browser-github-pages.cjs",
     "test:auto-visual": "node scripts/capture-auto-visual.cjs",
