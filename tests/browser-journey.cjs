@@ -22,7 +22,11 @@ const {chromium}=require('playwright');
       const v=flightViewport(innerWidth,innerHeight),right=v.worldLeft+v.w/v.scale;
       const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x&&e.x<=right);
       const hawk=g.entities.find(e=>e.kind==='hawk'&&!e.harmless&&!e.retreat&&e.x+60>g.x);
-      let target=wood?(wood.snake?(wood.top+55+wood.bottom-200)/2:(wood.top+wood.bottom)/2):320;
+      // A2 can occupy the lower portion of a trunk opening, including during
+      // its strike. Follow the fruit corridor with a safety margin for the bird.
+      const snakeUpper=wood?.snake?wood.top+50:0;
+      const snakeLower=wood?.snake?wood.bottom-225:0;
+      let target=wood?(wood.snake?Math.max(snakeUpper,Math.min(snakeLower,(snakeUpper+snakeLower)/2)):(wood.top+wood.bottom)/2):320;
       if(!wood&&hawk){const t=Math.max(0,Math.min(1,(hawk.startX-g.x)/(hawk.startX-hawk.targetX)));const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;target=lane>=320?Math.max(145,lane-125):Math.min(495,lane+125);}
       if(g.elapsed>=nextDecision){nextDecision=g.elapsed+1/30;const predicted=g.y+g.vy*.12+450*.12**2;if(pending===null&&predicted>target+10&&g.vy>0)pending=g.elapsed+.12;}
       if(pending!==null&&g.elapsed>=pending){window.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));pending=null;}
