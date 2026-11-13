@@ -1,3 +1,4 @@
+import {challengeAt} from './challenge.mjs';
 import { VisualQuality } from './quality.mjs';
 import { activeProbe } from './perf-hooks.mjs';
 import { LESSONS, resultAdvice } from './tutorial.mjs';
@@ -337,7 +338,7 @@ function result() {
     $('#result-eyebrow').textContent = game.won ? 'O BANDO ESTÁ REUNIDO' : 'CADA VOO É UM COMEÇO';
     $('#result-reason').textContent = game.reason;
     $('#result-advice').textContent = resultAdvice(game);
-    $('#result-mode').textContent = selectedMode==='tranquilo'?'Modo Amigável':'Modo Desafio';
+    $('#result-mode').textContent = selectedMode==='tranquilo'?'Modo Amigável':`Desafio · ${challengeAt(game.elapsed).name}`;
     const progress=DB.missionProgress(player);
     const earned=completedMissions(progress).filter(m=>!flightMissionIds.includes(m.id));
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;

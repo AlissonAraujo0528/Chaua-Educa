@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, STEP, FLIGHT } from '../Chaua-Educa-main/js/engine.mjs';
 import { offerPower } from '../Chaua-Educa-main/js/powers.mjs';
-import { JOURNAL_ART, ENTRIES } from '../Chaua-Educa-main/js/collection.mjs';
+import { ENTRIES } from '../Chaua-Educa-main/js/collection.mjs';
 
 test('flap impulse activates on flap and eases smoothly', () => {
     const g = new Game();
@@ -74,9 +74,7 @@ test('offerPower schedules pepper powerup when due', () => {
     assert.ok(schedule.nextPepper > 15);
 });
 
-test('Chauapedia reuses current game artwork for every discovery', () => {
-    for (const entry of ENTRIES) {
-        assert.ok(JOURNAL_ART[entry.id], `Missing journal art for ${entry.id}`);
-        assert.ok(JOURNAL_ART[entry.id].endsWith('.webp'));
-    }
+test('Chauapedia uses its own factual content instead of the gameplay illustration map',()=>{
+ assert.ok(ENTRIES.some(e=>e.id==='conservacao'&&e.source==='list2026'));
+ assert.ok(ENTRIES.find(e=>e.id==='conservacao').text.includes('Vulnerável'));
 });

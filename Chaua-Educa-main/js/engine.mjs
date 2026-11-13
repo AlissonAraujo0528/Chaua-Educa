@@ -1,3 +1,4 @@
+import {challengeAt,challengeSpeedGain} from './challenge.mjs';
 import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,roundedShape} from './collision.mjs';
 import {snakeA2HitsPlayer,snakeA2FruitHasClearance,placeA2Fruit,snakeA2CollisionRects,snakeA2HeadRect} from './snake-a2.mjs';
 import {livingWoodRects} from './forest-geometry.mjs';
@@ -217,7 +218,7 @@ export class Game {
     get body() { return { x: this.x - 20, y: this.y - 20, w: 40, h: 40 }; }
     get speed() {
         const p = FLIGHT[this.mode];
-        const gain = this.mode === 'aventura' ? Math.min(185, this.elapsed * 0.45 + Math.max(0, this.elapsed - 40) * 0.35) : Math.min(p.speedGain, this.elapsed * 0.45);
+        const gain = this.mode === 'aventura' ? challengeSpeedGain(this.elapsed) : Math.min(p.speedGain, this.elapsed * 0.45);
         const wind = physicsWind(this.distance, this.mode, this.tutorial);
         return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1) * (1 + wind * .06);
     }
@@ -608,14 +609,15 @@ export class Game {
     spawn() {
         const n = this.sequence++;
         const profile=FLIGHT[this.mode];
-        const soloHawk = this.elapsed > profile.hawkAt && n % 3 === 1;
+        const challenge=this.mode==='aventura'?challengeAt(this.elapsed):null;
+        const soloHawk = this.elapsed > profile.hawkAt && n % (challenge?.hawkEvery??3) === 1;
         // Reserve the first encounters: finish the preceding wood before a
         // solo hawk, and let that hawk leave before presenting another trunk.
         const waitingForSolo = this.entities.some(e => e.kind === 'hawk' && e.solo && !e.harmless && e.x > this.x - 100);
         if (waitingForSolo || (soloHawk && this.entities.some(e => e.kind === 'wood' && e.x + 85 > this.x - 40))) {
             this.sequence--; this.nextSpawn = .4; return;
         }
-        if (n > 0 && n % 6 === 5) {
+        if (n > 0 && n % (challenge?.quietEvery??6) === (challenge?.quietEvery??6)-1) {
             this.nextSpawn = 2.8;
             this.onEvent({ type: 'quiet' });
             return;
@@ -646,7 +648,7 @@ export class Game {
             this.entities.push({ id:this.nextId++,kind:'hawk',solo:true,x,y,startX:x,
                 targetX:this.x-60,startY:y,targetY:swoop?lane:y,
                 warning:Math.max(profile.warning,travel*.25),phase:'warning',
-                age:0,dive,ascent,w:66,h:34 });
+                age:0,dive,ascent,boost:challenge?.hawkBoost??50,w:66,h:34 });
         } else {
             const variants = ['plain', 'branch', 'plain'];
             const variant = plan.variant ?? (this.stage===1 && n%2===0?'branch':this.elapsed > 17 ? variants[n % variants.length] : 'plain');
