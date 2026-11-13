@@ -41,6 +41,7 @@ const root=process.env.GAME_URL||'http://127.0.0.1:5501/';
   assert.ok(measured.maxBoundary<=1,'snow interpolation must be continuous across atlas stages');
   await page.locator('#surface-proof').screenshot({path:'test-results/surface-foods/snow-levels.png'});
   await page.evaluate(async()=>{document.querySelector('#surface-proof').remove();const {game}=await import('/js/script.js');game.state='menu';});
+  await page.goto(root,{waitUntil:'networkidle'});
   await page.locator('#inputPlayer').fill('Teste alimentos');await page.locator('#btnStart:not([disabled])').click();
   await page.waitForTimeout(800);assert.deepEqual(errors,[]);
   console.log('PASS surface weather, twelve food sheets, silhouette and snow continuity',measured);

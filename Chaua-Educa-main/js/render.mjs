@@ -1310,7 +1310,7 @@ export class Renderer {
                     c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
                     c.beginPath(); c.moveTo(e.targetX, e.targetY); c.lineTo(e.startX, e.startY); c.stroke(); c.restore();
                 }
-                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low');
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low',winterAmount(game));
             } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, wet);
         }
         const auraAt=probe&&probe.deep?probe.begin('render.shieldAura'):0;
@@ -1538,13 +1538,13 @@ export class Renderer {
             if(rain>.03&&!reduced)
                 drawSurfaceRainImpacts(c,x,upper?y+3:y-3,rain,time,e.id||0,
                     this.decoration==='low',reduced);
-            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time, this.decoration==='low');
+            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time, this.decoration==='low',winterAmount(game));
         }
     }
     trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0){
         drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time,snow,rain});
     }
-    snake(wood,reduced,snow=0,rain=0,time=0,low=false){
+    snake(wood,reduced,snow=0,rain=0,time=0,low=false,cold=snow){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;
         c.save();c.translate(place.x,place.y);c.scale(place.facing,1);
         drawSnakeA2(c,s,place.factor,reduced);
@@ -1555,8 +1555,8 @@ export class Renderer {
         if(snow>.32&&activePhase>.16)
             drawSnowShedding(c,'snake',snow,time,activePhase,
                 {low,reduced,seed:wood.id||0});
-        if(snow>.18&&!s.retreat){
-            const breath=winterBreathSettings('snake',snow,time,
+        if(cold>.18&&!s.retreat){
+            const breath=winterBreathSettings('snake',cold,time,
                 {low,reduced,activity:activePhase,seed:wood.id||0});
             if(breath){
                 // The existing animated snake's head collider supplies
@@ -1579,7 +1579,7 @@ export class Renderer {
         }
         c.restore();
     }
-    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0, rain = 0, low = false) {
+    hawk(entityOrX, yOrTime = 0, timeOrReduced = 0, warning = false, angle = 0, retreat = false, snow = 0, rain = 0, low = false, cold = snow) {
         const c = this.c;
         let x, y, time, e = null;
         if (typeof entityOrX === 'object') {
@@ -1635,8 +1635,8 @@ export class Renderer {
         if(snow>.32&&shake>.16)
             drawSnowShedding(c,'hawk',snow,time,shake,
                 {low,reduced,seed:entity.id||0});
-        if(snow>.18&&!retreat&&!warning){
-            const breath=winterBreathSettings('hawk',snow,time,
+        if(cold>.18&&!retreat&&!warning){
+            const breath=winterBreathSettings('hawk',cold,time,
                 {low,reduced,activity:entity.dive?.75:0,seed:entity.id||0});
             if(breath)drawAnimalBreath(c,-86,14,breath.strength,
                 breath.time,breath.period,breath.duration,-1,
