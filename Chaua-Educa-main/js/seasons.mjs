@@ -65,7 +65,7 @@ export class SeasonalBackdrop {
     this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
    }
    if(!this.pending){
-    const pw=Math.ceil((w+margin*2)*dpr),ph=Math.ceil(h*dpr);
+    const pw=Math.max(1,Math.ceil((w+margin*2)*dpr)),ph=Math.max(1,Math.ceil(h*dpr));
     const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
     surface.width=pw;surface.height=ph;
     this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0,
