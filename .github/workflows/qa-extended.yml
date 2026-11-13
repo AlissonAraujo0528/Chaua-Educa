@@ -31,6 +31,8 @@ jobs:
           node tests/browser-action-sprites.cjs
           node tests/browser-real-action-sprites.cjs
           node tests/browser-v2-cross-browser.cjs
+          WEATHER_BROWSER=firefox node tests/browser-animal-weather.cjs
+          WEATHER_BROWSER=webkit node tests/browser-animal-weather.cjs
       - name: Save real art and cross-browser screenshots
         if: always()
         uses: actions/upload-artifact@v6
@@ -39,5 +41,6 @@ jobs:
           path: |
             test-results/action-sprites/
             test-results/v2-cross-browser/
+            test-results/animal-weather/
           if-no-files-found: ignore
           retention-days: 7

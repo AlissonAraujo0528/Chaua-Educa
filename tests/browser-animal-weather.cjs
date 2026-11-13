@@ -1,8 +1,9 @@
-const {chromium}=require('playwright');
+const playwright=require('playwright');
+const browserName=process.env.WEATHER_BROWSER||'chromium';
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox']});
+ const browser=await playwright[browserName].launch({executablePath:browserName==='chromium'?process.env.CHROMIUM_PATH||undefined:undefined,args:browserName==='chromium'?['--no-sandbox']:[]});
  try{
   const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -67,7 +68,7 @@ const fs=require('node:fs/promises');
   assert.ok(measured.seen.some(x=>x.id==='hawk:92'));
   assert.deepEqual(errors,[]);
   await fs.mkdir('test-results/animal-weather',{recursive:true});
-  await page.locator('#animal-contact-proof').screenshot({path:'test-results/animal-weather/contact-poses.png'});
-  console.log('PASS animal weather contact opacity and production pose selection',measured);
+  await page.locator('#animal-contact-proof').screenshot({path:`test-results/animal-weather/contact-poses${browserName==='chromium'?'':'-'+browserName}.png`});
+  console.log('PASS animal weather contact opacity and production pose selection',browserName,measured);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
