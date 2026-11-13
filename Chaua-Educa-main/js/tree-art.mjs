@@ -1,13 +1,49 @@
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
+import {winterOverlayStages} from './winter-vfx.mjs';
+
+// Tiny local highlights follow the existing bark, without painting a large
+// rectangular light patch or modifying any authored tree atlas.
+export function drawWetBarkSheen(c,x,y,width,wet,time=0,seed=0){
+ if(wet<=0||width<=0)return;
+ c.save();
+ c.lineCap='round';
+ c.lineWidth=Math.max(.75,Math.min(2.2,width*.019));
+ c.strokeStyle='#a4cad3';
+ c.globalAlpha=Math.min(.32,wet*.28);
+ c.beginPath();
+ const left=x+width*.20+(seed%3)*width*.025;
+ c.moveTo(left,y+3);
+ c.quadraticCurveTo(left+width*.045,y+21,left+width*.026,y+51);
+ c.stroke();
+ c.globalAlpha=wet*.13;
+ c.lineWidth=Math.max(.6,width*.008);
+ c.beginPath();
+ c.moveTo(x+width*.66,y+14);
+ c.quadraticCurveTo(x+width*.64,y+27,x+width*.65,y+35);
+ c.stroke();
+ // A falling bead releases periodically from the cap; zero allocations
+ // and no new silhouette, facial feature, limb, or head is ever drawn.
+ const cycle=((time*1.15+seed*.37)%1+1)%1;
+ if(cycle>.67){
+  const phase=(cycle-.67)/.33;
+  c.globalAlpha=wet*(1-phase)*.22;
+  c.fillStyle='#add4db';
+  c.beginPath();
+  c.ellipse(left+width*.026,y+51+phase*26,1.1,1.7,0,0,Math.PI*2);
+  c.fill();
+ }
+ c.restore();
+}
+
 
 // Source sprites retain their authored proportions. Only an undecorated bark
 // strip extends toward the viewport edge; caps, knots and leaves never stretch.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
- const fullSnow = snow >= 0.98;
- const snowImg4 = fullSnow ? (images.get(`trees-${kind}-snow-04`) || images.get(`trees-${kind}-snow`)) : null;
+ const fullSnow = snow >= 1 - 1e-6;
+ const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
  const image = snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
@@ -28,70 +64,25 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
   c.drawImage(image, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
  }
 
- // Wet wood and glossy specular sheen in rain
- if (rain > 0 && typeof c.save === 'function') {
-  c.save();
-  const topY = upper ? y - length : py;
-  const hVal = upper ? length + (f.endY - splice) * s : (y + length - py);
+ // Restrained wet detail on existing bark, near the visible trunk cap.
+ if(rain>0)drawWetBarkSheen(c,coreLeft,upper?join-70:py+8,width,rain,time,variant);
 
-  // Glossy specular sheen catching storm sky light
-  if (typeof c.createLinearGradient === 'function') {
-   const sheen = c.createLinearGradient(coreLeft, 0, coreLeft + width, 0);
-   sheen.addColorStop(0, 'rgba(255, 255, 255, 0)');
-   sheen.addColorStop(0.24, `rgba(215, 238, 255, ${rain * 0.16})`);
-   sheen.addColorStop(0.36, `rgba(240, 250, 255, ${rain * 0.28})`);
-   sheen.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-   c.fillStyle = sheen;
-   c.fillRect(coreLeft, topY, width, hVal);
-  }
-
-  // Water droplets trickling down and dripping from branch caps
-  if (upper) {
-   const dropCycle = (time * 1.5 + variant * 0.67) % 1;
-   const tipX = px + cw * s * 0.52;
-   const tipY = join + (f.endY - splice) * s;
-   if (dropCycle > 0.22) {
-    const fallT = (dropCycle - 0.22) / 0.78;
-    const dropY = tipY + fallT * 32 + 220 * fallT * fallT;
-    c.fillStyle = '#d2ecff';
-    c.beginPath();
-    c.ellipse(tipX, dropY, 1.4, 2.8, 0, 0, Math.PI * 2);
-    c.fill();
+ // Crossfade between the EXISTING four transparent snowfall WebP layers.
+ // Only the visible branch/cap is coated; a suspended tree must never gain
+ // snow along the trunk section attached to the ceiling.
+ if(snow>0&&!fullSnow){
+  for(const {stage,alpha} of winterOverlayStages(snow)){
+   const overlay=images.get(`trees-${kind}-overlay-0${stage}`);
+   if(!overlay || alpha<=0)continue;
+   c.save();c.globalAlpha=Math.min(1,alpha);
+   if(upper){
+    c.drawImage(overlay,sx+cx,sy+splice,cw,f.endY-splice,
+      px,join,cw*s,(f.endY-splice)*s);
+   }else{
+    c.drawImage(overlay,sx+cx,sy+cy,cw,splice-cy,
+      px,py,cw*s,(splice-cy)*s);
    }
-  } else {
-   const dropCycle = (time * 1.4 + variant * 0.79) % 1;
-   const isBranch = variant === 3 && f.perch;
-   const tipX = isBranch ? px + f.perch[0] * s : coreLeft + width * 0.18;
-   const tipY = isBranch ? py + f.perch[1] * s : py + 6;
-   if (dropCycle > 0.25) {
-    const fallT = (dropCycle - 0.25) / 0.75;
-    const dropY = tipY + fallT * 28 + 200 * fallT * fallT;
-    c.fillStyle = '#d2ecff';
-    c.beginPath();
-    c.ellipse(tipX, dropY, 1.3, 2.6, 0, 0, Math.PI * 2);
-    c.fill();
-   }
-  }
-  c.restore();
- }
-
- // Snow accumulation transition: overlay pure snow layer progressively
- if (snow > 0 && !fullSnow) {
-  const stageNum = Math.min(4, Math.max(1, Math.ceil(snow * 4)));
-  const overlay = images.get(`trees-${kind}-overlay-0${stageNum}`) || images.get(`trees-${kind}-snow-0${stageNum}`) || images.get(`trees-${kind}-snow`);
-  if (overlay) {
-   c.save?.();
-   if (c.globalAlpha !== undefined) c.globalAlpha = Math.min(1, snow * 1.15);
-   if (upper) {
-    const start = y - length;
-    if (join > start) c.drawImage(overlay, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
-    c.drawImage(overlay, sx + cx, sy + splice, cw, f.endY - splice, px, join, cw * s, (f.endY - splice) * s);
-   } else {
-    const end = y + length;
-    if (end > join) c.drawImage(overlay, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
-    c.drawImage(overlay, sx + cx, sy + cy, cw, splice - cy, px, py, cw * s, (splice - cy) * s);
-   }
-   c.restore?.();
+   c.restore();
   }
  }
 
@@ -116,7 +107,7 @@ const TREE_CORE_WIDTH = 128;
 const TREE_VARIANTS = ['rot', 'hollow', 'moss', 'vine'];
 const TREE_SPLICES = [181, 180, 180, 182];
 
-export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0) {
+export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0, visibleReach = 1000) {
  const image = images.get('tree-variants');
  const index = TREE_VARIANTS.indexOf(kind);
  if (!image || index < 0) return;
@@ -134,7 +125,11 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   // Repeat a reflected bark band at native scale. Stretching a scanline
   // turned grooves and moss into long vertical stripes on portrait screens.
   const bandHeight = 96, tileHeight = bandHeight * scale;
-  for (let pos = join - .5, tile = 0; pos < 1000; pos += tileHeight, tile++) {
+  // Culling is presentation-only: include a margin for fractional camera
+  // transforms and wood sway. When called without the flight camera,
+  // preserve the complete source drawing for screenshots/tests.
+  const reach=Math.max(join,Math.min(1000,Number.isFinite(visibleReach)?visibleReach:1000));
+  for (let pos = join - .5, tile = 0; pos < reach; pos += tileHeight, tile++) {
    c.save();
    c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
    if (tile % 2 === 0) c.scale(1, -1);
@@ -145,31 +140,9 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
    left, 0, TREE_CELL * scale, join);
 
-  // Wet bark in rain
-  if (rain > 0 && breakAge === undefined) {
-   c.save();
-   if (typeof c.createLinearGradient === 'function') {
-    const sheen = c.createLinearGradient(-TREE_WIDTH / 2, 0, TREE_WIDTH / 2, 0);
-    sheen.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    sheen.addColorStop(0.24, `rgba(210, 235, 255, ${rain * 0.16})`);
-    sheen.addColorStop(0.36, `rgba(240, 250, 255, ${rain * 0.28})`);
-    sheen.addColorStop(0.55, 'rgba(255, 255, 255, 0)');
-    c.fillStyle = sheen;
-    c.fillRect(-TREE_WIDTH / 2, 0, TREE_WIDTH, join + 400);
-   }
-
-   const dropCycle = (time * 1.5 + (index + 1) * 0.83) % 1;
-   if (dropCycle > 0.24) {
-    const fallT = (dropCycle - 0.24) / 0.76;
-    const dropY = join * 0.85 + fallT * 30 + 210 * fallT * fallT;
-    const dropX = -TREE_WIDTH * 0.25;
-    c.fillStyle = '#d2ecff';
-    c.beginPath();
-    c.ellipse(dropX, dropY, 1.4, 2.7, 0, 0, Math.PI * 2);
-    c.fill();
-   }
-   c.restore();
-  }
+  // Material highlight remains local to the cap; the WebP silhouette stays intact.
+  if(rain>0&&breakAge===undefined)
+   drawWetBarkSheen(c,-TREE_WIDTH/2,16,TREE_WIDTH,rain,time,index);
 
   // Snow variant transition
   if (snow > 0 && breakAge === undefined) {
@@ -177,15 +150,11 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    if (snowImage) {
     c.save();
     c.globalAlpha = Math.min(1, snow * 1.15);
-    const bandHeight = 96, tileHeight = bandHeight * scale;
-    for (let pos = join - .5, tile = 0; pos < 1000; pos += tileHeight, tile++) {
-     c.save();
-     c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
-     if (tile % 2 === 0) c.scale(1, -1);
-     c.drawImage(snowImage, sx + (TREE_CELL - TREE_CORE_WIDTH) / 2, sy + splice - bandHeight,
-      TREE_CORE_WIDTH, bandHeight, -TREE_WIDTH / 2, 0, TREE_WIDTH, tileHeight + .5);
-     c.restore();
-    }
+    // Keep the original snowy cut face, but do not tile the snowy bark
+    // strip all the way to the ceiling: repeating it made vertical stripes.
+    // Upper trunks are turned upside down. Mirroring this white cut-face
+    // onto their underside would make snow adhere against gravity, so
+    // falling crystals are handled separately by drawSnowContact().
     if (!upper) {
      c.drawImage(snowImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
       left, 0, TREE_CELL * scale, join);

@@ -3,10 +3,25 @@ import {SNAKE_TIMING} from './animals.mjs';
 // Each state is derived from the simulation clock; no per-frame mutable timers.
 const clamp = value => Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
 const frame = (count, progress) => Math.min(count-1,Math.floor(clamp(progress)*count));
-export const ACTION_TIMINGS = Object.freeze({parrotImpact:.42,shieldRebound:.30,hawkStun:1.05,hawkRetreat:2,snakeDaze:.85});
+// The actual impact motion finishes quickly, then the authored final dazed
+// pose remains visible until the Game Over dialog. Shield recovery is separate.
+export const ACTION_TIMINGS = Object.freeze({
+ parrotImpact:1.2,
+ parrotRecoil:.32,
+ shieldRebound:.30,
+ hawkStun:1.05,
+ hawkRetreat:2,
+ snakeDaze:.85
+});
 export function parrotAction(p = {}) {
  if(p.reduced||p.perched||p.landing!==null&&p.landing!==undefined||p.surprise)return null;
- if(p.defeated)return {state:'impact',sheet:'parrot-impact',frame:frame(6,p.impactProgress||0)};
+ if(p.defeated){
+   const progress=clamp(p.impactProgress||0);
+   // Authored impact frames 0..3 go from surprise to spiral-eyed daze.
+   // Frames 4 and 5 are RECOVERY poses and must never occur on a fatal hit.
+   return {state:progress>=1?'stunned':'impact',sheet:'parrot-impact',
+     frame:Math.min(3,Math.floor(progress*4))};
+ }
  if(Number.isFinite(p.shieldHitAge)&&p.shieldHitAge>=0&&p.shieldHitAge<ACTION_TIMINGS.shieldRebound)
    return {state:'shield-rebound',sheet:'parrot-impact',frame:frame(6,p.shieldHitAge/ACTION_TIMINGS.shieldRebound)};
  const t=Number.isFinite(p.time)?p.time:0;
@@ -31,7 +46,7 @@ export function hawkAction(e={},time=0,reduced=false) {
       angle:Math.sin(t*14)*.12,
       offsetY:Math.sin(t*10)*3.2};
  }
- if(e.dive||e.phase==='leaving')return null; // preserve authored dive and glide.
+ if(e.dive)return null; // Preserve legacy inclined dive; reuse the same flight atlas throughout crossing AND exit.
  const t=Number.isFinite(time)?time:0;
  const position=((t*16+(e.id||0)*1.5)%8+8)%8, current=Math.floor(position), fraction=position-current;
  const phase=(position/8)*Math.PI*2;
