@@ -23,8 +23,9 @@ wind physics, scoring, victory score or number of simultaneous collectables.
   data and mission credit; they cannot unlock replacement foods. Catalogue
   version 2 is recorded without rewriting old scoreboards.
 - Food moisture and snow are clipped to each food's alpha in one reusable
-  128px buffer. The journal uses still crops of the same atlas and direct links
-  to the source for each food.
+  128px buffer during gameplay. The journal shares catalogue text/IDs and
+  source links, while its reader uses independent photography and numbered
+  food entries; it never samples the gameplay atlas.
 - The adaptive-quality fix compares a RAF interval to prior callback work.
   An isolated uncertain gap has a bounded allowance without clearing history;
   repeated cheap-JS gaps remain evidence of possible compositor/GPU pressure.
@@ -79,3 +80,42 @@ Pause/quiz use the frozen scene clock, and a new run resets the effect state.
 pause/reset and budgets. `tests/browser-animal-weather.cjs` checks all 216
 anchors against real opaque artwork, exercises production pose selection and
 captures 32 rain/snow poses in `animal-weather/contact-poses.png`.
+
+
+## Mobile framing and background clarity
+
+The mobile shell now fits the visible viewport, including browser bars and the
+software keyboard. Menus retain 44px touch targets and 16px name input; long
+dialogs scroll internally. Short landscape fits the complete 640-unit flight
+height instead of magnifying a cropped corridor. Portrait remains playable if
+the browser denies landscape/fullscreen. Device-sized browser tests cover 11
+portrait/landscape viewports, keyboard resizing, input and pause/resume.
+
+Mobile menu actions use a light backing so foliage cannot hide their labels.
+The three procedural distant butterflies (two ellipses each) were removed:
+they looked like paired dancing dots over the seasonal scenery. No replacement
+asset, alternative emitter or unused butterfly code remains.
+
+
+## Progressive Desafio and independent Chauapédia
+
+Challenge pressure advances from active flight time 30s–510s, continuing after
+scenery distance reaches its last stage. Later flight adds forced height
+variation to otherwise flat patterns, fewer long clearings, faster hawks and
+continued speed gain through 540s. Gaps retain the 115-unit floor; encounter
+shift budgets, announced hawk routes and isolation are preserved. Speed uses a
+numeric helper, avoiding difficulty-object allocation in the 120Hz hot path.
+Amigável is unchanged. Ranking ruleset v10 archives v9 Desafio scores and
+retains v8/v9 Amigável records, discoveries and missions without deleting saves.
+
+The unchanged 120ms-reaction calibration pilot won 1/4 Desafio seeds after this
+change (previously 3/4), while Amigável remained 4/4 with identical sample
+results. This is scripted calibration, **not a human win-rate claim**. Browser
+completion QA uses an expert corridor controller through actual keyboard
+inputs; it keeps all hazards, collisions, quizzes and rewards active. Four
+expert headless seeded routes completed at the 1259-unit browser world width.
+
+Reader photographs, category dates and citations are documented in
+`docs/journal-credits.md`. No game sprite, food thumbnail generator or duplicate
+art renderer remains in the encyclopedia. UI captures cover ranking, missions,
+help, reader/detail and result panels at desktop/phone/short landscape sizes.

@@ -16,21 +16,22 @@ const {chromium}=require('playwright');
    const summary=await page.evaluate(async(seed)=>{
     const {game:g}=await import('/js/script.js');const {isSnakeA2Ready}=await import('/js/snake-a2.mjs');
     if(!isSnakeA2Ready())throw Error('A2 must load on the default game URL');const {flightViewport}=await import('/js/viewport.mjs');
-    g.start(g.mode,[],seed);let pending=null,nextDecision=0,hits=new Set(),stages=new Set();
+    g.start(g.mode,[],seed);let hits=new Set(),stages=new Set();
     for(let frame=0;frame<40000;frame++){
      if(g.state==='playing'){
       const v=flightViewport(innerWidth,innerHeight),right=v.worldLeft+v.w/v.scale;
       const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x&&e.x<=right);
       const hawk=g.entities.find(e=>e.kind==='hawk'&&!e.harmless&&!e.retreat&&e.x+60>g.x);
-      let target=wood?(wood.snake?(wood.top+55+wood.bottom-200)/2:(wood.top+wood.bottom)/2):320;
-      if(!wood&&hawk){const t=Math.max(0,Math.min(1,(hawk.startX-g.x)/(hawk.startX-hawk.targetX)));const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;target=lane>=320?Math.max(145,lane-125):Math.min(495,lane+125);}
-      if(g.elapsed>=nextDecision){nextDecision=g.elapsed+1/30;const predicted=g.y+g.vy*.12+450*.12**2;if(pending===null&&predicted>target+10&&g.vy>0)pending=g.elapsed+.12;}
-      if(pending!==null&&g.elapsed>=pending){window.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));pending=null;}
+      let target=wood?(wood.snake?wood.top+Math.min(85,(wood.bottom-wood.top)*.35):(wood.top+wood.bottom)/2):320;
+      if(!wood&&hawk){const t=Math.max(0,Math.min(1,(hawk.startX-g.x)/(hawk.startX-hawk.targetX)));const lane=hawk.startY+(hawk.targetY-hawk.startY)*t;target=lane>=320?Math.max(145,lane-140):Math.min(495,lane+140);}
+      // Expert navigation gate, not a human win-rate estimate: time a tap at
+      // the lower part of the clear corridor, leaving room for its 50px ascent.
+      if(g.y>target+26&&g.vy>0&&g.flapCooldown<=0){window.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));}
       for(const e of g.entities){if(e.kind==='hawk')hits.add(e.dive?'dive':'hawk');if(e.snake)hits.add(e.snake.branch?'branch-snake':'snake');}
       stages.add(g.stage);
      }
      window.stepFlight();
-     if(g.state==='quiz') {document.querySelector(g.question.answer?'#answer-true':'#answer-false').click();document.querySelector('#quiz-continue').click();pending=null;}
+     if(g.state==='quiz') {document.querySelector(g.question.answer?'#answer-true':'#answer-false').click();document.querySelector('#quiz-continue').click();}
      if(g.state==='ended')break;
     }
     return {mode:g.mode,seed,won:g.won,reason:g.reason,score:g.score,correct:g.correct,elapsed:g.elapsed,stages:[...stages],encounters:[...hits],nearestWoods:g.entities.filter(e=>e.kind==='wood'&&Math.abs(e.x-g.x)<260).map(e=>({x:Math.round(e.x),top:Math.round(e.top),bottom:Math.round(e.bottom),variant:e.variant,snake:e.snake?.phase})).slice(0,3)};

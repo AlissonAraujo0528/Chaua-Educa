@@ -24,9 +24,3 @@ export function drawFood(c,variety,x,y,size=50,time=0,reduced=false,phase=0,snow
   b.globalCompositeOperation='source-over';c.drawImage(weatherBuffer.canvas,x-size/2,y-size/2,size,size);
  }else c.drawImage(image,...rect,x-size/2,y-size/2,size,size);
 }
-export function foodThumbnail(food){
- const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;
- canvas.setAttribute('aria-hidden','true');canvas.className='food-thumbnail';
- drawFood(canvas.getContext('2d'),food.slot,64,64,128,0,true);
- return canvas;
-}

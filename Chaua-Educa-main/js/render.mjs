@@ -1126,17 +1126,6 @@ export class Renderer {
         this.cameraTime=sceneTime;
         const view={...baseView,worldTop:this.cameraTop};
         const s = view.scale;
-        // Tiny, muted butterflies stay in the distant layer; no pickup glow or collision.
-        c.save();c.globalAlpha=.32;
-        for(let i=0;i<(this.decoration==='low'?1:3);i++) {
-            const t=reduced?0:game.elapsed;
-            const bx=view.x+view.w*(.38+i*.2)+Math.sin(t*.3+i)*12;
-            const by=view.y+view.h*.11+Math.sin(t*.5+i*2)*7;
-            const wing=reduced?3:1.2+Math.abs(Math.sin(t*5+i))*2;
-            oval(c,bx-wing,by,wing,2.5,'#687f6a',-.45);
-            oval(c,bx+wing,by,wing,2.5,'#687f6a',.45);
-        }
-        c.restore();
         let shakeX = 0, shakeY = 0;
         if (!reduced && game.shakeTime > 0 && game.shakeDuration > 0) {
             const factor = game.shakeTime / game.shakeDuration;

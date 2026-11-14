@@ -1,3 +1,4 @@
+import {challengeAt} from './challenge.mjs';
 import {JOURNEY} from './journey.mjs';
 // Declarative encounter vocabulary. Coordinates are always logical world units.
 export const ENCOUNTERS = Object.freeze([
@@ -21,12 +22,13 @@ export function seededRandom(seed) {
 export function planEncounter({sequence,elapsed,lastCenter,lastPattern,profile,speed,stage=0,random}) {
     const eligible=ENCOUNTERS.filter(p=>p.unlock<=elapsed && p.id!==lastPattern).flatMap(p=>JOURNEY[stage].patterns.includes(p.id)?[p,p]:[p]);
     const pattern=sequence===0?ENCOUNTERS[0]:eligible[Math.min(eligible.length-1,Math.floor(random()*eligible.length))];
-    const interval=Math.max(profile.minInterval,profile.interval-elapsed*profile.ramp)+pattern.interval;
+    const challenge=profile.actualSpeed?challengeAt(elapsed):null;
+    const interval=Math.max(challenge?.minInterval??profile.minInterval,profile.interval-elapsed*profile.ramp)+pattern.interval;
     // Amigável keeps its original travel budget. Aventura uses its actual
     // speed and a tighter reversal budget to produce meaningful height changes.
     const available=Math.max(0,(interval*speed-(profile.clearance??220))/(profile.actualSpeed?speed:300)-(profile.turnaround??.45));
-    const maxShift=Math.min(profile.shiftLimit??55,available*(profile.shiftRate??100));
-    const shift=Math.max(-maxShift,Math.min(maxShift,pattern.shift+(random()-.5)*16));
+    const maxShift=Math.min(challenge?.shiftLimit??profile.shiftLimit??55,available*(challenge?.shiftRate??profile.shiftRate??100));
+    const shift=Math.max(-maxShift,Math.min(maxShift,(pattern.shift||(sequence%2?1:-1)*(challenge?.drift??0))*(challenge?.shiftMultiplier??1)+(random()-.5)*16));
     const center=Math.max(200,Math.min(440,lastCenter+shift));
     const progression = Math.min(1, sequence / 25);
     const gap = Math.max(profile.minGap, Math.round(profile.gap - progression * (profile.gap - profile.minGap))) + pattern.extraGap * (1 - progression * 0.4);

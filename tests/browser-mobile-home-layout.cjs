@@ -16,6 +16,7 @@ const out='test-results/mobile-home';fs.mkdirSync(out,{recursive:true});
    await page.addInitScript(()=>{Element.prototype.requestFullscreen=async()=>{throw Error('unsupported mobile fullscreen')};});
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'domcontentloaded'});
    await page.locator('#start-training:not([disabled])').waitFor();
+   await page.evaluate(()=>document.fonts.ready);
    const measure=()=>page.evaluate(()=>{
     const selectors=['#inputPlayer','#btnStart','#start-training','.mode-picker label','#open-ranking','#open-guide','#open-collection','#open-missions','#open-settings','#open-credits'];
     return {w:innerWidth,h:innerHeight,scrollW:document.documentElement.scrollWidth,scrollH:document.documentElement.scrollHeight,
