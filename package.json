@@ -1,9 +1,9 @@
 {
   "name": "chaua-educa",
-  "version": "2.5.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
-  "description": "Uma aventura educativa do papagaio-chau\u00e1 pela Mata Atl\u00e2ntica.",
+  "description": "Uma aventura educativa do papagaio-chauá pela Mata Atlântica.",
   "scripts": {
     "start": "python scripts/dev-server.py",
     "build": "sass --no-source-map Chaua-Educa-main/scss/style.scss Chaua-Educa-main/css/style.css",

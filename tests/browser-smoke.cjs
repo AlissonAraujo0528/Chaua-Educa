@@ -150,7 +150,7 @@ async function begin(page, name = 'Guardião da mata') {
         await page.locator('#restart-button').click(); await playing(page);
         assert.deepEqual(await model(page,g=>[g.score,g.feather,g.shield,g.fruits,g.correct]),[0,0,false,0,0]);
         // Victory is a separate presentation and never delays restart.
-        await model(page,g=>{g.score=1000;g.medal=true;g.distance=28000;g.entities=[];g.quizPending=false;g.refuge={x:330,y:320};g.y=320;g.vy=0;g.advanceJourney(1/120);});
+        await model(page,g=>{g.score=1000;g.medal=true;g.distance=g.mode==='tranquilo'?84000:140000;g.entities=[];g.quizPending=false;g.refuge={x:330,y:320};g.y=320;g.vy=0;g.advanceJourney(1/120);});
         await page.locator('#result-dialog').waitFor({state:'visible'});
         assert.match(await page.locator('#result-title').innerText(),/celebra/);
         assert.equal(await page.locator('#restart-button').isEnabled(),true);
@@ -158,7 +158,7 @@ async function begin(page, name = 'Guardião da mata') {
         // Local record survives reload and the old record is untouched.
         await page.reload({waitUntil:'networkidle'});
         assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('db-chaua'))[0].score_val),777);
-        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('db-chaua-floresta-v11'))[0].score_val),1000);
+        assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('db-chaua-floresta-v12'))[0].score_val),1000);
         console.log('PASS desktop: keyboard, pause, shield, quiz, multiplier, defeat, victory, immediate restart, isolated ranking, persistence');
 
         const mobile = await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});

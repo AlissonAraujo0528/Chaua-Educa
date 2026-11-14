@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {journeyLength} from '../Chaua-Educa-main/js/journey.mjs';
 import {Game,STEP} from '../Chaua-Educa-main/js/engine.mjs';
 import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,rectShape,intersects} from '../Chaua-Educa-main/js/collision.mjs';
 
@@ -36,7 +37,7 @@ test('convex contact handles crossing, containment, separation and exact tangenc
 });
 test('refuge starts fully outside each viewport and moves continuously into view',()=>{
  for(const right of [960,1400,2200]){
-  const g=new Game();g.state='playing';g.distance=28000;g.score=1000;g.viewWidth=right;g.nextSpawn=Infinity;
+  const g=new Game();g.state='playing';g.distance=journeyLength(g.mode);g.score=1000;g.viewWidth=right;g.nextSpawn=Infinity;
   g.advanceJourney(STEP);assert.ok(g.refuge.x-48>right);
   const before=g.refuge.x;g.snapshot();g.advanceJourney(STEP);
   assert.ok(g.refuge.x<before);assert.ok(before-g.refuge.x<3);

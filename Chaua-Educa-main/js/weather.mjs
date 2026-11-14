@@ -1,4 +1,4 @@
-import { JOURNEY } from './journey.mjs';
+import { JOURNEY,journeyReferenceDistance } from './journey.mjs';
 import { smoothstep } from './motion.mjs';
 import {seasonFromFlight,seasonWeights} from './climate-timeline.mjs';
 
@@ -64,10 +64,11 @@ export function journeyStorm(distance, mode, tutorial = false) {
 
 // WORLD PHYSICS ONLY. Visual menu overrides (sun, storm, autumn, etc.)
 // must never modify moving hazards, encounters or deterministic replays.
-// This is exactly the old AUTO numeric-distance wind curve, including
-// its adventure-only storm term, independent of weatherOverride.
+// The deterministic route-relative curve includes the challenge storm term;
+// it never depends on the player's visual weather selection.
 export function physicsWind(distance,mode,tutorial=false){
     if(tutorial || !Number.isFinite(distance))return 0;
+    distance=journeyReferenceDistance(distance,mode);
     const gustStart=JOURNEY[2].start+600;
     const gustEnd=JOURNEY[2].start+3700;
     const gust=smoothstep(Math.min(distance-gustStart,gustEnd-distance)/900);
@@ -135,7 +136,7 @@ export function drawJourneyFog(context, width, height, fog) {
 
 // Visual lightning flash and electric bolt in the clouds during storms
 export function drawLightning(context, width, height, time, storm, reduced) {
-    if (storm <= 0.05) return;
+    if (storm <= 0.05 || reduced) return;
 
     // Strike occurs deterministically every ~3.2 seconds
     const cycle = (time * 0.31 + 0.15) % 1;

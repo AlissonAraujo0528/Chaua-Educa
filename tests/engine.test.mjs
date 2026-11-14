@@ -1,3 +1,4 @@
+import {journeyLength} from '../Chaua-Educa-main/js/journey.mjs';
 import {pilotTarget} from './helpers/pilot.mjs';
 import { QUESTIONS } from '../Chaua-Educa-main/js/questions.mjs';
 import test from 'node:test';
@@ -105,7 +106,7 @@ test('generation introduces snakes and hawks gradually and preserves open routes
             if (obstacle) {
                 assert.ok(obstacle.bottom-obstacle.top>=FLIGHT.aventura.minGap);
                 const center = obstacle.snake?obstacle.top+85:(obstacle.top+obstacle.bottom)/2;
-                assert.ok(Math.abs(center-lastCenter)<=55.01); lastCenter=center;
+                assert.ok(Math.abs(center-lastCenter)<=55.01 || obstacle.recovery&&lastCenter>=obstacle.top+50&&lastCenter<=obstacle.bottom-50); lastCenter=center;
                 for (const hawk of hawks) {
                     assert.ok(hawk.warning>=FLIGHT.aventura.warning);
                     assert.ok(Math.max(hawk.startY,hawk.targetY)+20<obstacle.top || Math.min(hawk.startY,hawk.targetY)-20>obstacle.bottom);
@@ -129,7 +130,7 @@ test('desktop and portrait routes are flyable through the full progression', () 
     for (const width of [296, 960]) {
         const game = new Game({width, random:()=>.5}); game.state='playing';
         let sawSnake=false, sawHawk=false;
-        for (let i=0;i<180/STEP;i++) {
+        for (let i=0;i<600/STEP;i++) {
             const nextWood=game.entities.find(e=>e.kind==='wood'&&e.x+100>game.x);
             const target=pilotTarget(game);
             if (game.y>target+12 && game.vy>0 && game.flapCooldown<=0) {game.press();game.release();}
@@ -137,9 +138,9 @@ test('desktop and portrait routes are flyable through the full progression', () 
             game.tick(STEP);
             sawSnake ||= game.entities.some(e=>e.snake);
             sawHawk ||= game.entities.some(e=>e.kind==='hawk');
-            if (game.state==='ended'||game.distance>=28000) break;
+            if (game.state==='ended'||game.distance>=journeyLength(game.mode)) break;
         }
-        assert.equal(game.distance,28000,`width ${width}: ${game.reason}`);
+        assert.equal(game.distance,journeyLength(game.mode),`width ${width}: ${game.reason}`);
         assert.ok(sawSnake && sawHawk); // Extra collections can complete 200 points before the first dive.
         assert.ok(game.fruits>10 && game.correct>=2);
         assert.ok(game.correct<=Math.floor(game.elapsed/30));

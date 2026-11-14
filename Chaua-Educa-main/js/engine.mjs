@@ -4,7 +4,7 @@ import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,roundedShape} from
 import {snakeA2HitsPlayer,snakeA2FruitHasClearance,placeA2Fruit,snakeA2CollisionRects,snakeA2HeadRect} from './snake-a2.mjs';
 import {livingWoodRects} from './forest-geometry.mjs';
 import { createTutorial, advanceTutorial } from './tutorial.mjs';
-import { JOURNEY, JOURNEY_LENGTH, ARRIVAL_SECONDS, journeyStage } from './journey.mjs';
+import { JOURNEY, journeyLength, ARRIVAL_SECONDS, journeyStage } from './journey.mjs';
 import { offerPower, POWER_BALANCE } from './powers.mjs';
 import { advanceHawk, advanceSnake } from './animals.mjs';
 import { planEncounter, seededRandom } from './encounters.mjs';
@@ -20,12 +20,12 @@ export const HEIGHT = 640;
 export const STEP = 1 / 120;
 export const FEATHER_SECONDS = 10;
 export const CONTACT = Object.freeze({top:20, bottom:HEIGHT-25, recoveryMargin:36, grace:1.6});
-export const VICTORY_SCORE = 1000;
+export const MEDAL_SCORE = 1000;
 export const QUIZ_INTERVAL = 30;
 export const FLIGHT = Object.freeze({
     gravity: 900, fallLimit: 360, tapLift: 300,
     holdLift: 230, staminaLift: 50, flapInterval: .22, inputBuffer: .12,
-    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:210,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
+    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:230,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
     tranquilo: {speed:205,gap:220,minGap:185,interval:2.1,minInterval:1.8,ramp:.0017,speedGain:30,snakeAt:32,hawkAt:55,warning:2.2},
 });
 export const STAGES = JOURNEY.map(s=>s.name);
@@ -209,7 +209,7 @@ export class Game {
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
             flapCooldown: 0, pendingTap: 0, stamina: 1, wing: 0, flapImpulse: 0, angle: 0, y: HEIGHT * .48,
             vy: 0, countdown: 2.4, entities: [], particles: [], popups: [], collectPulse: 0, powerFade: 0, nextSpawn: 1.5,
-            sequence: 0, snakeSequence:0, hawkSequence:0, foodSequence:0, lastGap: 320, lastPattern: null, encounterHistory: [], question: null, questionPool: [],
+            sequence: 0, snakeSequence:0, hawkSequence:0, postHawkRecovery:false, foodSequence:0, lastGap: 320, lastPattern: null, encounterHistory: [], question: null, questionPool: [],
             answerResult: null, quizPending: false, nextQuizAt: QUIZ_INTERVAL, reviewIds: [], reason: '', stage: 0, nextId: 1, hit: null, impactRemaining: 0, shakeTime: 0, shakeDuration: 0, shakeIntensity: 0,
         });
         this.snapshot();
@@ -290,7 +290,7 @@ export class Game {
     addScore(value, multiplier = this.scoreMultiplier, source = 'passage') {
         this.score += value * multiplier;
         this.scoreBreakdown[source] += value * multiplier;
-        if(!this.medal && this.score>=VICTORY_SCORE){this.medal=true;this.onEvent({type:'medal'});}
+        if(!this.medal && this.score>=MEDAL_SCORE){this.medal=true;this.onEvent({type:'medal'});}
         this.onEvent({ type: 'points', value: value * multiplier });
         this.popups.push({x:this.x+28,y:this.y-30,prevY:this.y-30,
             text:`+${value*multiplier}`,gold:multiplier>=2,life:.85});
@@ -628,6 +628,14 @@ export class Game {
         const x = spawnWidth + margin;
         const travel = (x - this.x) / this.speed;
         const plan=planEncounter({sequence:n,elapsed:this.elapsed,lastCenter:this.lastGap,lastPattern:this.lastPattern,profile,speed:this.speed,stage:this.stage,random:this.encounterRandom});
+        const recovery=!soloHawk&&this.postHawkRecovery;
+        if(recovery){
+            // A marked predator can send the player to either edge of the sky.
+            // Offer one central, wide passage before resuming narrow hazards.
+            plan.center=this.mode==='tranquilo'?280:320;plan.gap=Math.max(plan.gap,340);
+            plan.fruits=[{x:15,y:plan.center}];plan.optional=false;plan.variant='plain';
+            this.postHawkRecovery=false;
+        }
         let {gap,center}=plan;
         if(this.stage===2)plan.interval+=.15;
         if(this.stage===3)plan.interval+=.1;
@@ -638,6 +646,7 @@ export class Game {
         const hawkAlone = soloHawk;
         let hasSnake = false, encounterGap = gap;
         if (hawkAlone) {
+            this.postHawkRecovery=true;
             const lane=Math.max(160,Math.min(480,this.y+(this.encounterRandom()-.5)*70));
             // Each encounter alternates a complete curved attack. The target
             // is marked once during warning; it never homes during the charge.
@@ -651,10 +660,10 @@ export class Game {
         } else {
             const variants = ['plain', 'branch', 'plain'];
             const variant = plan.variant ?? (this.stage===1 && n%2===0?'branch':this.elapsed > 17 ? variants[n % variants.length] : 'plain');
-            hasSnake=this.elapsed>profile.snakeAt&&(n%2===0||variant==='branch');
+            hasSnake=!recovery&&this.elapsed>profile.snakeAt&&(n%2===0||variant==='branch');
             const attackType=hasSnake?SNAKE_ATTACK_ORDER[this.snakeSequence%SNAKE_ATTACK_ORDER.length]:null;
             const gentle=this.mode==='tranquilo';
-            encounterGap=gap+(hasSnake?Math.max(profile.snakeClearance??180,snakeAttack({attackType}).clearance)+(gentle&&attackType!=='frontal'?25:0):0);
+            encounterGap=gap+(hasSnake?Math.max(profile.snakeClearance??180,snakeAttack({attackType}).clearance):0);
             // Widen below the planned safe flight line. Changing the gap must
             // not pull that line up by half the snake's extra clearance.
             // When the lower trunk cannot fit, keep a normal passage and offer
@@ -664,7 +673,7 @@ export class Game {
             const bottom=top+encounterGap;
             if(hasSnake)this.snakeSequence++;
             this.encounterHistory.at(-1).gap=encounterGap;
-            const wood = { id: this.nextId++, kind: 'wood', x, y: 0, top, bottom, variant, scored: false, route:n, encounter:plan.id };
+            const wood = { id: this.nextId++, kind: 'wood', x, y: 0, top, bottom, variant, recovery, scored: false, route:n, encounter:plan.id };
             if (this.stage >= 1 && !hasSnake && variant === 'plain') {
                 wood.fragileSide = Math.floor(n / 2) % 2 ? 'top' : 'bottom';
                 wood.fragileKind = Math.floor(n / 4) % 2 ? 'hollow' : 'rot';
@@ -720,7 +729,7 @@ export class Game {
     }
 
     advanceJourney(dt) {
-        if(this.score<VICTORY_SCORE)return;
+        if(this.distance<journeyLength(this.mode))return;
         const danger=this.entities.some(e=>(e.kind==='wood'&&e.x+85>this.x-36)||(e.kind==='hawk'&&!e.harmless&&e.x+30>this.x-36));
         if(danger || (this.quizDue&&!this.refuge))return;
         if(!this.refuge){this.refuge={x:Math.max(this.width,this.viewWidth||this.width)+220,y:320};this.onEvent({type:'refuge'});}
@@ -765,8 +774,8 @@ export class Game {
         this.elapsed += dt;
         advanceSurfaceWeather(this,dt);
         const speed = this.speed;
-        if(!this.tutorial)this.distance = Math.min(JOURNEY_LENGTH,this.distance+speed*dt);
-        const nextStage=journeyStage(this.distance);
+        if(!this.tutorial)this.distance = Math.min(journeyLength(this.mode),this.distance+speed*dt);
+        const nextStage=journeyStage(this.distance,this.mode);
         if(nextStage!==this.stage){this.stage=nextStage;this.stageAge=0;this.onEvent({type:'stage',stage:this.stage,message:JOURNEY[this.stage].message});}
         this.stageAge+=dt;
         const previousFeather=this.feather;
@@ -801,7 +810,7 @@ export class Game {
             if (this.state !== 'playing') return;
         }
         this.nextSpawn -= dt;
-        if (this.nextSpawn <= 0 && !this.quizDue && this.score<VICTORY_SCORE) {
+        if (this.nextSpawn <= 0 && !this.quizDue && this.distance<journeyLength(this.mode)) {
             const probe=activeProbe,spawnAt=probe?probe.begin('engine.spawn'):0;
             this.spawn();
             if(probe)probe.end('engine.spawn',spawnAt);

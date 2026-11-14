@@ -1,12 +1,16 @@
 # Chaua-Educa
 
-## Versão jogável 2.5.0
+## Preparação para a Versão 2.0 · versão 1.0.1
 
 Abra `Chaua-Educa-main/index.html` por um servidor HTTP. Para testar localmente, rode `npm start` na raiz e abra `http://127.0.0.1:5501/`. A Cobra A2 e as spritesheets oficiais de ação são obrigatórias. Arquivos faltando impedem o início e exibem um erro explícito; os antigos parâmetros de seleção de sprites foram removidos. Consulte [a documentação da arte atual](docs/arte-runtime.md).
 
-A revisão atual acrescenta três ataques da cobra, três investidas curvas do gavião e chuva, neve e rajadas mais legíveis. [Relatório da revisão](docs/revisao-ataques-clima.md). Regras `floresta-v11`: os resultados anteriores dos dois modos ficam no Histórico; coleção e missões permanecem salvas.
+A preparação conserva os três ataques da cobra, as três investidas curvas do gavião e os efeitos climáticos do PR #77. [Relatório daquela revisão](docs/revisao-ataques-clima.md). Coleção e missões permanecem salvas.
 
-> **Nota de manutenção:** as seções históricas abaixo registram a evolução do projeto; para arte e hitboxes atuais, use `docs/arte-runtime.md`, o código e os testes da versão 2.5.0.
+O desenvolvimento da 2.0 acontece na branch `preparacao-para-a-versao-2.0`, em incrementos 1.0.1, 1.0.2 e seguintes. A versão 2.0.0 fica reservada ao lançamento aprovado. Consulte [o acompanhamento da preparação](docs/preparacao-2.0.md). Para sincronizar o próximo número do pacote, lockfile e interface: `node scripts/set-game-version.mjs 1.0.2`.
+
+A campanha 1.0.1 conclui pelo percurso, com rotas proporcionais à velocidade de cada modo e alvo de seis minutos de voo. Os 1.000 pontos valem uma medalha opcional. O placar atual usa regras `floresta-v12`; recordes anteriores continuam no Histórico.
+
+> **Nota de manutenção:** as seções históricas abaixo registram a evolução do projeto; para arte e hitboxes atuais, use `docs/arte-runtime.md`, o código e os testes da revisão atual.
 
 "Chauá-educa" is a compelling game with a noble purpose – raising awareness and making an effort to save an endangered species known as the Chauá parrot. In this engaging gaming experience, you step into the wings of a delightful parrot named Chauá. Your mission goes beyond entertainment; it's about making a difference.
 

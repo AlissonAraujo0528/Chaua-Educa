@@ -3,13 +3,13 @@
 // Reports successful runs and failed pilot attempts separately.
 // A pilot is NOT a substitute for real-player telemetry.
 import {predictedHawkY} from '../Chaua-Educa-main/js/animals.mjs';
-import {Game,STEP,VICTORY_SCORE} from '../Chaua-Educa-main/js/engine.mjs';
+import {Game,STEP,MEDAL_SCORE} from '../Chaua-Educa-main/js/engine.mjs';
+import {journeyLength,JOURNEY_LENGTHS,CAMPAIGN_TARGET_SECONDS} from '../Chaua-Educa-main/js/journey.mjs';
 import {mkdirSync,writeFileSync} from 'node:fs';
 
 export const CALIBRATION_SEEDS=Object.freeze([104,217,451,999]);
-// The existing real-browser journey test took 794–827 seconds to reach 1,000 points.
-// A 260-second cap would incorrectly report zero winning runs.
-const MAX_SECONDS=1180;
+// Generous cap beyond the six-minute route, including alignment time.
+const MAX_SECONDS=600;
 const q=(values,p)=>{
  if(!values.length)return null;
  const a=[...values].sort((x,y)=>x-y);
@@ -59,7 +59,7 @@ export function simulateFlight(mode,seed,maxSeconds=MAX_SECONDS){
   game.tick(STEP);
   sampledStages.add(game.stage);
   if(score560===null&&game.score>=560)score560={distance:game.distance,seconds:game.elapsed,score:game.score};
-  if(medal===null&&game.score>=VICTORY_SCORE)medal={distance:game.distance,seconds:game.elapsed,score:game.score};
+  if(medal===null&&game.score>=MEDAL_SCORE)medal={distance:game.distance,seconds:game.elapsed,score:game.score};
   if(firstRefuge===null&&game.refuge)firstRefuge={distance:game.distance,seconds:game.elapsed};
   if(game.state==='ended')break;
   if(game.state!==previousState && game.state==='impact')pending=null;
@@ -67,7 +67,7 @@ export function simulateFlight(mode,seed,maxSeconds=MAX_SECONDS){
  }
  return {
   mode,seed,won:game.won,state:game.state,reason:game.reason||null,
-  distance:Math.round(game.distance),seconds:Math.round(game.elapsed*100)/100,
+  distance:Math.round(game.distance),routeLength:journeyLength(mode),seconds:Math.round(game.elapsed*100)/100,
   score:game.score,fruits:game.fruits,correct:game.correct,
   stages:[...sampledStages].sort(),at560:score560,at1000:medal,refuge:firstRefuge
  };
@@ -79,7 +79,7 @@ export function makeReport(samples){
   return [mode,{
    attempts:all.length,wins:wins.length,winRate:wins.length/all.length,
    winningDistance:summary(wins,'distance'),winningSeconds:summary(wins,'seconds'),
-   // A 1000-point medal doesn't guarantee immediate arrival; use both values.
+   // The optional medal is independent of reaching the route destination.
    medalDistance:summary(wins.filter(w=>w.at1000).map(w=>({...w,distance:w.at1000.distance})),'distance'),
    score560Distance:summary(wins.filter(w=>w.at560).map(w=>({...w,distance:w.at560.distance})),'distance'),
    failedPilots:all.filter(s=>!s.won).map(s=>({seed:s.seed,reason:s.reason,distance:s.distance,score:s.score}))
@@ -87,7 +87,7 @@ export function makeReport(samples){
  }));
  return {type:'climate-journey-calibration',seedCount:CALIBRATION_SEEDS.length,
   source:'actual Game simulation, scripted autopilot (not human telemetry)',
-  victoryScore:VICTORY_SCORE,referenceJourneyLength:28000,byMode,samples};
+  medalScore:MEDAL_SCORE,routeLengths:JOURNEY_LENGTHS,targetSeconds:CAMPAIGN_TARGET_SECONDS,byMode,samples};
 }
 
 if(import.meta.url===new URL('file://'+process.argv[1]).href){
