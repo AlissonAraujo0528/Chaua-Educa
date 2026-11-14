@@ -7,6 +7,7 @@ Os incrementos desta preparação começam em **1.0.1**, seguindo 1.0.2, 1.0.3 e
 ## 1.0.1 — campanha e identificação da preparação
 
 - Rotas de 140.000 unidades no Desafio e 84.000 no Amigável, proporcionais às velocidades dos modos, com alvo de cerca de seis minutos de voo ativo.
+- A curva de pressão do Desafio atinge sua fase final dentro da nova duração de campanha, mantendo seus limites seguros.
 - Os quatro capítulos avançam pelo percurso. A barra mostra caminho percorrido, independentemente dos pontos.
 - Concluir o percurso libera o abrigo, após limpar ameaças e responder eventual pergunta pendente. O pouso continua exigindo alinhamento com o bando.
 - Os 1.000 pontos passam a valer uma medalha opcional; não antecipam nem bloqueiam a chegada.

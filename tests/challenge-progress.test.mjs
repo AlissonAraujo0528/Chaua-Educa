@@ -1,3 +1,4 @@
+import {CAMPAIGN_TARGET_SECONDS} from '../Chaua-Educa-main/js/journey.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {challengeAt} from '../Chaua-Educa-main/js/challenge.mjs';
@@ -8,6 +9,8 @@ import DB from '../Chaua-Educa-main/js/database.js';
 test('challenge keeps growing after the final scenery stage, with finite safe ceilings',()=>{
  const times=[0,30,90,180,300,480,720];let previous=challengeAt(0);
  for(const time of times){const now=challengeAt(time);assert.ok(now.speedGain>=previous.speedGain);assert.ok(now.pressure>=previous.pressure);assert.ok(now.minInterval<=previous.minInterval);assert.ok(now.quietEvery>=previous.quietEvery);previous=now;}
+ assert.equal(challengeAt(CAMPAIGN_TARGET_SECONDS).pressure,1,'all challenge tiers must fit inside the campaign');
+ assert.equal(challengeAt(CAMPAIGN_TARGET_SECONDS*.9).name,'Voo de resistência');
  assert.ok(challengeAt(650).speedGain>challengeAt(240).speedGain);
  assert.deepEqual(challengeAt(99999),challengeAt(10000));
  assert.deepEqual(challengeAt(NaN),challengeAt(0));
