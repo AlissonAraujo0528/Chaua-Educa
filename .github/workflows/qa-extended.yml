@@ -28,6 +28,7 @@ jobs:
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-cross-browser.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null' EXIT
+          UI_BROWSER=webkit node tests/browser-editorial-ui.cjs
           MOBILE_BROWSER=firefox node tests/browser-mobile-home-layout.cjs
           MOBILE_BROWSER=webkit node tests/browser-mobile-home-layout.cjs
           node tests/browser-action-sprites.cjs
@@ -45,5 +46,6 @@ jobs:
             test-results/v2-cross-browser/
             test-results/animal-weather/
             test-results/mobile-home/
+            test-results/editorial-ui/
           if-no-files-found: ignore
           retention-days: 7

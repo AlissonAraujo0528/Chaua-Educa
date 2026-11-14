@@ -2,7 +2,7 @@ import {FOOD_IDS} from './foods.mjs';
 import { normalizeProgress, advanceProgress } from './missions.mjs';
 import { activeProbe } from './perf-hooks.mjs';
 import { ENTRIES, INITIAL_ENTRIES } from './collection.mjs';
-export const RULES_VERSION = 'floresta-v9';
+export const RULES_VERSION = 'floresta-v10';
 export default class DB {
     static dbName = `db-chaua-${RULES_VERSION}`;
     static storageAvailable = true;
@@ -34,7 +34,7 @@ export default class DB {
         if(legacy)return valid;
         // Only Aventura changed its rules. Keep the unchanged Amigável records
         // in the current board, without mutating any v8 record or save.
-        const old=this.readObject('db-chaua-floresta-v8',[]);
+        const old=['floresta-v8','floresta-v9'].flatMap(version=>{const rows=this.readObject(`db-chaua-${version}`,[]);return Array.isArray(rows)?rows:[];});
         const merged=new Map(valid.map(p=>[JSON.stringify([p.playerName,p.mode]),{...p}]));
         for(const row of Array.isArray(old)?old:[]){
             if(!row||row.mode!=='tranquilo'||typeof row.playerName!=='string'||!Number.isFinite(row.score_val))continue;
@@ -52,7 +52,7 @@ export default class DB {
 
     static previousScores() {
         const data = this.readObject('chaua-educa-v2', {});
-        const archived=['floresta-v2','floresta-v3','floresta-v4','floresta-v5','floresta-v6','floresta-v7','floresta-v8'].flatMap(ruleset=>{
+        const archived=['floresta-v2','floresta-v3','floresta-v4','floresta-v5','floresta-v6','floresta-v7','floresta-v8','floresta-v9'].flatMap(ruleset=>{
             const forest=this.readObject(`db-chaua-${ruleset}`,[]);
             return (Array.isArray(forest)?forest:[]).filter(s=>s && typeof s.playerName==='string' && Number.isFinite(s.score_val) && s.score_val>=0).map(s=>({...s,ruleset}));
         });
