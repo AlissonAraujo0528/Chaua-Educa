@@ -28,6 +28,7 @@ const name=process.env.LEARNING_BROWSER||'chromium';
    await page.locator('#collection-dialog').waitFor({state:'visible'});assert.match(await page.locator('.journal-reading').textContent(),/Handroanthus/);
    assert.equal(await page.locator('.journal-back').evaluate(e=>e===document.activeElement),true);
    await page.locator('#collection-dialog .close-dialog').click();await page.locator('#result-dialog').waitFor({state:'visible'});
+   await page.waitForFunction(()=>document.activeElement?.closest('#flight-learning-items')&&document.activeElement.textContent.includes('Chauás revelam ipês'));
    assert.equal(await entry.evaluate(e=>e===document.activeElement),true);
    assert.ok(await page.locator('#result-dialog').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
    fs.mkdirSync('test-results/learning-flow',{recursive:true});await page.locator('#result-dialog').screenshot({path:`test-results/learning-flow/${name}-${viewport.width}-recap.png`});

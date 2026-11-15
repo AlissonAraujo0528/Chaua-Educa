@@ -547,7 +547,11 @@ for(const id of ['journal-nature-tab','journal-food-tab'])$('#'+id).addEventList
 $('#open-collection').addEventListener('click',()=>showCollection());
 $('#collection-dialog').addEventListener('close',()=>{
  const focus=learningReturnFocus;learningReturnFocus=null;
- if(focus&&game.state==='ended'){openDialog('#result-dialog');focus.focus({preventScroll:true});}
+ if(focus&&game.state==='ended'){
+  openDialog('#result-dialog');
+  // WebKit can restore the closing modal's focus after its close event.
+  requestAnimationFrame(()=>{if($('#result-dialog').open&&game.state==='ended'&&focus.isConnected)focus.focus({preventScroll:true});});
+ }
 });
 
 renderer.ready.then(() => {
