@@ -34,16 +34,28 @@ export function hawkAnimation(e,time=0,reduced=false){
  if(cycle>1.5)return flightFrame(CLIPS.hawk.glide,(cycle-1.5)*.5);
  return flightFrame(CLIPS.hawk.flight,cycle/1.5*2.2);
 }
-export function placeWarnings(items,view){
- const result=[];
+// Screen-space labels avoid both other labels and protected actor regions.
+// If a tiny viewport cannot fit everything, minimize covered area explicitly.
+export function placeWarnings(items,view,protectedRegions=[]){
+ const result=[],gap=6,left=view.x+4,top=view.y+4;
+ const area=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w+gap)-Math.max(a.x,b.x-gap))*
+  Math.max(0,Math.min(a.y+a.h,b.y+b.h+gap)-Math.max(a.y,b.y-gap));
  for(const item of items){
-  const box={...item,x:Math.max(view.x+4,Math.min(view.x+view.w-item.w-4,item.x)),y:Math.max(view.y+4,Math.min(view.y+view.h-item.h-4,item.y))};
-  const fits=y=>y>=view.y+4&&y+box.h<=view.y+view.h-4;
-  const clear=y=>!result.some(b=>box.x<b.x+b.w+4&&box.x+box.w+4>b.x&&y<b.y+b.h+4&&y+box.h+4>b.y);
-  const candidates=[box.y,view.y+4,view.y+view.h-box.h-4,...result.flatMap(b=>[b.y-box.h-6,b.y+b.h+6])];
-  candidates.sort((a,b)=>Math.abs(a-box.y)-Math.abs(b-box.y));
-  box.y=candidates.find(y=>fits(y)&&clear(y))??box.y;
-  result.push(box);
+  const box={...item,w:Math.min(item.w,Math.max(1,view.w-8)),h:Math.min(item.h,Math.max(1,view.h-8))};
+  const right=Math.max(left,view.x+view.w-box.w-4),bottom=Math.max(top,view.y+view.h-box.h-4);
+  box.x=Math.max(left,Math.min(right,item.x));box.y=Math.max(top,Math.min(bottom,item.y));
+  const blockers=[...protectedRegions,...result];
+  const xs=[box.x,left,right,...blockers.flatMap(b=>[b.x-box.w-gap,b.x+b.w+gap])];
+  const ys=[box.y,top,bottom,...blockers.flatMap(b=>[b.y-box.h-gap,b.y+b.h+gap])];
+  let best={x:box.x,y:box.y,overlap:Infinity,distance:Infinity};
+  for(const x of new Set(xs))for(const y of new Set(ys)){
+   if(x<left||x>right||y<top||y>bottom)continue;
+   const candidate={x,y,w:box.w,h:box.h};
+   const overlap=blockers.reduce((sum,b)=>sum+area(candidate,b),0);
+   const distance=(x-box.x)**2+(y-box.y)**2;
+   if(overlap<best.overlap||overlap===best.overlap&&distance<best.distance)best={x,y,overlap,distance};
+  }
+  result.push({...box,x:best.x,y:best.y});
  }
  return result;
 }

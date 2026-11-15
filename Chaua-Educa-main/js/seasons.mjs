@@ -127,14 +127,14 @@ export class SeasonalBackdrop {
  }
 }
 
-export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0){
+export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,motion=null){
  if(reduced)return;
  const state=journeySeason(game);
  const weights=[0,0,0,0];weights[state.from]+=1-state.mix;weights[state.to]+=state.mix;
  const driftOffset=game.distance||0;
  // Snow shares the exact winter weight used by terrain, animals and lighting.
  // The original atlas contains only petals and leaves, not snow textures.
- drawSnowfall(c,w,h,time,weights[3],reduced,low,wind,false);
+ drawSnowfall(c,w,h,time,weights[3],reduced,low,wind,false,motion);
  if(!atlas)return;
  const count=low?7:14, cell=(atlas.naturalWidth||atlas.width)/2;
  // Rain and storm are independent weather modes, not seasons. Suppress

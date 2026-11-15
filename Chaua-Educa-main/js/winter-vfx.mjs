@@ -5,7 +5,7 @@ const wrap=(v,span)=>((v%span)+span)%span;
 
 // Far and mid-distance snow are drawn beneath the animals. Near-camera flakes
 // are sparse and do not compete with fruits, HUD, warning labels or predators.
-export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0,foreground=false){
+export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0,foreground=false,motion=null){
  const amount=clamp01(intensity);
  if(amount<=.012||reduced||w<=0||h<=0)return;
  const layers=foreground?[{depth:1,count:low?6:18}]:
@@ -20,7 +20,7 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
    const velocity=(28+depth*74+(i%5)*7);
    const y=wrap(seed*17.31+time*velocity,h+60)-30;
    const sway=Math.sin(time*(.54+depth*.42)+seed)*((1-depth)*12+4);
-   const x=wrap(seed*29.17+time*(wind*21+depth*4)+sway,w+60)-30;
+   const x=wrap(seed*29.17+(motion?.wind??time*wind)*21+time*depth*4+sway,w+60)-30;
    const radius=(foreground?1.45:.95)+depth*(foreground?1.65:1.5)+(i%3)*.12;
    c.moveTo(x+radius,y);
    c.arc(x,y,radius,0,Math.PI*2);
@@ -34,7 +34,7 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
   c.beginPath();
   for(let i=0;i<6;i++){
    const seed=(i+1)*241.73;
-   const x=wrap(seed*2.17+time*(wind*19+6)+Math.sin(time*.6+i)*7,w+48)-24;
+   const x=wrap(seed*2.17+(motion?.wind??time*wind)*19+time*6+Math.sin(time*.6+i)*7,w+48)-24;
    const y=wrap(seed*3.41+time*(95+i*13),h+48)-24;
    const r=2.7+i*.3;
    c.moveTo(x-r,y);c.lineTo(x+r,y);

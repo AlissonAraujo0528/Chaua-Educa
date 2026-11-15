@@ -207,7 +207,7 @@ export function drawLightning(context, width, height, time, storm, reduced) {
 // opaque white lines. Coordinates are deterministic in active flight time.
 const rainWrap=(value,span)=>((value%span)+span)%span;
 const rainClamp=x=>Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
-function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250){
+function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250,motion=null){
  if(w<=0||h<=0)return;
  const bands=foreground?[{depth:1,count:low?10:38}]:
   [{depth:.40,count:low?18:68},{depth:.73,count:low?28:104}];
@@ -228,9 +228,8 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
   c.beginPath();
   for(let i=0;i<visibleCount;i++){
    const seed=(i+1)*67.17+depth*119.7;
-   const fallSpeed=230+depth*270+storm*120+(i%4)*27+speed*.1;
-   const y=rainWrap(seed*11.17+time*fallSpeed,h+64)-32;
-   const x=rainWrap(seed*23.79-time*(14+wind*48+storm*14)*depth,w+64)-32;
+   const y=rainWrap(seed*11.17+time*(230+depth*270+(i%4)*27)+(motion?.storm??time*storm)*120+(motion?.speed??time*speed)*.1,h+64)-32;
+   const x=rainWrap(seed*23.79-(time*14+(motion?.wind??time*wind)*48+(motion?.storm??time*storm)*14)*depth,w+64)-32;
    const length=(foreground?10:6)+depth*8+(i%3)*1.5;
    const sideways=-(wind*.55+storm*.26+speed*.0016)*length;
    c.moveTo(x,y);
@@ -245,13 +244,13 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
   c.beginPath();
   for(let i=0;i<visibleCount;i++){
    const seed=(i+1)*67.17+depth*119.7;
-   const fallSpeed=230+depth*270+storm*120+(i%4)*27+speed*.1;
-   const y=rainWrap(seed*11.17+time*fallSpeed,h+64)-32;
-   const x=rainWrap(seed*23.79-time*(14+wind*48+storm*14)*depth,w+64)-32;
+   const y=rainWrap(seed*11.17+time*(230+depth*270+(i%4)*27)+(motion?.storm??time*storm)*120+(motion?.speed??time*speed)*.1,h+64)-32;
+   const x=rainWrap(seed*23.79-(time*14+(motion?.wind??time*wind)*48+(motion?.storm??time*storm)*14)*depth,w+64)-32;
    const radius=(foreground?.95:.48)+depth*.52+(i%3)*.08;
    const length=(foreground?10:6)+depth*8+(i%3)*1.5;
-   c.moveTo(x+radius,y+length);
-   c.ellipse(x,y+length,radius,radius*1.28,-.1,0,Math.PI*2);
+   const tipX=x-(wind*.55+storm*.26+speed*.0016)*length*.42;
+   c.moveTo(tipX+radius,y+length);
+   c.ellipse(tipX,y+length,radius,radius*1.28,-.1,0,Math.PI*2);
   }
   c.fill();
  }
@@ -296,7 +295,7 @@ export function drawSurfaceRainImpacts(c,x,y,wet,time,seed=0,low=false,reduced=f
 
 // Distant rain with a narrow atmospheric wash, near-bluish shadows, droplets
 // and ground contact. Keeps tint restrained so the authored forest survives.
-export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail,storm=0,wind=0,speed=250){
+export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail,storm=0,wind=0,speed=250,motion=null){
  if(rain<=0||width<=0||height<=0)return;
  const c=context;
  c.save();
@@ -305,25 +304,25 @@ export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail
  c.fillStyle=wash;c.fillRect(0,0,width,height);
  c.restore();
  if(reduced)return;
- renderRainBands(c,width,height,time,rain,storm,wind,lowDetail,false,speed);
+ renderRainBands(c,width,height,time,rain,storm,wind,lowDetail,false,speed,motion);
  drawRainRipples(c,width,height,time,rain,storm,lowDetail,reduced);
 }
 
 // Foreground is deliberately sparse: actors, pickups and hazards must remain
 // legible. In low/reduced modes unnecessary close droplets are suppressed.
-export function drawForegroundRain(context,width,height,time,rain,reduced,lowDetail,storm=0,wind=0,speed=250){
+export function drawForegroundRain(context,width,height,time,rain,reduced,lowDetail,storm=0,wind=0,speed=250,motion=null){
  if(reduced||rain<=0)return;
- renderRainBands(context,width,height,time,rain,storm,wind,lowDetail,true,speed);
+ renderRainBands(context,width,height,time,rain,storm,wind,lowDetail,true,speed,motion);
 }
 
 // A few long gusts remain legible against both green foliage and white winter
 // mountains. Two batched strokes, bounded particle count, active scene clock.
-export function drawWindGusts(c,w,h,time,wind,low=false,reduced=false){
+export function drawWindGusts(c,w,h,time,wind,low=false,reduced=false,motion=null){
  if(wind<=.01||reduced||w<=0||h<=0)return;
  c.save();c.lineCap='round';c.beginPath();
  const count=low?3:7;
  for(let i=0;i<count;i++){
-  const x=w+180-rainWrap(i*173.7+time*(180+wind*90),w+360);
+  const x=w+180-rainWrap(i*173.7+time*180+(motion?.wind??time*wind)*90,w+360);
   const y=45+rainWrap(i*97.1+Math.sin(time*.6+i)*12,Math.max(1,h-90));
   const length=80+wind*65+(i%3)*16;
   c.moveTo(x,y);c.bezierCurveTo(x-length*.3,y-13,x-length*.7,y+15,x-length,y+3);

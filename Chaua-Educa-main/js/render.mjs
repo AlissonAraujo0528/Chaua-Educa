@@ -1,3 +1,4 @@
+import {flightWarnings} from './flight-warnings.mjs';
 import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
 import {pickupPose} from './pickup-geometry.mjs';
 import {snakeAttack,HAWK_ATTACKS} from './attack-patterns.mjs';
@@ -13,16 +14,17 @@ import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
-import {birdAnimation,hawkAnimation,placeWarnings} from './animation.mjs';
+import {birdAnimation,hawkAnimation} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
 import {predictedHawkY} from './animals.mjs';
 import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
-import { flightViewport, advanceFlightCamera, warningPosition, snakeWarningPosition } from './viewport.mjs';
+import { flightViewport, advanceFlightCamera } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning } from './weather.mjs';
 import {drawFood} from './food-art.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
+import {WeatherMotion} from './weather-motion.mjs';
 import {TreeDrips} from './weather-art.mjs';
 import {AnimalWeather} from './animal-weather.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
@@ -588,6 +590,7 @@ export class Renderer {
         this.canvas = canvas;
         this.c = canvas.getContext('2d');
         this.treeDrips = new TreeDrips();
+        this.weatherMotion = new WeatherMotion();
         this.animalWeather = new AnimalWeather();
         this.forestCache = null;
         this.fragmentedBackdrop = null;
@@ -925,7 +928,7 @@ export class Renderer {
         }
         return normal;
     }
-    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1, rain = 0, storm = 0, fog = 0, wind = 0, seasonDistance = null, rainSpeed = 250) {
+    background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1, rain = 0, storm = 0, fog = 0, wind = 0, seasonDistance = null, rainSpeed = 250, weatherMotion = null) {
         if (reduced) offset = 0;
         const c = this.c, w = this.w, h = this.h;
         const palette=BACKGROUND_PALETTE;
@@ -1021,11 +1024,11 @@ export class Renderer {
             c.fill();c.restore();
         }
         drawForestLife(c,w,h,time,seasonDistance??{elapsed:0,mode:'aventura',seed:0},rain,wind,reduced,this.decoration==='low',storm);
-        if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind);
+        if(seasonal)drawSeasonParticles(c,images.get('season-particles'),w,h,time,seasonDistance,reduced,this.decoration==='low',wind,weatherMotion);
         drawJourneyFog(c, w, h, fog);
-        drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm, wind, rainSpeed);
+        drawJourneyRain(c, w, h, time, rain, reduced, this.decoration === 'low', storm, wind, rainSpeed,weatherMotion);
         drawLightning(c, w, h, time, storm, reduced);
-        drawWindGusts(c,w,h,time,wind,this.decoration==='low',reduced);
+        drawWindGusts(c,w,h,time,wind,this.decoration==='low',reduced,weatherMotion);
         // Golden pollen belongs to warm seasons; it must not mix with snow.
         c.save();c.globalAlpha = (1-rain)*(1-winterLight);
         c.fillStyle = '#ffedb275';
@@ -1107,10 +1110,11 @@ export class Renderer {
         const wind = journeyWind(game, game.mode, game.tutorial);
         const snow = surfaceSnow(game);
         const wet = game.surfaceWeather?.wet ?? rain;
+        const weatherMotion=this.weatherMotion.advance(sceneTime,{wind,storm,speed:game.speed||250,seed:`${game.seed}:${game.tutorial?'training':'flight'}`});
         const probe=activeProbe;
         const backgroundAt=probe?probe.begin('render.background'):0;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4),
-            rain, storm, fog, wind, game.tutorial?null:game, game.speed||250);
+            rain, storm, fog, wind, game.tutorial?null:game, game.speed||250,weatherMotion);
         if(probe)probe.end('render.background',backgroundAt);
         const baseView = this.getViewport();
         // Follow the player only on screens that cannot fit the full world at
@@ -1409,24 +1413,17 @@ export class Renderer {
         if(rain>0&&!reduced){
             const rWind=journeyWind(game,game.mode,game.tutorial);
             const rStorm=journeyStorm(game,game.mode,game.tutorial);
-            drawForegroundRain(c,this.w,this.h,sceneTime,rain,reduced,this.decoration==='low',rStorm,rWind,game.speed||250);
+            drawForegroundRain(c,this.w,this.h,sceneTime,rain,reduced,this.decoration==='low',rStorm,rWind,game.speed||250,weatherMotion);
         }
         // Only a few flakes pass in front of the flight action. HUD and
         // predator/snake notices are drawn above them for legibility.
         if(winterAmount(game)>.01)drawSnowfall(c,this.w,this.h,sceneTime,winterAmount(game),reduced,
-            this.decoration==='low',wind,true);
+            this.decoration==='low',wind,true,weatherMotion);
         // Natural viewport flight boundary
-        const notices=[];
-        for(const e of game.entities)if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
-            const predictedY=Number.isFinite(e.startX)&&Number.isFinite(e.targetX)
-                ?predictedHawkY(e,game.x):e.y;
-            const p=warningPosition(view,predictedY);notices.push({...p,w:116,h:38,type:'hawk',entity:e});
-        }else if(e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)){
-            notices.push({...snakeWarningPosition(view,e),w:160,h:26,type:'snake',entity:e});
-        }
-        if(notices.length){
-            for(const box of placeWarnings(notices,view)){
-                c.save();c.fillStyle='#fff4dbee';c.strokeStyle='#70513d';c.lineWidth=1.2;
+        const {boxes}=flightWarnings(game,view,reduced,shakeX,shakeY);
+        if(boxes.length){
+            for(const box of boxes){
+                c.save();c.fillStyle='#fff4db';c.strokeStyle='#70513d';c.lineWidth=1.2;
                 c.beginPath();c.roundRect(box.x,box.y,box.w,box.h,8);c.fill();c.stroke();
                 c.fillStyle='#49372c';c.textAlign='center';c.font='800 12px Nunito';
                 if(box.type==='snake')c.fillText(box.entity.snake.phase==='striking'?snakeAttack(box.entity.snake).label:box.entity.snake.phase==='windup'?snakeAttack(box.entity.snake).label+'…':'Cobra à frente',box.x+box.w/2,box.y+18);

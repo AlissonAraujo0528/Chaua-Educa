@@ -4,6 +4,17 @@ Branch de trabalho: `preparacao-para-a-versao-2.0`.
 
 Os incrementos desta preparação começam em **1.0.1**, seguindo 1.0.2, 1.0.3 e seguintes. A identificação **2.0.0** fica reservada ao lançamento aprovado. O histórico técnico anterior é preservado no Git. Para atualizar pacote, lockfile e identificação visível conjuntamente, usar `node scripts/set-game-version.mjs NUMERO`.
 
+## 1.0.5 — avisos legíveis e continuidade do clima
+
+- Avisos consideram regiões protegidas do chauá, do gavião visível e da cabeça/boca da cobra na pose atual. A posição pode mudar horizontalmente e verticalmente para evitar esses atores e outros avisos, respeitando câmera e viewport. Se uma tela excepcionalmente pequena não comportar todos os elementos, o resolvedor minimiza a área coberta; não promete encaixe impossível. O cartão tem fundo opaco para manter o contraste em fundos claros, chuva e neve.
+- Chuva, neve e rajadas compartilham deslocamentos de vento integrados no tempo ativo da cena. A mudança de vento, tempestade ou velocidade não reaplica a velocidade nova a todo o tempo anterior do voo. Pausa conserva os deslocamentos; reinício, treino/voo e busca temporal descontínua reinicializam o estado. O estado é pequeno e pertence a cada renderizador, sem partículas ou superfícies adicionais.
+- As cabeças das gotas agora terminam no mesmo ponto da curva inclinada; antes, eram desenhadas ao lado da ponta.
+- Spritesheets, anatomia, máscaras de colisão, física, pontuação, dificuldade e persistência mantêm as referências aprovadas. Não há importação do experimento da branch `Fracasso`. A neve progressiva e a proteção do tronco superior continuam nas verificações existentes.
+
+Verificações novas: 135 combinações de viewport/câmera/ataque/fase para avisos; integração climática a 30/144 Hz, pausa, reinício, busca temporal e encaixe das gotas. O teste `browser-visual-polish.cjs` exercita o renderizador real em 1366×768, 844×390 e 390×844; verão, chuva e inverno; perfis detalhado/econômico e movimento reduzido. Confere os cartões efetivamente desenhados, regiões protegidas, pixels idênticos com o relógio parado e ausência de deslocamento climático ao mudar a velocidade em pausa. Gera 27 cenas por navegador e relatórios em `extended-browser-qa/visual-polish`. Os testes de ataques, estações, superfícies, sprites e colisões continuam ativos.
+
+O resultado automatizado não substitui a avaliação estética e de conforto em aparelhos físicos. A entrega é revisável na branch; a aprovação visual do jogador e a matriz física continuam pendentes até a 2.0.0.
+
 ## 1.0.4 — fontes e ciclo de vida dos caches
 
 - Baloo 2 e Nunito convertidas integralmente para WOFF2: 960.132 → 280.912 bytes (redução de 70,7%). Mantidos os 1.601/1.103 glifos, os 856/938 pontos de código, métricas, contornos e tabelas de variação/posicionamento conferidos com FontTools. Sem recorte de caracteres. Licenças OFL mantidas; os TTF substituídos foram removidos da pasta publicada.
@@ -74,16 +85,25 @@ A meta de duração vem do modelo físico e de pilotos automatizados. A avaliaç
 
 307 testes de lógica aprovados localmente, incluindo 80 percursos completos sem poderes e 24 trajetos com reação programada de 120 ms. As oito sementes de calibração completaram a nova campanha em aproximadamente 339–355 segundos de voo ativo, com pontuações abaixo de 1.000, comprovando que a medalha não bloqueia o pouso. Esses são pilotos automatizados, não taxas de vitória ou durações medidas com pessoas. Build Sass e integridade dos atlas também são verificados. Os resultados de navegador estão no CI do PR de preparação.
 
-## Próximos incrementos
+## Roteiro até a 2.0.0
 
-1. Validar o polimento dos três botes em aparelhos físicos, com atenção à leitura dos avisos e do recolhimento. A 1.0.2 usa poses intactas existentes e suas máscaras/contatos atuais, sem substituir a arte.
-2. Ampliar a validação de reação em aparelhos físicos. A 1.0.1 já exercita aviso, marcação e contato com velocidades e turbo atuais, sem a antiga hipótese fixa de 350 unidades/s.
-3. Avaliar com iniciantes e educadores o treino seguro, os resumos e as novas missões da 1.0.3; ajustar o ritmo com base nessas sessões.
-4. Medir e otimizar carga inicial, memória, caches e fluidez com a arte final.
-5. Validar release candidate em navegadores e aparelhos físicos, com participantes iniciantes e educadores.
-6. Publicar a 2.0 no endereço canônico após aprovação e verificação da revisão efetivamente servida.
+Cada incremento tem entrega verificável e remove seus consumidores/arquivos descartados na mesma alteração. Fontes necessárias à reprodução da arte ativa permanecem; backups de artes substituídas não entram na pasta publicada. A numeração pode avançar por 1.0.12 e seguintes; a aprovação dos resultados determina o lançamento.
 
-Cada incremento deve remover seus arquivos e consumidores descartados na mesma alteração. Fontes necessárias à reprodução da arte ativa permanecem; backups de artes substituídas não entram na pasta publicada.
+| Versão | Entrega | Critério |
+|---|---|---|
+| 1.0.1–1.0.3 | Campanha, colisões, recuperação dos botes, treino seguro e descobertas por voo | Entregas registradas acima; validação física pendente |
+| 1.0.4 | Carregamento, fontes e ciclo de vida dos caches | A/B reproduzível, melhoria comprovada e qualidade preservada |
+| 1.0.5 | Polimento visual, animações e clima | Revisão das artes intactas, avisos e transições; efeitos legíveis em econômico/celular; avaliação física pendente |
+| 1.0.6 | Variedade, rotas opcionais, respostas aos ataques e retomada por capítulo no Amigável | Encontros com saída viável, progressão e recuperação compreensíveis |
+| 1.0.7 | Perguntas/fontes, descobertas por capítulo e observação em local seguro | Conteúdo correto e compreensão observada em jogadores |
+| 1.0.8 | Toque, teclado, acessibilidade, áudio, orientação, pausa e retorno ao aplicativo | Fluxos completos, controles acessíveis e ausência de rolagem durante o voo |
+| 1.0.9 | Código/arquivos ativos, persistência, créditos, links, falhas e publicação | Recursos obrigatórios presentes e progresso preservado nos cenários testados |
+| 1.0.10 | Beta com iniciantes, jogadores habituais e educadores em Android, iPhone e notebook | Problemas identificados e classificados, com medições reais |
+| 1.0.11 | Candidata ao lançamento, funcionalidades congeladas e regressão completa | Nenhuma falha bloqueante ou grave conhecida; requisitos/limitações documentados |
+| 1.0.12 e seguintes | Correções encontradas na candidata | Repetir as verificações afetadas na revisão corrigida |
+| 2.0.0 | Publicação final, notas, créditos e canal de relatos | Versão correta servida no endereço definitivo e progresso esperado preservado |
+
+O lançamento público é **2.0.0**, sem uma etapa 1.1.0 substituindo esse objetivo. Testes automatizados não concluem os critérios que exigem jogadores e aparelhos físicos. Não será declarado lançamento apenas por esgotar os números do roteiro.
 
 ## Integração
 
