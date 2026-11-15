@@ -625,7 +625,8 @@ export class Renderer {
                 images.set('season-particles', off);
             }
             this.seasonalBackdrop=new SeasonalBackdrop();
-            this.seasonalBackdrop.prepare(images.get('season-backgrounds'),this.w,this.h,this.dpr,{elapsed:0,mode:'aventura',seed:0});
+            // Prepare the first season during countdown, before the flight.
+            // The menu uses forest.webp and does not need seasonal surfaces.
             // Initialize the enlarged predator compositor while assets load,
             // before the start button is enabled, not at its first encounter.
             this.c.save();this.c.translate(-1000,-1000);
@@ -672,8 +673,21 @@ export class Renderer {
         };
         return view;
     }
+    releaseForestCaches() {
+        for(const key of ['skyCache','forestCache','fragmentedBackdrop','transitionBackdrop']){
+            const cache=this[key];
+            if(cache){cache.surface.width=0;cache.surface.height=0;this[key]=null;}
+        }
+    }
+    selectBackdrop(kind) {
+        if(this.backdropKind===kind)return;
+        if(kind==='seasonal')this.releaseForestCaches();
+        else this.seasonalBackdrop?.release();
+        this.backdropKind=kind;
+    }
     resize() {
         const r = this.canvas.getBoundingClientRect();
+        const previousW=this.w,previousH=this.h,previousDpr=this.dpr;
         this.w = r.width; this.h = r.height;
         this.cachedView = null;
         // Orientation/resize may change whether a resolution drop saves pixels.
@@ -681,10 +695,11 @@ export class Renderer {
             this.decoration=identicalCanvasBudgets(this.w,this.h,window.devicePixelRatio)?'low':'high';
         const size=canvasResolution(this.w,this.h,window.devicePixelRatio,this.resolution);
         this.dpr=size.dpr;
+        if(previousW!==this.w||previousH!==this.h||previousDpr!==this.dpr)this.seasonalBackdrop?.release();
         if(this.canvas.width!==size.width)this.canvas.width=size.width;
         if(this.canvas.height!==size.height)this.canvas.height=size.height;
         if(this.skyCache&&(this.skyCache.width!==size.width||this.skyCache.height!==size.height||this.skyCache.dpr!==this.dpr)){
-            this.skyCache.surface.width=0;this.skyCache=null;
+            this.skyCache.surface.width=0;this.skyCache.surface.height=0;this.skyCache=null;
         }
         if(this.forestCache&&(this.forestCache.viewW!==size.width||this.forestCache.viewH!==size.height||this.forestCache.dpr!==this.dpr)){
             this.forestCache.surface.width=0;this.forestCache.surface.height=0;
@@ -916,6 +931,7 @@ export class Renderer {
         const palette=BACKGROUND_PALETTE;
         const light = reduced||stageMix===1 ? palette[stage] : mixColor(palette[Math.max(0, stage - 1)], palette[stage], stageMix);
         const seasonal=seasonDistance!==null && images.get('season-backgrounds');
+        this.selectBackdrop(seasonal?'seasonal':'forest');
         const winterLight=seasonDistance!==null?winterAmount(seasonDistance):0;
         const forest=seasonal?null:images.get('forest');
         const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;

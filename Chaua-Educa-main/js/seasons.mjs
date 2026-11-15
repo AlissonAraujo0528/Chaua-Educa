@@ -35,14 +35,17 @@ export class SeasonalBackdrop {
   this.budgetMs=Math.max(.1,budgetMs);
   this.now=now;
  }
+ release(){
+  for(const surface of this.frames.values()){surface.width=0;surface.height=0;}
+  if(this.pending){this.pending.surface.width=0;this.pending.surface.height=0;}
+  this.pending=null;this.frames.clear();this.key='';this.atlas=null;
+ }
  prepare(atlas,w,h,dpr,game){
   const state=journeySeason(game),margin=26;
   const key=`${w}:${h}:${dpr}`;
   if(this.key!==key || this.atlas!==atlas){
    this.onTelemetry?.('cache-reset',{width:w,height:h,dpr});
-   for(const surface of this.frames.values()){surface.width=0;surface.height=0;}
-   if(this.pending){this.pending.surface.width=0;this.pending.surface.height=0;}
-   this.pending=null;this.frames.clear();this.key=key;this.atlas=atlas;
+   this.release();this.key=key;this.atlas=atlas;
   }
   const needed=new Set(state.mix===1?[state.to]:[state.from,state.to]);
   // Visual interpolation retains Game state on its prototype; copy explicit

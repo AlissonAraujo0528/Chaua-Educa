@@ -1,13 +1,13 @@
 @charset "UTF-8";
 @font-face {
   font-family: "Baloo 2";
-  src: url("../Fonts/Baloo2/Baloo2.ttf") format("truetype");
+  src: url("../Fonts/Baloo2/Baloo2.woff2") format("woff2");
   font-weight: 400 800;
   font-display: swap;
 }
 @font-face {
   font-family: Nunito;
-  src: url("../Fonts/Nunito/Nunito.ttf") format("truetype");
+  src: url("../Fonts/Nunito/Nunito.woff2") format("woff2");
   font-weight: 200 1000;
   font-display: swap;
 }

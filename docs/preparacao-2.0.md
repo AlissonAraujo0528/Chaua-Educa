@@ -4,6 +4,18 @@ Branch de trabalho: `preparacao-para-a-versao-2.0`.
 
 Os incrementos desta preparação começam em **1.0.1**, seguindo 1.0.2, 1.0.3 e seguintes. A identificação **2.0.0** fica reservada ao lançamento aprovado. O histórico técnico anterior é preservado no Git. Para atualizar pacote, lockfile e identificação visível conjuntamente, usar `node scripts/set-game-version.mjs NUMERO`.
 
+## 1.0.4 — fontes e ciclo de vida dos caches
+
+- Baloo 2 e Nunito convertidas integralmente para WOFF2: 960.132 → 280.912 bytes (redução de 70,7%). Mantidos os 1.601/1.103 glifos, os 856/938 pontos de código, métricas, contornos e tabelas de variação/posicionamento conferidos com FontTools. Sem recorte de caracteres. Licenças OFL mantidas; os TTF substituídos foram removidos da pasta publicada.
+- O menu não aloca mais antecipadamente uma superfície de estação que só será usada no voo. A primeira estação continua preparada durante a contagem, e a preparação gradual das próximas estações permanece.
+- A troca entre floresta de menu/treino e fundo sazonal libera explicitamente as superfícies incompatíveis. O mesmo tipo de fundo conserva seus caches durante o uso, sem recriação a cada quadro.
+- Redimensionamento libera imediatamente as superfícies sazonais prontas e parciais. Uma chamada de resize sem mudança efetiva preserva o cache. Superfícies descartadas têm largura e altura zeradas.
+- Imagens, spritesheets, efeitos, física e placares preservados; os recursos obrigatórios continuam carregados antes de liberar o voo. Não foi adicionado carregamento tardio de ataques.
+
+Verificação local: 322 testes de lógica aprovados e build Sass reproduzível. O CI executa um comparativo contra a revisão 1.0.3 `f32ee40`, no mesmo runner e navegador, alternando a ordem das amostras. São três carregamentos frios e três recargas por revisão em cada viewport (1366 × 768 e 390 × 844), com rede emulada de 20 Mbps/50 ms. A prontidão observada inclui artes obrigatórias e fontes carregadas.
+
+O comparativo também acompanha três ciclos de floresta/voo, redimensionamento e hashes dos pixels desenhados. A estimativa de caches é largura × altura × quatro bytes: não mede a RAM real do aparelho nem residência de texturas na GPU. O relatório fica no artefato `auto-visual-captures`, pasta `startup-memory/report.json`, e os resultados consolidados no PR de preparação. Taxas de quadros e efeitos continuam cobertos pelas verificações existentes; não há certificação nova de 60 FPS em hardware físico nesta etapa.
+
 ## 1.0.3 — treino seguro e descobertas de cada voo
 
 - O treino opcional passa a ter seis etapas: toque, sustentação, soltura, abertura entre troncos, três investidas do gavião e três botes da cobra. As práticas usam a física, os avisos e as funções de colisão atuais. Contatos reiniciam somente a tentativa, com orientação; não há Game Over, pontuação, perguntas, desbloqueios ou avanço de missões no treino.

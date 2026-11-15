@@ -1,6 +1,6 @@
 # Chaua-Educa
 
-## Preparação para a Versão 2.0 · versão 1.0.3
+## Preparação para a Versão 2.0 · versão 1.0.4
 
 Abra `Chaua-Educa-main/index.html` por um servidor HTTP. Para testar localmente, rode `npm start` na raiz e abra `http://127.0.0.1:5501/`. A Cobra A2 e as spritesheets oficiais de ação são obrigatórias. Arquivos faltando impedem o início e exibem um erro explícito; os antigos parâmetros de seleção de sprites foram removidos. Consulte [a documentação da arte atual](docs/arte-runtime.md).
 
@@ -56,7 +56,7 @@ npm run test:browser  # com o servidor ativo: teclado, toque, quizzes e interfac
 
 O teste de navegador utiliza o Chromium do sistema quando disponível. Em outra máquina, instale o navegador com `npx playwright install chromium`, ou defina `CHROMIUM_PATH`. `GAME_URL` permite mudar a origem do servidor. `SCREENSHOT_DIR` é opcional para salvar uma captura de tela da versão móvel.
 
-`scss/style.scss` é a fonte dos estilos da nova interface e `css/style.css` é o arquivo gerado. `js/engine.mjs` contém a simulação em passos de 1/120 s; `render.mjs`, a arte desenhada no canvas; `script.js`, a interface, os controles e o áudio; `questions.mjs`, o material educativo; `database.js`, os recordes. Baloo 2 e Nunito são servidas localmente, com suas licenças SIL OFL em `Fonts/`. Os créditos e as referências originais continuam disponíveis na interface.
+`scss/style.scss` é a fonte dos estilos da nova interface e `css/style.css` é o arquivo gerado. `js/engine.mjs` contém a simulação em passos de 1/120 s; `render.mjs`, a arte desenhada no canvas; `script.js`, a interface, os controles e o áudio; `questions.mjs`, o material educativo; `database.js`, os recordes. Baloo 2 e Nunito são servidas localmente em WOFF2 integral (280.912 bytes no total), com suas licenças SIL OFL em `Fonts/`. Os créditos e as referências originais continuam disponíveis na interface.
 
 ### Correções de continuidade
 

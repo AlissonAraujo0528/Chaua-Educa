@@ -44,7 +44,16 @@ jobs:
         run: |
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-http.log 2>&1 &
           chaua_server_pid=$!
-          trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
+          # Pin the comparison to the last approved preparation revision.
+          baseline_sha=f32ee403b493d5a25f86c1710223d96c0af106b1
+          git fetch --no-tags --depth=1 origin "$baseline_sha"
+          baseline_dir="$RUNNER_TEMP/prep104-baseline"
+          mkdir -p "$baseline_dir"
+          git archive "$baseline_sha" Chaua-Educa-main | tar -x -C "$baseline_dir"
+          python3 -m http.server 5503 --bind 127.0.0.1 --directory "$baseline_dir/Chaua-Educa-main" > /tmp/chaua-baseline.log 2>&1 &
+          baseline_pid=$!
+          trap 'kill "$chaua_server_pid" "$baseline_pid" 2>/dev/null' EXIT
+          BASE_GAME_URL=http://127.0.0.1:5503/ node scripts/benchmark-startup-memory.cjs
           # Fail fast on full real-browser flight before lengthy visual benchmarks.
           node tests/browser-collision-art.cjs
           node tests/browser-learning-flow.cjs
@@ -108,6 +117,7 @@ jobs:
         with:
           name: auto-visual-captures
           path: |
+            test-results/startup-memory/
             test-results/learning-flow/
             test-results/collision-art/
             test-results/auto-visual/
