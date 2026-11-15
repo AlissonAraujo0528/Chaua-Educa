@@ -27,7 +27,7 @@ const {chromium}=require('playwright');
       // Expert navigation gate, not a human win-rate estimate: time a tap at
       // the lower part of the clear corridor, leaving room for its 50px ascent.
       if(g.y>target+20&&g.vy>0&&g.flapCooldown<=0){window.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));}
-      for(const e of g.entities){if(e.kind==='hawk')hits.add(e.dive?'dive':'hawk');if(e.snake)hits.add(e.snake.branch?'branch-snake':'snake');}
+      for(const e of g.entities){if(e.kind==='hawk')hits.add(e.dive?'dive':'hawk');if(e.snake){hits.add('snake');if(e.snake.branch)hits.add('branch-snake');}}
       stages.add(g.stage);
      }
      window.stepFlight();
