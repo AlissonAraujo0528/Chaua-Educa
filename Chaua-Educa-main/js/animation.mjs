@@ -40,7 +40,8 @@ export function placeWarnings(items,view,protectedRegions=[]){
  const result=[],gap=6,left=view.x+4,top=view.y+4;
  const area=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w+gap)-Math.max(a.x,b.x-gap))*
   Math.max(0,Math.min(a.y+a.h,b.y+b.h+gap)-Math.max(a.y,b.y-gap));
- for(const item of items){
+ // Place the taller notices first so a small card cannot consume their only slot.
+ for(const item of [...items].sort((a,b)=>b.h-a.h)){
   const box={...item,w:Math.min(item.w,Math.max(1,view.w-8)),h:Math.min(item.h,Math.max(1,view.h-8))};
   const right=Math.max(left,view.x+view.w-box.w-4),bottom=Math.max(top,view.y+view.h-box.h-4);
   box.x=Math.max(left,Math.min(right,item.x));box.y=Math.max(top,Math.min(bottom,item.y));

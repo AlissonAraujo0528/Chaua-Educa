@@ -5,6 +5,7 @@ import {drawForegroundRain,drawWindGusts} from '../Chaua-Educa-main/js/weather.m
 import {drawSnowfall} from '../Chaua-Educa-main/js/winter-vfx.mjs';
 import {flightWarnings} from '../Chaua-Educa-main/js/flight-warnings.mjs';
 import {flightViewport,flightCameraTop} from '../Chaua-Educa-main/js/viewport.mjs';
+import {snakeA2SpriteRect,snakeA2CollisionRects} from '../Chaua-Educa-main/js/snake-a2.mjs';
 import {placeWarnings} from '../Chaua-Educa-main/js/animation.mjs';
 
 function traceContext(){
@@ -69,4 +70,15 @@ test('a constrained label can move sideways instead of covering a protected face
  const view={x:0,y:0,w:320,h:90},face={x:0,y:0,w:150,h:90};
  const [box]=placeWarnings([{x:0,y:30,w:130,h:26}],view,[face]);
  assert.ok(!overlap(box,face));assert.ok(box.x>=156);
+});
+
+test('notice clearance encloses the whole current snake art cell, including mirrored/scaled strikes',()=>{
+ for(const attackType of ['frontal','alto','varredura'])for(const phase of ['watching','warning','windup','striking','recovering'])for(const phaseAge of [0,.1,.2,.4]){
+  const wood={x:485,bottom:540,snake:{attackType,phase,phaseAge,age:3}};
+  const bound=snakeA2SpriteRect(wood);
+  for(const cell of snakeA2CollisionRects(wood)){
+   assert.ok(cell.x>=bound.x-1e-8&&cell.x+cell.w<=bound.x+bound.w+1e-8);
+   assert.ok(cell.y>=bound.y-1e-8&&cell.y+cell.h<=bound.y+bound.h+1e-8);
+  }
+ }
 });

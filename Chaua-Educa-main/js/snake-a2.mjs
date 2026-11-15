@@ -286,6 +286,16 @@ export function snakeA2CollisionRects(wood,reduced=false){
  return rects;
 }
 
+// Exact destination cell used by drawSnakeA2. Presentation clearance only;
+// collision still uses the detailed masks, never this transparent-cell box.
+export function snakeA2SpriteRect(wood,reduced=false){
+ if(!wood?.snake||wood.snake.retreat)return null;
+ const place=snakePlacement(wood),pose=snakeA2Pose(wood.snake,reduced);
+ const factor=place.factor*snakeA2ArtScale(pose);
+ return {x:place.x-SNAKE_A2_GRID.anchorX*factor,y:place.y-SNAKE_A2_GRID.anchorY*factor,
+  w:SNAKE_A2_GRID.cell*factor,h:SNAKE_A2_GRID.cell*factor};
+}
+
 // Upper silhouette supplies the head/mouth location for weather effects.
 // The collision remains the complete mask, not this illustrative bounding box.
 export function snakeA2HeadRect(wood,reduced=false){

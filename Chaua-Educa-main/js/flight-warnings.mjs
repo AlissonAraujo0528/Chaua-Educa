@@ -1,6 +1,6 @@
 import {placeWarnings} from './animation.mjs';
 import {warningPosition,snakeWarningPosition} from './viewport.mjs';
-import {snakeA2HeadRect} from './snake-a2.mjs';
+import {snakeA2SpriteRect} from './snake-a2.mjs';
 import {predictedHawkY} from './animals.mjs';
 
 // Presentation only: protected regions do not alter collision or encounters.
@@ -18,7 +18,7 @@ export function flightWarnings(game,view,reduced=false,shakeX=0,shakeY=0){
  protect({x:game.x-116,y:game.y-116,w:232,h:232});
  for(const e of game.entities){
   if(e.kind==='wood'&&e.snake){
-   protect(snakeA2HeadRect(e,reduced));
+   protect(snakeA2SpriteRect(e,reduced));
    if(['warning','windup','striking'].includes(e.snake.phase))
     notices.push({...snakeWarningPosition(view,e),w:160,h:26,type:'snake',entity:e});
   }else if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
