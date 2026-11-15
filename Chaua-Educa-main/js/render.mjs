@@ -1,12 +1,14 @@
+import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
+import {pickupPose} from './pickup-geometry.mjs';
 import {snakeAttack,HAWK_ATTACKS} from './attack-patterns.mjs';
 import {breeze,treeBend,winterAmount} from './living-motion.mjs';
 import {drawForestLife} from './forest-life.mjs';
-import {HAWK_ART,hawkUsesActionArt} from './hawk-geometry.mjs';
+import {HAWK_ART} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mjs';
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
-import {parrotAction,hawkAction,ACTION_TIMINGS} from './action-states.mjs';
+import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
@@ -135,20 +137,10 @@ function animatedBird(c,p){
         c.rotate(angle+hit.angle+(impactProgress>=1?Math.sin(time*9)*.017:0));
     }
     else {
-        const heave=(!reduced&&!perched&&p.flapImpulse>0)?p.flapImpulse*Math.sin(p.flapImpulse*Math.PI)*3.5:0;
-        const heaveAngle=(!reduced&&!perched&&p.flapImpulse>0)?-p.flapImpulse*0.04:0;
-        if(heave!==0)c.translate(0,-heave);
-        c.rotate(angle+heaveAngle);
-        if(!reduced&&!perched&&!surprise&&!defeated){
-            // Continuous sub-pixel lift and feather-line sway while gliding.
-            // Keep the same intact WebP pose: alternating full-body frames
-            // would make the beak and wings pop / temporarily double.
-            const glide=Math.max(0,1-Math.max(0,p.wing||0)*8);
-            if(glide>0){
-                c.translate(0,Math.sin(time*2.6)*.65*scale*glide);
-                c.rotate(Math.sin(time*1.9)*.006*glide);
-            }
-        }
+        if(!perched&&!surprise&&!defeated&&landing===null){
+            const placement=playerFlightPlacement(p);
+            c.translate(placement.x-x,placement.y-y);c.rotate(placement.angle);
+        }else c.rotate(angle);
     }
     if(turbo&&!perched&&!reduced)drawTurboFlames(c,size,time);
     const action=parrotAction({...p,time,wing:p.wing,reduced,perched,landing,defeated,surprise,impactProgress});
@@ -1523,21 +1515,9 @@ export class Renderer {
         if(!images.has('hawk-atlas'))return;
         const entity=e??{x,y,warning:warning?1:0,retreat,dive:false};
         const clip=hawkAnimation(entity,time,reduced),cAngle=retreat?0:angle;
-        const action=hawkAction(entity,time,reduced) ?? (reduced&&hawkUsesActionArt(entity)?{sheet:entity.retreat?'hawk-stunned':'hawk-flight',frame:entity.retreat?2:0}:null);
-        let dynamicY=0,dynamicAngle=0;
-        if(!reduced&&!warning&&!retreat){
-            if(entity.dive){
-                const span=(entity.startX||1)-(entity.targetX||0);
-                const p=span>0?Math.max(0,Math.min(1,((entity.startX||x)-x)/span)):.5;
-                dynamicY=Math.sin(p*Math.PI)*7;
-                dynamicAngle=(p-.5)*.16;
-            }else if(!action){
-                dynamicY=Math.sin(time*2.8+(entity.id||0)*1.5)*3.5;
-                dynamicAngle=Math.cos(time*2.8+(entity.id||0)*1.5)*.035;
-            }
-        }
-        c.save();c.translate(x,y+dynamicY+(action?.offsetY||0));
-        c.rotate(cAngle+dynamicAngle+(action?.angle||0));
+        const presentation=hawkPresentation(entity,time,reduced),action=presentation.action;
+        c.save();c.translate(x,y+presentation.offsetY);
+        c.rotate(cAngle+presentation.angle);
         if(action){
             const activeFrame=(action.blend??0)<.5?action.frame:(action.next??action.frame);
             // Required art missing? Throw explicitly; never switch to v6 mid-flight.
@@ -1562,8 +1542,7 @@ export class Renderer {
     }
 
     pickup(e, time, reduced, snow = 0, rain = 0) {
-        const c = this.c, float = reduced ? 0 : Math.sin(time * 2 + e.id) * 3;
-        const pulse = reduced ? 1 : 1 + Math.sin(time * 3.2 + e.id) * 0.07;
+        const c=this.c,{float,pulse,angle:pickupAngle}=pickupPose(e,time,reduced);
         c.save(); c.translate(e.x, e.y);
         c.scale(pulse, pulse);
         if (e.kind === 'fruit') {
@@ -1589,7 +1568,7 @@ export class Renderer {
             }
             c.save();
             c.translate(0, float);
-            c.rotate(reduced ? 0 : Math.sin(time * 3 + e.id) * 0.15);
+            c.rotate(pickupAngle);
             const pepSprite = getPepperSprite();
             if (pepSprite) {
                 c.drawImage(pepSprite, -24, -28, 48, 56);

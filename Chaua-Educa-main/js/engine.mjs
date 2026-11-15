@@ -1,6 +1,7 @@
 import {SNAKE_ATTACK_ORDER,HAWK_ATTACK_ORDER,snakeAttack} from './attack-patterns.mjs';
 import {challengeAt,challengeSpeedGain} from './challenge.mjs';
-import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect,roundedShape} from './collision.mjs';
+import {pickupHitsPlayer} from './pickup-geometry.mjs';
+import {playerShapes,hawkShapes,shapesIntersect,shapesHitRect} from './collision.mjs';
 import {snakeA2HitsPlayer,snakeA2FruitHasClearance,placeA2Fruit,snakeA2CollisionRects,snakeA2HeadRect} from './snake-a2.mjs';
 import {livingWoodRects} from './forest-geometry.mjs';
 import { createTutorial, advanceTutorial } from './tutorial.mjs';
@@ -25,11 +26,10 @@ export const QUIZ_INTERVAL = 30;
 export const FLIGHT = Object.freeze({
     gravity: 900, fallLimit: 360, tapLift: 300,
     holdLift: 230, staminaLift: 50, flapInterval: .22, inputBuffer: .12,
-    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:230,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
+    aventura: {speed:275,gap:150,minGap:115,interval:1.48,minInterval:1.16,ramp:.0038,speedGain:65,snakeAt:16,hawkAt:30,warning:1.5,snakeClearance:170,fruitMargin:34,clearance:260,actualSpeed:true,turnaround:.3,shiftRate:160,shiftLimit:60},
     tranquilo: {speed:205,gap:220,minGap:185,interval:2.1,minInterval:1.8,ramp:.0017,speedGain:30,snakeAt:32,hawkAt:55,warning:2.2},
 });
 export const STAGES = JOURNEY.map(s=>s.name);
-export const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 export class FlightClock {
     constructor(game) { this.game = game; this.accumulator = 0; }
@@ -216,7 +216,6 @@ export class Game {
     }
 
     get x() { return 220 + (this.arrival?.offset || 0); }
-    get body() { return { x: this.x - 20, y: this.y - 20, w: 40, h: 40 }; }
     get speed() {
         const p = FLIGHT[this.mode];
         const gain = this.mode === 'aventura' ? challengeSpeedGain(this.elapsed) : Math.min(p.speedGain, this.elapsed * 0.45);
@@ -656,7 +655,7 @@ export class Game {
             this.entities.push({ id:this.nextId++,kind:'hawk',solo:true,x,y,startX:x,
                 targetX:this.x-60,startY:y,targetY:lane,
                 warning:Math.max(profile.warning,travel*.25),phase:'warning',
-                age:0,dive,ascent,attackKind,attackX:this.x,targetLocked:false,gentle:this.mode==='tranquilo',lockWarning:this.mode==='tranquilo'?1.5:1.1,boost:challenge?.hawkBoost??50,w:66,h:34 });
+                age:0,dive,ascent,attackKind,attackX:this.x,targetLocked:false,gentle:this.mode==='tranquilo',lockWarning:this.mode==='tranquilo'?1.5:1.1,boost:challenge?.hawkBoost??50 });
         } else {
             const variants = ['plain', 'branch', 'plain'];
             const variant = plan.variant ?? (this.stage===1 && n%2===0?'branch':this.elapsed > 17 ? variants[n % variants.length] : 'plain');
@@ -805,8 +804,12 @@ export class Game {
             }
             this.advanceEffects(dt);return;
         }
-        if (this.y < CONTACT.top || this.y > CONTACT.bottom) {
-            this.boundaryContact(this.y < CONTACT.top ? 'top' : 'bottom');
+        const boundaryX=this.x,boundaryY=this.y,boundaryAngle=this.angle;
+        const boundaryBody=playerShapes(boundaryX,boundaryY,boundaryAngle,{time:this.sceneTime,wing:this.wing,flapImpulse:this.flapImpulse,reduced:this.reducedMotion});
+        let bodyTop=Infinity,bodyBottom=-Infinity;
+        for(const polygon of boundaryBody)for(const p of polygon){bodyTop=Math.min(bodyTop,p.y);bodyBottom=Math.max(bodyBottom,p.y);}
+        if (bodyTop<CONTACT.top || bodyBottom>CONTACT.bottom) {
+            this.boundaryContact(bodyTop<CONTACT.top?'top':'bottom');
             if (this.state !== 'playing') return;
         }
         this.nextSpawn -= dt;
@@ -817,13 +820,13 @@ export class Game {
         }
 
         // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
-        let cachedPlayerBody = null;
-        let cachedX = NaN, cachedY = NaN, cachedAngle = NaN;
+        let cachedPlayerBody=boundaryBody;
+        let cachedX=boundaryX,cachedY=boundaryY,cachedAngle=boundaryAngle;
         const getPlayerBody = () => {
             const px = this.x, py = this.y, pa = this.angle;
             if (!cachedPlayerBody || cachedX !== px || cachedY !== py || cachedAngle !== pa) {
                 cachedX = px; cachedY = py; cachedAngle = pa;
-                cachedPlayerBody = playerShapes(px, py, pa);
+                cachedPlayerBody = playerShapes(px,py,pa,{time:this.sceneTime,wing:this.wing,flapImpulse:this.flapImpulse,reduced:this.reducedMotion});
             }
             return cachedPlayerBody;
         };
@@ -833,7 +836,7 @@ export class Game {
             const px = this.x;
             if (e.kind === 'hawk') {
                 advanceHawk(e,dt,speed,px,this.y);
-                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x - px) < 140 && Math.abs(e.y - this.y) < 110 && shapesIntersect(getPlayerBody(),hawkShapes(e))) this.collide(e, true);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x-px)<180 && Math.abs(e.y-this.y)<140 && shapesIntersect(getPlayerBody(),hawkShapes(e,this.sceneTime,this.reducedMotion))) this.collide(e, true);
                 continue;
             }
             e.x -= speed * dt;
@@ -858,7 +861,7 @@ export class Game {
                 }
                 if (this.state !== 'playing') break;
                 if (!e.scored && e.x + 85 < px - 20) { e.scored = true; if (!e.broken && !e.contacted) this.addScore(1); }
-            } else if (!e.collected && Math.abs(e.x - px) < 36 && Math.abs(e.y - this.y) < 36 && overlaps(this.body, { x: e.x - 18, y: e.y - 18, w: 36, h: 36 })) this.collect(e);
+            } else if (!e.collected && Math.abs(e.x-px)<100 && Math.abs(e.y-this.y)<90 && pickupHitsPlayer(e,getPlayerBody(),this.elapsed,this.reducedMotion)) this.collect(e);
         }
         const minBound = (this.viewLeft !== undefined ? this.viewLeft : 0) - 260;
         const maxBound = Math.max(this.width, this.viewWidth || this.width) + 800;

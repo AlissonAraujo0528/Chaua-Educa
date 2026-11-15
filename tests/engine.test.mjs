@@ -1,9 +1,10 @@
+import {shapesHitRect,rectShape} from '../Chaua-Educa-main/js/collision.mjs';
 import {journeyLength} from '../Chaua-Educa-main/js/journey.mjs';
 import {pilotTarget} from './helpers/pilot.mjs';
 import { QUESTIONS } from '../Chaua-Educa-main/js/questions.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, FlightClock, STEP, FLIGHT, overlaps } from '../Chaua-Educa-main/js/engine.mjs';
+import { Game, FlightClock, STEP, FLIGHT } from '../Chaua-Educa-main/js/engine.mjs';
 import {ACTION_TIMINGS} from '../Chaua-Educa-main/js/action-states.mjs';
 
 function flight(options) { const game = new Game(options); game.state = 'playing'; game.nextSpawn = Infinity; return game; }
@@ -90,8 +91,8 @@ test('shield repels animals and never destroys them', () => {
 test('legacy hollow variants are solid living wood, without a rectangular window', () => {
     const game = flight(), obstacle = wood(game,{top:260,variant:'hollow'});
     const cavity = { x:game.x-18, y:170, w:36, h:36 };
-    assert.equal(game.woodRects(obstacle).some(r=>overlaps(cavity,r)), true);
-    assert.equal(game.woodRects(obstacle).some(r=>overlaps({...cavity,y:240},r)), true);
+    assert.equal(game.woodRects(obstacle).some(r=>shapesHitRect([rectShape(cavity)],r)), true);
+    assert.equal(game.woodRects(obstacle).some(r=>shapesHitRect([rectShape({...cavity,y:240})],r)), true);
 });
 
 test('generation introduces snakes and hawks gradually and preserves open routes', () => {
@@ -133,7 +134,7 @@ test('desktop and portrait routes are flyable through the full progression', () 
         for (let i=0;i<600/STEP;i++) {
             const nextWood=game.entities.find(e=>e.kind==='wood'&&e.x+100>game.x);
             const target=pilotTarget(game);
-            if (game.y>target+12 && game.vy>0 && game.flapCooldown<=0) {game.press();game.release();}
+            if (game.y>target+20 && game.vy>0 && game.flapCooldown<=0) {game.press();game.release();}
             if (game.state==='quiz') {game.answer(game.question.answer);game.continueQuiz();}
             game.tick(STEP);
             sawSnake ||= game.entities.some(e=>e.snake);

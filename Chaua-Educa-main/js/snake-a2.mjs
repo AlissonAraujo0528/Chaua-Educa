@@ -172,12 +172,23 @@ export function snakeA2Pose(s={},reduced=false){
  if(reduced)return {key:'idle',frame:0,state:'idle'};
  const timing=snakeAttack(s);
  switch(s.phase){
-  case 'warning':return {key:'idle',frame:Math.min(5,3+frame(validTime(s.warningAge)/SNAKE_TIMING.warning,3)),state:'alert'};
+  case 'warning':{
+   const frames=timing.key==='attack'?[2,3,4]:[1,0,0];
+   return {key:'idle',frame:frames[frame(validTime(s.warningAge)/SNAKE_TIMING.warning,frames.length)],state:'alert'};
+  }
   case 'windup':return {key:timing.key,frame:frame(validTime(s.phaseAge)/timing.windup,4),state:'windup'};
   case 'striking':return {key:timing.key,frame:4+frame(validTime(s.phaseAge)/timing.strike,2),state:'strike'};
-  case 'recovering':return {key:timing.key,frame:6+frame(validTime(s.phaseAge)/timing.recovery,2),state:'recover'};
-  case 'spent':case 'leaving':return {key:'idle',frame:7,state:s.phase};
-  default:return {key:'idle',frame:[0,1,2,1,0,6,7,0][Math.floor(validTime(s.age)*2.3)%8],state:'watching'};
+  case 'recovering':{
+   // Recoil through the intact windup poses in reverse. The former 5→6→7
+   // shortcut skipped the extended neck and snapped the head back ~40px.
+   // Idle intermediates register the raised frontal head against its rest pose.
+   const sequence=timing.key!=='attack'?[[timing.key,5],[timing.key,4],[timing.key,3],[timing.key,2],[timing.key,1],[timing.key,0],['idle',0]]:
+    [[timing.key,5],[timing.key,4],[timing.key,3],[timing.key,2],[timing.key,1],[timing.key,0],['idle',4],['idle',3],['idle',2],['idle',1],['idle',0]];
+   const [key,f]=sequence[frame(validTime(s.phaseAge)/timing.recovery,sequence.length)];
+   return {key,frame:f,state:'recover'};
+  }
+  case 'spent':case 'leaving':return {key:'idle',frame:0,state:s.phase};
+  default:return {key:'idle',frame:[0,1,2,1][Math.floor(validTime(s.age)*2.3)%4],state:'watching'};
  }
 }
 export function preloadSnakeA2(){

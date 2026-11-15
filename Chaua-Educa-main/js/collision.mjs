@@ -1,3 +1,5 @@
+import {COLLISION_ART} from './collision-art-data.mjs';
+import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
 import {predictedHawkY} from './animals.mjs';
 import {hawkBodyParts} from './hawk-geometry.mjs';
 // Convex body shapes exclude decorative feathers, beaks and feet.
@@ -9,7 +11,10 @@ function ellipse(x,y,rx,ry,angle=0){
 function bodyPart(x,y,dx,dy,rx,ry,angle){
  return ellipse(x+dx*Math.cos(angle)-dy*Math.sin(angle),y+dx*Math.sin(angle)+dy*Math.cos(angle),rx,ry,angle);
 }
-export function playerShapes(x,y,angle=0){return [bodyPart(x,y,-3,2,16,14,angle),bodyPart(x,y,15,-7,9,10,angle)];}
+export function playerShapes(x,y,angle=0,pose=null){
+ const p=pose?playerFlightPlacement({...pose,x,y,angle}):{x,y,angle};
+ return COLLISION_ART.bodies.parrot.map(([dx,dy,rx,ry])=>bodyPart(p.x,p.y,dx,dy,rx,ry,p.angle));
+}
 export function hawkAngle(e){
  if(e.attackKind)return Math.max(-.65,Math.min(.65,Math.atan((predictedHawkY(e,e.x+1)-predictedHawkY(e,e.x-1))/2)));
  if(e.dive)return -Math.atan2(e.targetY-e.startY,e.startX-e.targetX);
@@ -19,9 +24,11 @@ export function hawkAngle(e){
  }
  return 0;
 }
-export function hawkShapes(e){const a=hawkAngle(e);return hawkBodyParts(e).map(([dx,dy,rx,ry])=>bodyPart(e.x,e.y,dx,dy,rx,ry,a));}
+export function hawkShapes(e,time=0,reduced=false){
+ const p=hawkPresentation(e,time,reduced),a=(e.retreat?0:hawkAngle(e))+p.angle;
+ return hawkBodyParts(e).map(([dx,dy,rx,ry])=>bodyPart(e.x,e.y+p.offsetY,dx,dy,rx,ry,a));
+}
 export function rectShape({x,y,w,h}){return [{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];}
-export function roundedShape(rect){return ellipse(rect.x+rect.w/2,rect.y+rect.h/2,rect.w/2,rect.h/2);}
 export function intersects(a,b){
  for(const poly of [a,b])for(let i=0;i<poly.length;i++){
   const p=poly[i],q=poly[(i+1)%poly.length],nx=-(q.y-p.y),ny=q.x-p.x;

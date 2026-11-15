@@ -41,7 +41,7 @@ test('80 four-stage routes are navigable without shields, fruit or quiz pauses',
    g.entities=g.entities.filter(e=>e.kind==='wood'||e.kind==='hawk');
    const wood=g.entities.find(e=>e.kind==='wood'&&e.x+100>g.x);
    const target=pilotTarget(g);
-   if(g.y>target+12&&g.vy>0&&g.flapCooldown<=0){g.press();g.release();}
+   if(g.y>target+20&&g.vy>0&&g.flapCooldown<=0){g.press();g.release();}
    g.tick(STEP);
    if(g.distance>=journeyLength(g.mode))break;
    if(g.state==='ended'){assert.equal(g.won,true,`${mode} seed ${seed}: ${g.reason}`);break;}

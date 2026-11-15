@@ -87,7 +87,7 @@ test('both difficulties remain playable with 120ms reaction and 30Hz decisions, 
             if(g.elapsed>=nextDecision&&g.state==='playing'){
                 nextDecision=g.elapsed+1/30;
                 const target=pilotTarget(g),predict=g.y+g.vy*.12+450*.12**2;
-                if(pending===null&&predict>target+10&&g.vy>0)pending=g.elapsed+.12;
+                if(pending===null&&predict>target+12&&g.vy>0)pending=g.elapsed+.12;
             }
             if(pending!==null&&g.elapsed>=pending){g.press();g.release();pending=null;}
             g.tick(STEP);

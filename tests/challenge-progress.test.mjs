@@ -32,7 +32,7 @@ test('an active pilot can navigate a late challenge corridor without powers or q
  const g=new Game({seed:0});g.reset('aventura');g.state='playing';g.elapsed=650;g.distance=28000;g.nextQuizAt=Infinity;
  for(let i=0;i<45/STEP;i++){
   g.entities=g.entities.filter(e=>e.kind==='wood'||e.kind==='hawk');
-  if(g.y>pilotTarget(g)+12&&g.vy>0&&g.flapCooldown<=0){g.press();g.release();}g.tick(STEP);
+  if(g.y>pilotTarget(g)+20&&g.vy>0&&g.flapCooldown<=0){g.press();g.release();}g.tick(STEP);
   assert.equal(g.state,'playing',g.reason);
  }
  assert.equal(g.shield,false);assert.equal(g.fruits,0);

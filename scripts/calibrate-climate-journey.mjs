@@ -40,17 +40,17 @@ export function simulateFlight(mode,seed,maxSeconds=MAX_SECONDS){
    pending=null;
   }
   if(game.state==='playing'){
-   const wood=game.entities.find(e=>e.kind==='wood'&&e.x+100>game.x&&e.x<=(game.visibleRight??Infinity));
+   const wood=game.entities.find(e=>e.kind==='wood'&&e.x+120>game.x&&e.x<=(game.visibleRight??Infinity));
    const hawk=game.entities.find(e=>e.kind==='hawk'&&!e.harmless&&!e.retreat&&e.x+60>game.x);
-   let target=wood?(wood.snake?wood.top+Math.min(85,(wood.bottom-wood.top)*.35):(wood.top+wood.bottom)/2):320;
+   let target=wood?(wood.snake?wood.top+Math.min(95,(wood.bottom-wood.top)*.38):(wood.top+wood.bottom)/2+8):320;
    if(!wood&&hawk){
     const lane=predictedHawkY(hawk,game.x);
-    target=hawk.attackKind&&!hawk.targetLocked?320:lane>=320?Math.max(145,lane-140):Math.min(495,lane+140);
+    target=hawk.attackKind&&!hawk.targetLocked?320:lane>=320?145:495;
    }
    if(game.elapsed>=nextDecision){
     nextDecision=game.elapsed+1/30;
     const predicted=game.y+game.vy*.12+450*.12**2;
-    if(pending===null&&predicted>target+10&&game.vy>0)pending=game.elapsed+.12;
+    if(pending===null&&predicted>target+12&&game.vy>0)pending=game.elapsed+.12;
    }
    if(pending!==null&&game.elapsed>=pending){
     game.press();game.release();pending=null;

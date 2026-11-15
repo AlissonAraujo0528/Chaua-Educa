@@ -1,6 +1,7 @@
+import {playerShapes,shapesHitRect} from '../Chaua-Educa-main/js/collision.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {Game,STEP,CONTACT,overlaps} from '../Chaua-Educa-main/js/engine.mjs';
+import {Game,STEP,CONTACT} from '../Chaua-Educa-main/js/engine.mjs';
 function setup(){const events=[];const g=new Game({onEvent:e=>events.push(e)});g.state='playing';g.nextSpawn=Infinity;return {g,events};}
 
 test('shield rescues both boundaries, corrects velocity and interpolation, and expires normally',()=>{
@@ -18,7 +19,7 @@ test('living trunk rescues into a free passage without deleting its collision ge
  const {g}=setup();const e={id:1,kind:'wood',x:g.x-20,top:350,bottom:510,variant:'plain'};
  const before=g.woodRects(e);g.entities=[e];g.shield=true;g.tick(STEP);
  assert.equal(g.y,430);assert.equal(g.vy,0);assert.equal(e.broken,undefined);assert.equal(e.contacted,true);
- assert.equal(g.woodRects(e).length,before.length);assert.ok(g.woodRects(e).every(r=>!overlaps(g.body,r)));
+ assert.equal(g.woodRects(e).length,before.length);assert.ok(g.woodRects(e).every(r=>!shapesHitRect(playerShapes(g.x,g.y,g.angle),r)));
  e.x=g.x-200;g.tick(STEP);assert.equal(g.score,0);
 });
 test('only the dry branch disappears while trunk remains solid',()=>{

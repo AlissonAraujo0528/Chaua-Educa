@@ -8,7 +8,7 @@ test('body ellipses reject empty rectangular corners but retain solid body conta
  const body=playerShapes(100,100);
  assert.equal(shapesHitRect(body,{x:81,y:84,w:2,h:2}),false);
  assert.equal(shapesHitRect(body,{x:97,y:96,w:6,h:8}),true);
- assert.equal(shapesHitRect(body,{x:115,y:90,w:3,h:3}),true);
+ assert.equal(shapesHitRect(body,{x:130,y:82,w:3,h:3}),true);
  assert.equal(shapesHitRect(body,{x:65,y:65,w:4,h:4}),false,'wing tips are decorative');
 });
 test('rotation follows the head and never stretches the body polygons',()=>{
