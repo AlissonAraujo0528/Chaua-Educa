@@ -380,7 +380,7 @@ function result() {
 function renderFlightLearning(){
  const entries=flightLearningEntries(flightLearning),panel=$('#flight-learning');
  panel.hidden=!entries.length;panel.open=false;
- $('#flight-learning-summary').textContent=`${entries.length} tema${entries.length===1?'':'s'} · ${flightLearning.foods.length} alimento${flightLearning.foods.length===1?'':'s'} diferentes · ${flightLearning.questions.length} pergunta${flightLearning.questions.length===1?'':'s'} respondidas · ${flightLearning.chapters.length}/4 trechos. As fichas ficam na Chauapédia.`;
+ $('#flight-learning-summary').textContent=`${entries.length} tema${entries.length===1?'':'s'} · ${flightLearning.foods.length} alimento${flightLearning.foods.length===1?'':'s'} diferente${flightLearning.foods.length===1?'':'s'} · ${flightLearning.questions.length} pergunta${flightLearning.questions.length===1?'':'s'} respondida${flightLearning.questions.length===1?'':'s'} · ${flightLearning.chapters.length}/4 trechos. As fichas ficam na Chauapédia.`;
  $('#flight-learning-items').replaceChildren(...entries.map(entry=>{
   const button=document.createElement('button');button.type='button';button.className='learning-entry';button.textContent=entry.title+' →';
   button.addEventListener('click',()=>{learningReturnFocus=button;$('#result-dialog').close();showCollection(entry.id);});return button;

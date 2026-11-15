@@ -23,7 +23,7 @@ const name=process.env.LEARNING_BROWSER||'chromium';
    const learning=page.locator('#flight-learning');await learning.waitFor({state:'visible'});
    assert.equal(await learning.evaluate(e=>e.open),false);
    await learning.locator('summary').click();
-   assert.match(await page.locator('#flight-learning-summary').textContent(),/1 pergunta/);
+   assert.match(await page.locator('#flight-learning-summary').textContent(),/1 pergunta respondida/);
    const entry=page.locator('#flight-learning-items button').filter({hasText:'Chauás revelam ipês'});await entry.click();
    await page.locator('#collection-dialog').waitFor({state:'visible'});assert.match(await page.locator('.journal-reading').textContent(),/Handroanthus/);
    assert.equal(await page.locator('.journal-back').evaluate(e=>e===document.activeElement),true);
