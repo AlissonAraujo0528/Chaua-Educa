@@ -1,7 +1,8 @@
+import {createFlightLearning,advanceFlightLearning,flightLearningEntries} from './flight-learning.mjs';
 import {challengeAt} from './challenge.mjs';
 import { VisualQuality } from './quality.mjs';
 import { activeProbe } from './perf-hooks.mjs';
-import { LESSONS, resultAdvice } from './tutorial.mjs';
+import { LESSONS, resultAdvice, tutorialInstruction } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
 import { journeyRain, journeyStorm, journeyWind, getWeatherMode, setWeatherMode } from './weather.mjs';
@@ -42,6 +43,7 @@ let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0;
 let resultAnimation = null, soundOn = true;
 let assetsReady = false, lastOrientation = null, openingFlight = false;
 let flightMissionIds = [];
+let flightLearning=createFlightLearning(),learningReturnFocus=null;
 try { const saved = localStorage.getItem('chaua-sound'); soundOn = saved === null ? true : saved === 'true'; } catch { soundOn = true; }
 
 const forestAudio=new ForestAudio();
@@ -66,10 +68,12 @@ export const game = new Game({ onEvent(event) {
     }else sound(event.type);
     if(event.type==='tutorial-step'){
         if(game.tutorial.step!==2)flightInput.clear();
-        $('#screen-reader-status').textContent=LESSONS[game.tutorial.step]?.instruction || 'Treino concluído!';
+        $('#screen-reader-status').textContent=tutorialInstruction(game.tutorial);
     }
+    if(['tutorial-retry','tutorial-trial'].includes(event.type)){flightInput.clear();$('#screen-reader-status').textContent=tutorialInstruction(game.tutorial);}
     if(event.type==='tutorial-complete') DB.completeTutorial();
     if(game.tutorial)return;
+    flightLearning=advanceFlightLearning(flightLearning,event);
     DB.discoverEntries(discoveriesFor(event));
     if(['fruit','correct','incorrect','stage','route-complete','win'].includes(event.type)) DB.advanceMissions(player,event);
     if (event.type === 'fruit') DB.unlock(event.fruit);
@@ -176,6 +180,7 @@ function start(training = false) {
     // The new in-flight layout is observed after browser layout by the
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
+    flightLearning=createFlightLearning();learningReturnFocus=null;
     if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
     app.classList.toggle('training',training);
     previousState = ''; clock.reset(); lastTime = 0;
@@ -346,6 +351,7 @@ function result() {
     const progress=DB.missionProgress(player);
     const earned=completedMissions(progress).filter(m=>!flightMissionIds.includes(m.id));
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
+    renderFlightLearning();
     $('#journey-result').textContent=game.won?`Jornada concluída${game.medal?' · medalha de 1.000 pontos':''}`:`${Math.floor(journeyProgress(game)*100)}% do caminho · ${STAGES[game.stage]}`;
     $('#new-record').hidden = !record || game.score === 0;
     $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Alimentos ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
@@ -369,6 +375,16 @@ function result() {
         if (fraction < 1) resultAnimation = requestAnimationFrame(count);
     }
     resultAnimation = requestAnimationFrame(count);
+}
+
+function renderFlightLearning(){
+ const entries=flightLearningEntries(flightLearning),panel=$('#flight-learning');
+ panel.hidden=!entries.length;panel.open=false;
+ $('#flight-learning-summary').textContent=`${entries.length} tema${entries.length===1?'':'s'} · ${flightLearning.foods.length} alimento${flightLearning.foods.length===1?'':'s'} diferentes · ${flightLearning.questions.length} pergunta${flightLearning.questions.length===1?'':'s'} respondidas · ${flightLearning.chapters.length}/4 trechos. As fichas ficam na Chauapédia.`;
+ $('#flight-learning-items').replaceChildren(...entries.map(entry=>{
+  const button=document.createElement('button');button.type='button';button.className='learning-entry';button.textContent=entry.title+' →';
+  button.addEventListener('click',()=>{learningReturnFocus=button;$('#result-dialog').close();showCollection(entry.id);});return button;
+ }));
 }
 
 function showRanking(fromResult = false) {
@@ -438,7 +454,7 @@ function syncUI() {
     if (game.state === 'countdown') hudText('#count-number',Math.max(1, Math.ceil(game.countdown)));
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
-    hudText('#journey-destination',game.tutorial ? (LESSONS[game.tutorial.step]?.instruction || 'Pronto para a aventura!') : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(journeyProgress(game)*100)}%`);
+    hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(journeyProgress(game)*100)}%`);
     const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,journeyProgress(game)*100);
     if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
     hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
@@ -508,13 +524,14 @@ function frame(time) {
 }
 requestAnimationFrame(frame);
 
-function showCollection() {
+function showCollection(entryId=null) {
     const unlocked = DB.unlocked();
     const discovered = DB.discoveredEntries();
-    renderCollection($('#nature-items'),discovered,{foods:unlocked,foodContainer:$('#collection-items'),detailContainer:$('#journal-detail')});
+    const journal=renderCollection($('#nature-items'),discovered,{foods:unlocked,foodContainer:$('#collection-items'),detailContainer:$('#journal-detail')});
     $('#collection-progress').textContent=`${discovered.length} de ${ENTRIES.length} temas descobertos · ${unlocked.length} de ${FOODS.length} alimentos registrados`;
     setJournalTab('nature');
     openDialog('#collection-dialog');
+    if(typeof entryId==='string')journal.openEntry(entryId);
 }
 function setJournalTab(tab){
     const nature=tab==='nature';
@@ -527,7 +544,11 @@ $('#journal-food-tab').addEventListener('click',()=>setJournalTab('foods'));
 for(const id of ['journal-nature-tab','journal-food-tab'])$('#'+id).addEventListener('keydown',event=>{
     if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const nature=event.key==='Home'||(event.key!=='End'&&id==='journal-food-tab');setJournalTab(nature?'nature':'foods');$(nature?'#journal-nature-tab':'#journal-food-tab').focus();}
 });
-$('#open-collection').addEventListener('click', showCollection);
+$('#open-collection').addEventListener('click',()=>showCollection());
+$('#collection-dialog').addEventListener('close',()=>{
+ const focus=learningReturnFocus;learningReturnFocus=null;
+ if(focus&&game.state==='ended'){openDialog('#result-dialog');focus.focus({preventScroll:true});}
+});
 
 renderer.ready.then(() => {
     assetsReady=true;

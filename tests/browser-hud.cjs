@@ -49,7 +49,7 @@ const assert=require('node:assert/strict'),{chromium}=require('playwright');
      shield:document.querySelector('#shield-status').classList.contains('active'),golden:document.querySelector('#feather-status').classList.contains('golden'),
      spicy:document.querySelector('#pepper-status').classList.contains('spicy')};
    });
-   assert.deepEqual(training,{aria:'33',label:'Etapas do treino',stage:'2 · Segure para subir',feather:'Pena ×2',pepper:'Pimenta turbo',shield:false,golden:false,spicy:false});
+   assert.deepEqual(training,{aria:'16',label:'Etapas do treino',stage:'2 · Segure para subir',feather:'Pena ×2',pepper:'Pimenta turbo',shield:false,golden:false,spicy:false});
    await page.emulateMedia({reducedMotion:'no-preference'});
    assert.equal(await page.locator('#progress-fill').evaluate(node=>getComputedStyle(node).transitionProperty),'transform');
    await page.locator('#pause-dialog .back-home').click();

@@ -4,6 +4,17 @@ Branch de trabalho: `preparacao-para-a-versao-2.0`.
 
 Os incrementos desta preparação começam em **1.0.1**, seguindo 1.0.2, 1.0.3 e seguintes. A identificação **2.0.0** fica reservada ao lançamento aprovado. O histórico técnico anterior é preservado no Git. Para atualizar pacote, lockfile e identificação visível conjuntamente, usar `node scripts/set-game-version.mjs NUMERO`.
 
+## 1.0.3 — treino seguro e descobertas de cada voo
+
+- O treino opcional passa a ter seis etapas: toque, sustentação, soltura, abertura entre troncos, três investidas do gavião e três botes da cobra. As práticas usam a física, os avisos e as funções de colisão atuais. Contatos reiniciam somente a tentativa, com orientação; não há Game Over, pontuação, perguntas, desbloqueios ou avanço de missões no treino.
+- Pausar congela a prática, os avisos e a espera para tentar novamente. Iniciar uma partida normal remove o estado do treino. Os registros anteriores de treino concluído continuam válidos; repetir permanece opcional.
+- A tela de resultado oferece um resumo recolhido dos temas, alimentos diferentes, perguntas respondidas e trechos daquele voo. Respostas erradas também contam como contato com o conteúdo. O resumo é reiniciado na próxima partida e não grava dados a cada frame.
+- As fichas vistas no voo podem ser abertas diretamente na Chauapédia a partir do resultado, mantendo as fontes existentes. Fechar a leitura devolve o resultado e o foco ao botão de origem. Nada é aberto automaticamente durante o voo.
+- Duas missões opcionais adicionais: registrar os 12 alimentos atuais e responder a 12 perguntas diferentes. Os seis selos anteriores mantêm IDs e critérios; o título já obtido permanece. O novo título final é “Guardião de descobertas”. Milho e Coquinho históricos não substituem alimentos do catálogo atual para o novo selo.
+- As artes e as colisões da 1.0.2 são preservadas. As regras de pontuação continuam `floresta-v13`; não há nova migração de ranking nesta etapa.
+
+Verificação local: 318 testes aprovados, incluindo práticas reais dos seis ataques sem pontuação, nova tentativa após contato, pausa, preservação dos selos e resumo sem duplicações. A regressão dos 80 percursos e dos 24 voos com reação simulada continua ativa. O CI exercita a leitura a partir do resultado, retorno de foco, limpeza do resumo no reinício e apresentação em desktop e retrato nos três navegadores. Esses testes não substituem sessões com jogadores e aparelhos físicos.
+
 ## 1.0.2 — botes e geometria atual de contato
 
 - Recuperação frontal com 11 poses intactas; bote alto e varredura com sete. O recolhimento percorre os quadros de preparação em ordem inversa e termina na mesma pose de repouso, substituindo o salto de apenas dois quadros. Nenhuma cabeça, asa ou corpo adicional é sobreposto; as artes aprovadas permanecem intactas.
@@ -55,7 +66,7 @@ A meta de duração vem do modelo físico e de pilotos automatizados. A avaliaç
 
 1. Validar o polimento dos três botes em aparelhos físicos, com atenção à leitura dos avisos e do recolhimento. A 1.0.2 usa poses intactas existentes e suas máscaras/contatos atuais, sem substituir a arte.
 2. Ampliar a validação de reação em aparelhos físicos. A 1.0.1 já exercita aviso, marcação e contato com velocidades e turbo atuais, sem a antiga hipótese fixa de 350 unidades/s.
-3. Evoluir tutorial, descobertas por capítulo, missões e apresentação educativa; preservar fontes rastreáveis e a separação entre jogo e biologia.
+3. Avaliar com iniciantes e educadores o treino seguro, os resumos e as novas missões da 1.0.3; ajustar o ritmo com base nessas sessões.
 4. Medir e otimizar carga inicial, memória, caches e fluidez com a arte final.
 5. Validar release candidate em navegadores e aparelhos físicos, com participantes iniciantes e educadores.
 6. Publicar a 2.0 no endereço canônico após aprovação e verificação da revisão efetivamente servida.

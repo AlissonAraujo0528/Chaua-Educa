@@ -35,7 +35,7 @@ export function journalIllustration(id){
  return art;
 }
 export function renderCollection(container,unlocked,{foods=[],foodContainer,detailContainer}={}){
- let previousFocus=null;
+ let previousFocus=null;const buttons=new Map();
  const openDetail=(entry,button)=>{
   if(!detailContainer)return;
   previousFocus=button;detailContainer.closest('.journal-shell').classList.add('is-reading');
@@ -61,6 +61,7 @@ export function renderCollection(container,unlocked,{foods=[],foodContainer,deta
   const title=document.createElement('h3');title.textContent=entry.title;
   const text=document.createElement('p');text.textContent=discovered?entry.text.slice(0,135)+(entry.text.length>135?'…':''):entry.hint;
   const button=document.createElement('button');button.type='button';button.className='journal-open';button.textContent=discovered?'Ler descoberta →':'Continue explorando';button.disabled=!discovered;
+  buttons.set(entry.id,button);
   if(discovered)button.addEventListener('click',()=>openDetail(entry,button));
   copy.append(category,title,text,button);card.append(art,copy);return card;
  }));
@@ -70,4 +71,5 @@ export function renderCollection(container,unlocked,{foods=[],foodContainer,deta
   const title=document.createElement('h3');title.textContent=f.name;const text=document.createElement('p');text.textContent=found?f.description:'Recolha este item durante o voo para registrar sua descoberta.';
   const state=document.createElement('span');state.className='journal-category';state.textContent=found?'Registrado':'Ainda não coletado';const copy=document.createElement('div');const source=document.createElement('a');source.href=f.source;source.target='_blank';source.rel='noopener noreferrer';source.textContent='Fonte sobre este alimento ↗';copy.append(state,title,text,source);card.append(number,copy);return card;
  }));
+ return {openEntry(id){const entry=ENTRIES.find(e=>e.id===id);if(!entry||!unlocked.includes(id)||!detailContainer)return false;openDetail(entry,buttons.get(id));return true;}};
 }

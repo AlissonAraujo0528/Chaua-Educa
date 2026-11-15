@@ -74,6 +74,18 @@ async function begin(page, name = 'Guardião da mata') {
         await page.waitForFunction(()=>document.querySelector('#stage-name').textContent.startsWith('3 ·'));
         assert.equal(await model(page,g=>g.held),true);
         await page.keyboard.up('Space');
+        await page.waitForFunction(()=>document.querySelector('#stage-name').textContent.startsWith('4 ·'));
+        await page.evaluate(async()=>{
+            const {game:g}=await import('/js/script.js');
+            for(let i=0;i<180*120&&!g.tutorial.done;i++){
+                const e=g.entities[0];let target=320;
+                if(e?.kind==='wood')target=e.snake?235:328;
+                if(e?.kind==='hawk'&&e.targetLocked)target=e.targetY>=320?145:495;
+                if(g.y>target+20&&g.vy>0&&g.flapCooldown<=0){g.press();g.release();}
+                g.tick(1/120);
+            }
+            if(!g.tutorial.done)throw Error('Safe encounter practice was not completable');
+        });
         await page.locator('#training-dialog').waitFor({state:'visible'});
         assert.equal(await model(page,g=>g.score),0);
         assert.equal(await page.evaluate(()=>localStorage.getItem('chaua-missions-v1')),null);

@@ -47,6 +47,7 @@ jobs:
           trap 'kill "$chaua_server_pid" 2>/dev/null' EXIT
           # Fail fast on full real-browser flight before lengthy visual benchmarks.
           node tests/browser-collision-art.cjs
+          node tests/browser-learning-flow.cjs
           node tests/browser-attacks-weather.cjs
           node tests/browser-editorial-ui.cjs
           npm run test:journey
@@ -107,6 +108,7 @@ jobs:
         with:
           name: auto-visual-captures
           path: |
+            test-results/learning-flow/
             test-results/collision-art/
             test-results/auto-visual/
             test-results/surface-foods/

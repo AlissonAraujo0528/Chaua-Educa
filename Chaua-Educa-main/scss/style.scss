@@ -2037,3 +2037,11 @@ html.mobile-device body { position: fixed; inset: 0; }
   .app.mobile-device:not(.in-flight) .home h1 span { font-size: 30px; }
   .app.mobile-device:not(.in-flight) .mode-picker small { display: none; }
 }
+
+// Session learning stays after the flight; no educational overlays hide hazards.
+.flight-learning { margin: 1rem 0; text-align: left; border: 1px solid #cad8b7; border-radius: 16px; padding: .85rem 1rem; }
+.flight-learning summary { cursor: pointer; font-weight: 800; color: #214e38; }
+.flight-learning p { font-size: .85rem; line-height: 1.6; }
+#flight-learning-items { display: flex; flex-wrap: wrap; gap: .5rem; }
+.learning-entry { padding: .6rem .8rem; border: 1px solid #bdcda8; border-radius: 12px; color: #214e38; background: #edf2df; text-align: left; min-height: 44px; }
+.learning-entry:focus-visible { outline: 3px solid #7d9c37; outline-offset: 2px; }
