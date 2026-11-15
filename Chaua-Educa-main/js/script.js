@@ -379,6 +379,7 @@ $('#open-observation').addEventListener('click',()=>{
     const image=$('#observation-image');
     image.onerror=()=>{$('#observation-photo').hidden=true;$('#observation-photo-status').textContent='A foto não carregou. As descrições continuam disponíveis; você também pode voltar à pergunta.';};
     image.src=JOURNAL_PHOTOS.portrait.src;
+    for(const marker of document.querySelectorAll('.observation-hotspot')){const detail=OBSERVATION_DETAILS[marker.dataset.observationDetail];marker.style.left=detail.left+'%';marker.style.top=detail.top+'%';}
     openDialog('#observation-dialog');$('#observation-return').focus({preventScroll:true});$('#observation-dialog').scrollTop=0;
     requestAnimationFrame(()=>{if($('#observation-dialog').open)$('#observation-dialog').scrollTop=0;});
 });

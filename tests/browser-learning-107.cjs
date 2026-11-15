@@ -25,6 +25,8 @@ const name=process.env.LEARNING_BROWSER||'chromium';
    assert.match(await page.locator('#chapter-discovery-source').getAttribute('href'),/^https:\/\/www.gov.br\//);
    const before=await snapshot(page);await page.locator('#open-observation').click();
    await page.locator('#observation-dialog').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('#observation-image').naturalWidth>0);
+   const photo=await page.locator('#observation-image').boundingBox(),marker=await page.locator('.observation-hotspot[data-observation-detail=cabeca]').boundingBox();
+   assert.ok(marker.x>=photo.x+photo.width*.75,'head marker must leave the face unobstructed');
    await page.keyboard.press('v');await page.keyboard.press('f');await page.waitForTimeout(200);assert.deepEqual(await snapshot(page),before);
    await page.locator('.observation-hotspot[data-observation-detail=plumagem]').click();assert.match(await page.locator('#observation-detail-title').textContent(),/corpo/);
    const head=page.locator('.observation-choices [data-observation-detail=cabeca]');await head.focus();await page.keyboard.press('Enter');

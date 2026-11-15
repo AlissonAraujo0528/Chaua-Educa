@@ -7,7 +7,7 @@ export const CHAPTER_DISCOVERIES=Object.freeze([
  Object.freeze({stage:3,title:'Proteção de verdade',text:'Conservar ambientes naturais e combater a captura ilegal fazem parte da proteção dos papagaios. Os poderes desta aventura pertencem à imaginação.',entry:'conservacao',source:'icmbio'})
 ]);
 export const OBSERVATION_DETAILS=Object.freeze({
- cabeca:Object.freeze({label:'Testa e face',title:'Observe a testa',text:'Nesta fotografia, a testa avermelhada contrasta com a plumagem verde. A região frontal vermelha é uma característica descrita para o chauá.',entry:'chaua',source:'zoo',left:67,top:16}),
- plumagem:Object.freeze({label:'Plumagem do corpo',title:'Observe o corpo',text:'A maior parte do corpo é verde. Para reconhecer uma espécie, observe um conjunto de características; a cor verde sozinha não basta.',entry:'chaua',source:'zoo',left:43,top:53}),
+ cabeca:Object.freeze({label:'Testa e face',title:'Observe a testa',text:'Nesta fotografia, a testa avermelhada contrasta com a plumagem verde. A região frontal vermelha é uma característica descrita para o chauá.',entry:'chaua',source:'zoo',left:90,top:6}),
+ plumagem:Object.freeze({label:'Plumagem do corpo',title:'Observe o corpo',text:'A maior parte do corpo é verde. Para reconhecer uma espécie, observe um conjunto de características; a cor verde sozinha não basta.',entry:'chaua',source:'zoo',left:10,top:53}),
  registro:Object.freeze({label:'Foto e desenho',title:'Compare com a aventura',text:'Esta é uma fotografia de uma ave em cativeiro. O chauá desenhado no jogo e seus poderes são representações; a foto permite observar uma ave real.',entry:'fantasia',source:'game'})
 });

@@ -2080,3 +2080,5 @@ html.mobile-device body { position: fixed; inset: 0; }
  .observation figure { width:min(100%,200px); margin:auto; }
 }
 .observation figcaption small { display:block; margin-top:4px; font-size:10px; }
+
+.observation-guides { position:absolute; inset:0; width:100%; height:100%; fill:none; pointer-events:none; }

@@ -3491,3 +3491,12 @@ html.mobile-device body {
   margin-top: 4px;
   font-size: 10px;
 }
+
+.observation-guides {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  pointer-events: none;
+}
