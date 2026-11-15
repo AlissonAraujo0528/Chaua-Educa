@@ -393,6 +393,8 @@ function result() {
     drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
     if(birdProbe)birdProbe.end('ui.resultBird',birdAt);
     openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); $('#result-dialog').scrollTop=0;
+    // Native dialog focus can settle after showModal, especially on WebKit.
+    requestAnimationFrame(()=>{if($('#result-dialog').open&&game.state==='ended')$('#result-dialog').scrollTop=0;});
     $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} alimentos, ${game.correct} respostas corretas. ${game.reason}`;
     const begin = performance.now(), target = game.score;
     function count(now) {
