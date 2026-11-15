@@ -2050,3 +2050,33 @@ html.mobile-device body { position: fixed; inset: 0; }
 #continue-chapter-menu { display:block; width:100%; margin-top:8px; min-height:44px; line-height:1.25; white-space:normal; }
 #chapter-menu-note { margin:2px 0 0; font-size:11px; line-height:1.3; color:#526445; text-align:center; }
 #continue-chapter-result { width:100%; margin-bottom:10px; white-space:normal; }
+
+.chapter-discovery { text-align:left; padding:10px 12px; border:1px solid #ccd9ba; border-radius:12px; background:#edf3e3; margin:12px 0; font-size:13px; line-height:1.5; }
+.chapter-discovery summary { font-weight:800; cursor:pointer; }
+.chapter-discovery p { margin:10px 0; }
+.chapter-discovery a,.observation a { color:#315b40; text-decoration:underline; font-size:12px; overflow-wrap:anywhere; }
+.observation-invite { display:block; margin:14px auto 0; min-height:44px; padding:8px 12px; border:1px solid #759567; border-radius:12px; color:#315b40; background:#edf3e3; font:700 13px Nunito,sans-serif; }
+#observation-dialog { width:min(760px,calc(100vw - 24px)); }
+.observation { padding:24px; }
+#observation-close { position:absolute; right:12px; top:12px; width:44px; height:44px; background:#edf3e3; z-index:2; }
+.observation h2 { font-size:clamp(25px,4vw,34px); margin:10px 35px; }
+.observation .observation-intro { margin:10px 0 18px; line-height:1.5; }
+.observation-layout { display:grid; grid-template-columns:minmax(160px,240px) minmax(0,1fr); gap:20px; align-items:start; }
+.observation figure { margin:0; }
+.observation-photo { position:relative; width:100%; }
+.observation-photo img { display:block; width:100%; height:auto; border-radius:14px; }
+.observation-hotspot { position:absolute; transform:translate(-50%,-50%); width:44px; height:44px; border:2px solid #fffbed; border-radius:50%; background:#284d36; color:#fffbed; font-size:20px; font-weight:800; }
+.observation figcaption { line-height:1.3; margin-top:8px; }
+.observation-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.observation-choices button { min-height:44px; padding:9px 12px; border:1px solid #789268; border-radius:12px; background:#f2f5e9; color:#284d36; font:700 13px Nunito,sans-serif; }
+.observation-choices [aria-pressed=true] { background:#315b40; color:#fffbed; }
+#observation-detail { padding:12px 0; line-height:1.6; }
+#observation-detail h3 { font-size:21px; margin:8px 0; }
+#observation-detail p { margin:8px 0; }
+#observation-return { width:100%; margin-top:12px; }
+@media(max-width:600px) {
+ .observation { padding:18px; }
+ .observation-layout { grid-template-columns:1fr; gap:12px; }
+ .observation figure { width:min(100%,200px); margin:auto; }
+}
+.observation figcaption small { display:block; margin-top:4px; font-size:10px; }

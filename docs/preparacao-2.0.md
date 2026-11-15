@@ -4,6 +4,19 @@ Branch de trabalho: `preparacao-para-a-versao-2.0`.
 
 Os incrementos desta preparação começam em **1.0.1**, seguindo 1.0.2, 1.0.3 e seguintes. A identificação **2.0.0** fica reservada ao lançamento aprovado. O histórico técnico anterior é preservado no Git. Para atualizar pacote, lockfile e identificação visível conjuntamente, usar `node scripts/set-game-version.mjs NUMERO`.
 
+## 1.0.7 — educação contextual e observação segura
+
+- Revisados os 24 itens e suas fontes, mantendo IDs, respostas e registros existentes. Atualizados o endereço do Zoológico de Brasília, atribuições de bioma/fragmentação e a identificação do PAN Papagaios como ciclo finalizado. Perguntas sobre a pesquisa e a diversidade receberam formulações mais diretamente sustentadas pelas fontes. A revisão por item e os links consultados estão em [revisao-conteudo-1.0.7.md](revisao-conteudo-1.0.7.md).
+- Cada pergunta tem capítulos preferidos explícitos. Erros anteriores continuam prioritários e as perguntas não se repetem até esgotar o banco. A primeira pausa educativa de cada capítulo oferece uma descoberta contextual expansível, com fonte e vínculo à Chauapédia; não cria uma pausa adicional durante o voo.
+- Observação opcional de uma fotografia real já creditada na Chauapédia. Marcadores de toque e botões equivalentes de teclado exploram testa/face, plumagem e foto versus desenho. A imagem identifica uma ave em cativeiro e mantém créditos/licença, sem substituir sprites ou sugerir um registro local de fauna.
+- A atividade abre somente na pausa de pergunta, após a mesma verificação de rota livre, altura e velocidade. Voo, clima, poderes e avisos permanecem congelados. Não altera pontos ou penalidades, nem permite responder escondido à pergunta. Voltar/Escape restaura a pergunta, seu bônus e o foco do botão de origem. Não é possível abrir depois de responder para evitar a consequência do Desafio.
+- A foto só recebe endereço de carregamento ao abrir a atividade; não amplia a lista de recursos obrigatórios do voo. Uma falha da imagem mantém as descrições e a saída utilizáveis. Novos voos/retomadas limpam o estado transitório; as descobertas registradas continuam preservadas.
+- Pontuação e regras v14 permanecem, assim como missões, retomada, artes e máscaras. A observação contribui para o resumo educativo do voo sem gerar pontuação ou conquistas por colisão com animais.
+
+Verificação local: **347 testes de lógica aprovados**, build Sass reproduzível e nove spritesheets íntegras. As novas regressões cobrem contexto dos quatro capítulos, segurança, tempos congelados, bônus preservado, repetição/erros, identificação de fontes e reset. O teste `browser-learning-107.cjs` exercita toque equivalente, teclado, Escape, foco, retorno à mesma pergunta, erro de imagem, fontes e revisão em desktop/retrato/paisagem nos três navegadores. Capturas em `extended-browser-qa/learning-107`.
+
+**Compreensão com jogadores e educadores continua pendente**, assim como a validação nos aparelhos físicos da matriz. Essa parte do critério não é concluída por testes automatizados; o roteiro da beta inclui perguntas de verificação descritas na revisão de conteúdo.
+
 ## 1.0.6 — variedade, trilhas opcionais e retomada no Amigável
 
 - O planejador reduz ciclos curtos de padrões quando há vocabulário suficiente disponível; pesos por capítulo e limites de deslocamento/tempo continuam ativos. Clareiras, isolamento dos gaviões e passagem ampla após eles permanecem. Os três primeiros ataques de cada animal mantêm a ordem de apresentação; depois, grupos completos de três têm ordem variável por semente, sem repetir imediatamente na fronteira entre grupos. Perguntas e efeitos não alteram essa escolha.

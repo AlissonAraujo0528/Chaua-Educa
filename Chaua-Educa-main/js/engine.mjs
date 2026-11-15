@@ -1,3 +1,4 @@
+import {CHAPTER_DISCOVERIES,OBSERVATION_DETAILS} from './chapter-learning.mjs';
 import {SNAKE_ATTACK_ORDER,HAWK_ATTACK_ORDER,snakeAttack} from './attack-patterns.mjs';
 import {challengeAt,challengeSpeedGain} from './challenge.mjs';
 import {pickupHitsPlayer} from './pickup-geometry.mjs';
@@ -204,7 +205,7 @@ export class Game {
         this.encounterRandom = this.randomOverride ?? seededRandom(this.seed);
         this.powerRandom = this.randomOverride ?? seededRandom(this.seed ^ 0x85ebca6b);
         Object.assign(this, {
-            surfaceWeather:createSurfaceWeather(), resumed:false, chapterEntry:false, routeHintShown:false, tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
+            surfaceWeather:createSurfaceWeather(), chapterDiscoveries:[], chapterDiscovery:null, observationOpen:false, observedDetails:[], resumed:false, chapterEntry:false, routeHintShown:false, tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
             scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:8,nextShield:14,nextFeather:24,nextPepper:36},
             mode, state: 'menu', elapsed: 0, sceneTime: 0, distance: 0, score: 0, fruits: 0, correct: 0,
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
@@ -409,7 +410,7 @@ export class Game {
     }
 
     answer(value) {
-        if (this.state !== 'quiz' || this.answerResult !== null) return;
+        if (this.state !== 'quiz' || this.answerResult !== null || this.observationOpen) return;
         const right = value === this.question.answer;
         this.answerResult = right;
         if (right) { this.correct++; this.addScore(2, this.quizMultiplier, 'quiz'); }
@@ -419,7 +420,7 @@ export class Game {
     }
 
     continueQuiz() {
-        if (this.state !== 'quiz' || this.answerResult === null) return;
+        if (this.state !== 'quiz' || this.answerResult === null || this.observationOpen) return;
         this.nextQuizAt = this.elapsed + QUIZ_INTERVAL;
         if (!this.answerResult && this.mode !== 'tranquilo') { this.endCause='quiz'; this.end(false, 'Esta resposta não estava correta. Vamos aprender e tentar de novo?'); }
         else { this.state = 'countdown'; this.countdown = 1.5; this.cancelInput(); this.snapshot(); }
@@ -460,7 +461,7 @@ export class Game {
         if (danger || this.y < 120 || this.y > HEIGHT - 120 || Math.abs(this.vy) > 160) return false;
         if (!this.questionPool.length) this.questionPool = QUESTIONS.map((_,i)=>i);
         const review = this.questionPool.find(i=>this.reviewIds.includes(QUESTIONS[i].id));
-        const themed=this.questionPool.filter(i=>JOURNEY[this.stage].topics.includes(QUESTIONS[i].topic));
+        const themed=this.questionPool.filter(i=>QUESTIONS[i].chapters.includes(this.stage));
         const candidates=themed.length?themed:this.questionPool;
         const index=review===undefined?this.questionPool.indexOf(candidates[Math.floor(this.random()*candidates.length)]):this.questionPool.indexOf(review);
         this.question = QUESTIONS[this.questionPool.splice(index,1)[0]];
@@ -471,7 +472,25 @@ export class Game {
         this.state = 'quiz';
         this.cancelInput();
         this.nextSpawn = Math.max(this.nextSpawn, 1.5);
+        this.chapterDiscovery=this.chapterDiscoveries.includes(this.stage)?null:CHAPTER_DISCOVERIES[this.stage];
+        if(this.chapterDiscovery){this.chapterDiscoveries.push(this.stage);this.onEvent({type:'chapter-discovery',stage:this.stage});}
         return true;
+    }
+
+    openObservation(){
+        if(this.state!=='quiz'||this.observationOpen||this.answerResult!==null)return false;
+        this.observationOpen=true;this.cancelInput();return true;
+    }
+    observeDetail(id){
+        if(this.state!=='quiz'||!this.observationOpen||!Object.hasOwn(OBSERVATION_DETAILS,id))return false;
+        if(!this.observedDetails.includes(id)){
+            this.observedDetails.push(id);this.onEvent({type:'observation',detail:id,stage:this.stage});
+        }
+        return true;
+    }
+    closeObservation(){
+        if(!this.observationOpen)return false;
+        this.observationOpen=false;return true;
     }
 
     fruitBurst(x, y, variety, multiplier = 1) {

@@ -1,10 +1,11 @@
+import {CHAPTER_DISCOVERIES,OBSERVATION_DETAILS} from './chapter-learning.mjs';
 import { QUESTIONS, SOURCES, CONTENT_REVIEWED } from './questions.mjs';
 import {FOODS} from './foods.mjs';
 import {JOURNAL_PHOTOS,PHOTO_CREDIT,JOURNAL_FACTS,CONSERVATION_SOURCES} from './journal-content.mjs';
 
 export const ENTRIES = [
  {id:'chaua',title:'Conheça o chauá',category:'Ave',text:'Amazona rhodocorytha é o nome científico do papagaio-chauá. Ele vive na Mata Atlântica, no leste do Brasil.',source:'salve',hint:'Disponível desde o início.'},
- {id:'habitat',title:'Uma floresta para viver',category:'Habitat',text:'A perda e a fragmentação da floresta ameaçam o chauá. Conservar os ambientes naturais é parte de sua proteção.',source:'icmbio',hint:'Chegue às Árvores antigas ou descubra uma pergunta sobre habitat.'},
+ {id:'habitat',title:'Uma floresta para viver',category:'Habitat',text:'A perda e a fragmentação da floresta ameaçam o chauá. Conservar os ambientes naturais é parte de sua proteção.',source:'panReport',hint:'Chegue às Árvores antigas ou descubra uma pergunta sobre habitat.'},
  {id:'alimentos',title:'Além dos coletáveis',category:'Alimentação',text:'Há registros de chauás comendo pétalas de ipê. Os alimentos do jogo representam recursos citados para a espécie, incluindo frutos, sementes, brotos e pétalas. Não são uma dieta completa para aves reais. Comer uma semente não garante que ela seja dispersa ou germine.',source:'inma',hint:'Recolha um alimento.'},
  {id:'arvores',title:'Chauás revelam ipês',category:'Árvores e pesquisa',text:'Em Linhares (ES), acompanhar chauás ajudou a localizar Handroanthus riodocensis, um ipê raro. Aves e árvores podem ser estudadas em conjunto. O pouso no refúgio do jogo é uma representação, não uma descrição de ninho.',source:'inma',hint:'Chegue às Árvores antigas ou descubra uma pergunta sobre a pesquisa.'},
  {id:'fauna',title:'Animais, não vilões',category:'Fauna do jogo',text:'Cobras e gaviões são desafios nesta aventura. Os desenhos não identificam espécies, e suas investidas não comprovam predação do chauá na natureza. Você não precisa atingir animais para desbloquear descobertas.',source:'game',hint:'Disponível desde o início.'},
@@ -13,6 +14,8 @@ export const ENTRIES = [
 ];
 export const INITIAL_ENTRIES = ['chaua','fauna','fantasia'];
 export function discoveriesFor(event) {
+ if(event.type==='chapter-discovery')return Number.isInteger(event.stage)&&CHAPTER_DISCOVERIES[event.stage]?[CHAPTER_DISCOVERIES[event.stage].entry]:[];
+ if(event.type==='observation')return Object.hasOwn(OBSERVATION_DETAILS,event.detail)?[OBSERVATION_DETAILS[event.detail].entry]:[];
  if(event.type==='fruit')return ['alimentos'];
  if(event.type==='stage')return event.stage===1?['habitat','arvores']:event.stage>=2?['conservacao']:[];
  if(['correct','incorrect'].includes(event.type)) {

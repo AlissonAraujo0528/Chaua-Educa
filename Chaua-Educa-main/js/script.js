@@ -1,3 +1,5 @@
+import {OBSERVATION_DETAILS} from './chapter-learning.mjs';
+import {JOURNAL_PHOTOS} from './journal-content.mjs';
 import {chapterCheckpoint} from './chapter-checkpoints.mjs';
 import {createFlightLearning,advanceFlightLearning,flightLearningEntries} from './flight-learning.mjs';
 import {challengeAt} from './challenge.mjs';
@@ -307,6 +309,7 @@ $('#forest').addEventListener('lostpointercapture', event => flightInput.cancel(
 $('#flap-button').addEventListener('click', event => { if (event.detail === 0) { hold('activation'); release('activation'); } });
 window.addEventListener('keydown', event => {
     if (game.state === 'quiz') {
+        if(game.observationOpen)return;
         if (['v', 'f'].includes(event.key.toLowerCase()) && !event.repeat) { event.preventDefault(); answer(event.key.toLowerCase() === 'v'); }
         return;
     }
@@ -342,22 +345,53 @@ const unlockAudio = () => {
 
 
 function answer(value) {
-    if(game.state!=='quiz' || game.answerResult!==null)return;
+    if(game.state!=='quiz' || game.answerResult!==null || game.observationOpen)return;
     game.answer(value);
     const result = game.answerResult;
     if (result === null) return;
     $('#answer-true').disabled = true; $('#answer-false').disabled = true;
     const feedback = $('#answer-feedback');
     feedback.textContent = result ? `Boa descoberta! +${2 * game.quizMultiplier} pontos.` : `A afirmação é ${game.question.answer ? 'verdadeira' : 'falsa'}. ${game.mode === 'tranquilo' ? 'Você pode continuar o voo.' : 'No Desafio, esta resposta encerra o voo.'}`;
-    feedback.textContent += ` ${game.question.explanation}`;
+    feedback.textContent += ` ${game.question.explanation} Conteúdo revisado em ${game.question.reviewed.split('-').reverse().join('/')}.`;
     const source = SOURCES[game.question.source];
     const link = document.createElement('a'); link.href = source.url; link.textContent = ' Fonte: ' + source.label; link.target = '_blank'; link.rel = 'noopener noreferrer';
     if(game.question.source !== 'game') feedback.append(link);
     feedback.classList.toggle('incorrect', !result);
+    $('#open-observation').hidden=true;
     $('#quiz-continue').hidden = false;
     $('#quiz-continue').textContent = result || game.mode === 'tranquilo' ? 'Continuar o voo →' : 'Ver meu voo →';
     $('#quiz-continue').focus();
 }
+function returnFromObservation(){
+    if(!game.closeObservation())return;
+    $('#observation-dialog').close();
+    if(game.state==='quiz'){openDialog('#quiz-dialog');$('#open-observation').focus({preventScroll:true});}
+}
+$('#open-observation').addEventListener('click',()=>{
+    if(!game.openObservation())return;
+    clearInputs();$('#quiz-dialog').close();
+    $('#observation-photo').hidden=false;$('#observation-photo-status').textContent='';
+    $('#observation-detail-title').textContent='O que chamou sua atenção?';
+    $('#observation-detail-text').textContent='Observe a fotografia e escolha um dos detalhes. Esta atividade não altera seus pontos.';
+    $('#observation-detail-source').hidden=true;
+    for(const button of document.querySelectorAll('.observation-choices button'))button.setAttribute('aria-pressed','false');
+    $('#observation-credit').href=JOURNAL_PHOTOS.portrait.page;
+    const image=$('#observation-image');
+    image.onerror=()=>{$('#observation-photo').hidden=true;$('#observation-photo-status').textContent='A foto não carregou. As descrições continuam disponíveis; você também pode voltar à pergunta.';};
+    image.src=JOURNAL_PHOTOS.portrait.src;
+    openDialog('#observation-dialog');$('#observation-return').focus({preventScroll:true});$('#observation-dialog').scrollTop=0;
+    requestAnimationFrame(()=>{if($('#observation-dialog').open)$('#observation-dialog').scrollTop=0;});
+});
+for(const button of document.querySelectorAll('[data-observation-detail]'))button.addEventListener('click',()=>{
+    const id=button.dataset.observationDetail;if(!game.observeDetail(id))return;
+    const detail=OBSERVATION_DETAILS[id];$('#observation-detail-title').textContent=detail.title;$('#observation-detail-text').textContent=detail.text;
+    for(const choice of document.querySelectorAll('.observation-choices button'))choice.setAttribute('aria-pressed',String(choice.dataset.observationDetail===id));
+    const link=$('#observation-detail-source');link.hidden=detail.source==='game';
+    if(!link.hidden){const source=SOURCES[detail.source];link.href=source.url;link.textContent=`Fonte: ${source.label} ↗`;}
+});
+for(const id of ['observation-close','observation-return'])$('#'+id).addEventListener('click',returnFromObservation);
+$('#observation-dialog').addEventListener('cancel',event=>{event.preventDefault();returnFromObservation();});
+
 $('#answer-true').addEventListener('click', () => answer(true));
 $('#answer-false').addEventListener('click', () => answer(false));
 $('#quiz-continue').addEventListener('click', () => { $('#quiz-dialog').close(); clearInputs(); game.continueQuiz(); syncUI(); });
@@ -466,6 +500,13 @@ function syncUI() {
         if (!(previousState === 'countdown' && game.state === 'playing')) clearInputs();
         if (game.state === 'paused') openDialog('#pause-dialog');
         if (game.state === 'quiz') {
+            const discovery=game.chapterDiscovery;$('#chapter-discovery').hidden=!discovery;$('#chapter-discovery').open=false;
+            if(discovery){
+                $('#chapter-discovery-title').textContent=`Neste trecho: ${discovery.title}`;
+                $('#chapter-discovery-text').textContent=discovery.text;
+                const source=SOURCES[discovery.source];$('#chapter-discovery-source').href=source.url;$('#chapter-discovery-source').textContent=`Fonte: ${source.label} ↗`;
+            }
+            $('#open-observation').hidden=false;
             $('#question-text').textContent = game.question.text;
             $('#quiz-bonus').textContent = game.quizMultiplier > 1 ? `Bônus ×${game.quizMultiplier} garantido nesta resposta: +${2*game.quizMultiplier} pontos ao acertar.` : 'Uma resposta certa vale +2 pontos.';
             $('#quiz-bonus').textContent += game.mode === 'tranquilo' ? ' Amigável: errar permite continuar.' : ' Desafio: errar encerra o voo.';
