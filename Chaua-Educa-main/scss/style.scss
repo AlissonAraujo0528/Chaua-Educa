@@ -2045,3 +2045,8 @@ html.mobile-device body { position: fixed; inset: 0; }
 #flight-learning-items { display: flex; flex-wrap: wrap; gap: .5rem; }
 .learning-entry { padding: .6rem .8rem; border: 1px solid #bdcda8; border-radius: 12px; color: #214e38; background: #edf2df; text-align: left; min-height: 44px; }
 .learning-entry:focus-visible { outline: 3px solid #7d9c37; outline-offset: 2px; }
+
+// Chapter continuation stays optional and preserves the primary fresh-flight action.
+#continue-chapter-menu { display:block; width:100%; margin-top:8px; min-height:44px; line-height:1.25; white-space:normal; }
+#chapter-menu-note { margin-top:2px; font-size:11px; line-height:1.3; }
+#continue-chapter-result { width:100%; margin-bottom:10px; white-space:normal; }

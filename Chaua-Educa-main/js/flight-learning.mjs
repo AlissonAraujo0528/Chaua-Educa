@@ -1,7 +1,7 @@
 import {ENTRIES,discoveriesFor} from './collection.mjs';
 import {FOODS} from './foods.mjs';
 import {QUESTIONS} from './questions.mjs';
-export const createFlightLearning=()=>({entries:[],foods:[],questions:[],chapters:[0]});
+export const createFlightLearning=(stage=0)=>({entries:[],foods:[],questions:[],chapters:[stage]});
 const add=(list,id)=>list.includes(id)?list:[...list,id];
 // Session-only recap, recorded on learning events; never persisted per frame.
 export function advanceFlightLearning(previous,event){

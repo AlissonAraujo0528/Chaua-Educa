@@ -63,7 +63,7 @@ export function resultAdvice(game){
   top:'Antecipe a soltura do controle. Batidas curtas ajudam a manter distância da copa.',
   bottom:'Dê uma batida antes de chegar perto do chão. Segurar ajuda a recuperar altura.',
   hawk:'Observe o aviso do gavião e a faixa de passagem antes de mudar de altura.',
-  snake:'A cobra ocupa o galho sinalizado. Procure o espaço livre, sem tentar atravessá-la.',
+  snake:game.hit?.attackType==='alto'?'Antecipe a subida no bote alto; ele alcança uma faixa mais elevada.':game.hit?.attackType==='varredura'?'A varredura ocupa a faixa baixa. Mantenha o voo acima do corpo da cobra.':'No bote frontal, ganhe altura antes da investida e deixe espaço para a cobra recolher.',
   wood:'Alinhe-se com a abertura antes de alcançar o tronco. Alimentos nas bordas são opcionais.',
   quiz:'Releia a explicação na Chauapédia. No Amigável, você pode errar e continuar aprendendo.',
  };

@@ -928,6 +928,13 @@ export class Renderer {
         }
         return normal;
     }
+    resetFlightPresentation(){
+        // Checkpoint attempts can reuse the same seed and scene time. Clear
+        // short-lived visual state explicitly while retaining loaded art/caches.
+        this.treeDrips=new TreeDrips();this.animalWeather=new AnimalWeather();this.weatherMotion=new WeatherMotion();
+        this.cameraTime=undefined;this.cameraTop=undefined;
+    }
+
     background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1, rain = 0, storm = 0, fog = 0, wind = 0, seasonDistance = null, rainSpeed = 250, weatherMotion = null) {
         if (reduced) offset = 0;
         const c = this.c, w = this.w, h = this.h;

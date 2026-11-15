@@ -1,8 +1,9 @@
+import {CHECKPOINT_KEY,normalizeCheckpoint} from './chapter-checkpoints.mjs';
 import {FOOD_IDS} from './foods.mjs';
 import { normalizeProgress, advanceProgress } from './missions.mjs';
 import { activeProbe } from './perf-hooks.mjs';
 import { ENTRIES, INITIAL_ENTRIES } from './collection.mjs';
-export const RULES_VERSION = 'floresta-v13';
+export const RULES_VERSION = 'floresta-v14';
 export default class DB {
     static dbName = `db-chaua-${RULES_VERSION}`;
     static storageAvailable = true;
@@ -43,7 +44,7 @@ export default class DB {
 
     static previousScores() {
         const data = this.readObject('chaua-educa-v2', {});
-        const archived=['floresta-v2','floresta-v3','floresta-v4','floresta-v5','floresta-v6','floresta-v7','floresta-v8','floresta-v9','floresta-v10','floresta-v11','floresta-v12'].flatMap(ruleset=>{
+        const archived=['floresta-v2','floresta-v3','floresta-v4','floresta-v5','floresta-v6','floresta-v7','floresta-v8','floresta-v9','floresta-v10','floresta-v11','floresta-v12','floresta-v13'].flatMap(ruleset=>{
             const forest=this.readObject(`db-chaua-${ruleset}`,[]);
             return (Array.isArray(forest)?forest:[]).filter(s=>s && typeof s.playerName==='string' && Number.isFinite(s.score_val) && s.score_val>=0).map(s=>({...s,ruleset}));
         });
@@ -137,6 +138,20 @@ export default class DB {
         this.memory.set('chaua-discoveries',records);
         try { this._writeJSON('chaua-discoveries',records); }
         catch { this.storageAvailable=false; }
+    }
+
+    static chapterCheckpoint(player){
+        const rows=this.readObject(CHECKPOINT_KEY,[]);
+        return normalizeCheckpoint((Array.isArray(rows)?rows:[]).find(r=>r?.player===player)?.checkpoint);
+    }
+    static saveChapterCheckpoint(player,value){
+        if(typeof player!=='string'||player.trim().length<3)return;
+        const checkpoint=normalizeCheckpoint(value);
+        const stored=this.readObject(CHECKPOINT_KEY,[]);
+        const rows=(Array.isArray(stored)?stored:[]).filter(r=>r&&typeof r.player==='string'&&r.player!==player);
+        if(checkpoint)rows.push({player,checkpoint});
+        this.memory.set(CHECKPOINT_KEY,rows);
+        try{this._writeJSON(CHECKPOINT_KEY,rows);}catch{this.storageAvailable=false;}
     }
 
     static upsertPlayerScore(playerName, score, mode = 'aventura') {

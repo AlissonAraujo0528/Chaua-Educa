@@ -1,3 +1,4 @@
+import {chapterCheckpoint} from './chapter-checkpoints.mjs';
 import {createFlightLearning,advanceFlightLearning,flightLearningEntries} from './flight-learning.mjs';
 import {challengeAt} from './challenge.mjs';
 import { VisualQuality } from './quality.mjs';
@@ -73,6 +74,8 @@ export const game = new Game({ onEvent(event) {
     if(['tutorial-retry','tutorial-trial'].includes(event.type)){flightInput.clear();$('#screen-reader-status').textContent=tutorialInstruction(game.tutorial);}
     if(event.type==='tutorial-complete') DB.completeTutorial();
     if(game.tutorial)return;
+    if(event.type==='stage'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,chapterCheckpoint(game));
+    if(event.type==='win'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,null);
     flightLearning=advanceFlightLearning(flightLearning,event);
     DB.discoverEntries(discoveriesFor(event));
     if(['fruit','correct','incorrect','stage','route-complete','win'].includes(event.type)) DB.advanceMissions(player,event);
@@ -86,6 +89,7 @@ export const game = new Game({ onEvent(event) {
     if(event.type==='shield-kept')toast('Seu escudo já está pronto · proteção mantida');
     if(event.type==='feather' && event.renewed)toast('Pena renovada · mais 10s de pontos ×2');
     if(event.type==='pepper' && event.renewed)toast('Pimenta renovada · mais 6s de turbo e pontos ×2');
+    if(event.type==='route-offer')toast('Trilha dourada opcional · +4 sem contato. O centro continua livre.');
     if(event.type==='route-complete')toast(`Trilha completa · +${event.points} pontos`);
     if (event.type === 'points') {
         $('#score-bonus').textContent = `+${event.value}`; pointsUntil = game.elapsed + 1;
@@ -151,7 +155,7 @@ function openDialog(id) {
 
 // Start only after the optional browser orientation request. This prevents
 // the normal resize-on-rotation safeguard from pausing the countdown itself.
-async function launchFlight(training = false) {
+async function launchFlight(training = false, checkpoint = null) {
     training = training === true;
     if(openingFlight || !assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     openingFlight = true;
@@ -162,12 +166,12 @@ async function launchFlight(training = false) {
     } finally {
         openingFlight = false;
     }
-    start(training);
+    start(training,checkpoint);
     if(mobile && window.innerHeight > window.innerWidth)
         toast('Para ampliar a visão, ative a rotação automática e vire o celular.');
 }
 
-function start(training = false) {
+function start(training = false, checkpoint = null) {
     training = training === true;
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     closeDialogs(); clearInputs();
@@ -180,12 +184,13 @@ function start(training = false) {
     // The new in-flight layout is observed after browser layout by the
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
-    flightLearning=createFlightLearning();learningReturnFocus=null;
-    if(training)game.startTutorial();else game.start(selectedMode, DB.reviewTopics(player));
+    flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
+    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player));
+    renderer.resetFlightPresentation();
     app.classList.toggle('training',training);
     previousState = ''; clock.reset(); lastTime = 0;
     $('#score-bonus').textContent = ''; $('#toast').classList.remove('visible'); toastUntil = 0;
-    $('#screen-reader-status').textContent = 'O voo vai começar. Toque, seta para cima ou espaço para bater asas. Solte para descer.';
+    $('#screen-reader-status').textContent = checkpoint?`Retomando ${STAGES[game.stage]}. Novos pontos nesta tentativa; seu recorde permanece preservado.`:'O voo vai começar. Toque, seta para cima ou espaço para bater asas. Solte para descer.';
     // Remove focus from the submitting/restarting button, avoiding Space clicks.
     document.activeElement?.blur();
     syncUI();
@@ -195,7 +200,7 @@ function home() {
     game.reset(); previousState = ''; clock.reset(); lastTime = 0;
     releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
-    app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();
+    app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();updateChapterButtons();
 
     resize(); if(!mobileDevice)$('#inputPlayer').focus({ preventScroll: true });
 }
@@ -251,7 +256,7 @@ $('#inputPlayer').addEventListener('input', event => {
     const value = event.target.value;
     $('#btnStart').disabled = !assetsReady || value.trim().length < 3;
     $('#name-count').textContent = `${value.length}/24`;
-    event.target.setCustomValidity('');
+    event.target.setCustomValidity('');updateChapterButtons();
 });
 $('#start-form').addEventListener('submit', event => {
     event.preventDefault();
@@ -260,6 +265,24 @@ $('#start-form').addEventListener('submit', event => {
     if (player.length < 3 || player.length > 24) { $('#inputPlayer').setCustomValidity('Use de 3 a 24 caracteres no seu nome.'); $('#inputPlayer').reportValidity(); return; }
     selectedMode = $('input[name=mode]:checked').value;
     sound('fruit'); void launchFlight();
+});
+function updateChapterButtons(){
+    const name=$('#inputPlayer').value.trim(),friendly=$('input[name=mode]:checked').value==='tranquilo';
+    const checkpoint=friendly&&name.length>=3&&name.length<=24?DB.chapterCheckpoint(name):null;
+    $('#continue-chapter-menu').hidden=!checkpoint;$('#chapter-menu-note').hidden=!checkpoint;
+    $('#continue-chapter-menu').disabled=!assetsReady;
+    if(checkpoint)$('#continue-chapter-menu').textContent=`Retomar trecho ${checkpoint.stage+1} · ${STAGES[checkpoint.stage]}`;
+}
+for(const radio of document.querySelectorAll('input[name=mode]'))radio.addEventListener('change',updateChapterButtons);
+$('#continue-chapter-menu').addEventListener('click',()=>{
+    if(game.state!=='menu')return;
+    const name=$('#inputPlayer').value.trim(),checkpoint=DB.chapterCheckpoint(name);
+    if(!checkpoint||name.length<3||name.length>24||$('input[name=mode]:checked').value!=='tranquilo')return;
+    player=name;selectedMode='tranquilo';void launchFlight(false,checkpoint);
+});
+$('#continue-chapter-result').addEventListener('click',()=>{
+    const checkpoint=selectedMode==='tranquilo'?DB.chapterCheckpoint(player):null;
+    if(checkpoint&&game.state==='ended')void launchFlight(false,checkpoint);
 });
 $('#restart-button').addEventListener('click', () => { void launchFlight(); });
 $('.brand').addEventListener('click', event => { event.preventDefault(); home(); });
@@ -341,13 +364,13 @@ $('#quiz-continue').addEventListener('click', () => { $('#quiz-dialog').close();
 
 function result() {
     clearInputs();
-    const record = DB.upsertPlayerScore(player, game.score, selectedMode);
+    const record = !game.resumed&&DB.upsertPlayerScore(player, game.score, selectedMode);
     const panel = $('#result-dialog .result'); panel.classList.toggle('victory', game.won);
     $('#result-title').textContent = game.won ? 'A floresta celebra: você encontrou o bando!' : 'Opa! Vamos de novo?';
     $('#result-eyebrow').textContent = game.won ? 'O BANDO ESTÁ REUNIDO' : 'CADA VOO É UM COMEÇO';
     $('#result-reason').textContent = game.reason;
     $('#result-advice').textContent = resultAdvice(game);
-    $('#result-mode').textContent = selectedMode==='tranquilo'?'Modo Amigável':`Desafio · ${challengeAt(game.elapsed).name}`;
+    $('#result-mode').textContent = selectedMode==='tranquilo'?(game.resumed?'Amigável · retomada de capítulo':'Modo Amigável'):`Desafio · ${challengeAt(game.elapsed).name}`;
     const progress=DB.missionProgress(player);
     const earned=completedMissions(progress).filter(m=>!flightMissionIds.includes(m.id));
     $('#mission-result').textContent=earned.length ? `Novos selos: ${earned.map(m=>m.title).join(' · ')}` : `${progressTitle(progress)} · ${completedMissions(progress).length}/${MISSIONS.length} selos conquistados`;
@@ -356,7 +379,10 @@ function result() {
     $('#new-record').hidden = !record || game.score === 0;
     $('#score-breakdown').textContent=`Passagens ${game.scoreBreakdown.passage} · Alimentos ${game.scoreBreakdown.fruit} · Respostas ${game.scoreBreakdown.quiz} · Trilhas ${game.scoreBreakdown.route}. Valores já incluem os bônus da pena e da pimenta.`;
     $('#result-fruits').textContent = game.fruits; $('#result-correct').textContent = game.correct;
-    $('#storage-note').textContent = DB.storageAvailable ? 'Seu recorde fica salvo neste navegador.' : 'Armazenamento indisponível: recorde mantido apenas nesta sessão.';
+    const checkpoint=selectedMode==='tranquilo'&&!game.won?DB.chapterCheckpoint(player):null;
+    $('#continue-chapter-result').hidden=!checkpoint;
+    if(checkpoint)$('#continue-chapter-result').textContent=`Retomar trecho ${checkpoint.stage+1} · ${STAGES[checkpoint.stage]}`;
+    $('#storage-note').textContent = game.resumed?'Pontos desta retomada. Os recordes de voos desde o início permanecem preservados.':DB.storageAvailable ? 'Seu recorde fica salvo neste navegador.' : 'Armazenamento indisponível: recorde mantido apenas nesta sessão.';
     // Reuse the same raster surface across flights; keep the authored result art.
     const birdProbe=activeProbe,birdAt=birdProbe?birdProbe.begin('ui.resultBird'):0;
     const birdCanvas = $('#result-bird canvas');
@@ -555,7 +581,7 @@ $('#collection-dialog').addEventListener('close',()=>{
 });
 
 renderer.ready.then(() => {
-    assetsReady=true;
+    assetsReady=true;updateChapterButtons();
     updateTrainingButton();
     $('#asset-status').hidden=true;
     $('#btnStart').disabled=$('#inputPlayer').value.trim().length<3;

@@ -8,7 +8,8 @@ import { createTutorial, advanceTutorial } from './tutorial.mjs';
 import { JOURNEY, journeyLength, ARRIVAL_SECONDS, journeyStage } from './journey.mjs';
 import { offerPower, POWER_BALANCE } from './powers.mjs';
 import { advanceHawk, advanceSnake } from './animals.mjs';
-import { planEncounter, seededRandom } from './encounters.mjs';
+import {normalizeCheckpoint} from './chapter-checkpoints.mjs';
+import { planEncounter, seededRandom, attackAt } from './encounters.mjs';
 import { FOODS } from './foods.mjs';
 import { physicsWind } from './weather.mjs';
 import { activeProbe } from './perf-hooks.mjs';
@@ -203,7 +204,7 @@ export class Game {
         this.encounterRandom = this.randomOverride ?? seededRandom(this.seed);
         this.powerRandom = this.randomOverride ?? seededRandom(this.seed ^ 0x85ebca6b);
         Object.assign(this, {
-            surfaceWeather:createSurfaceWeather(), tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
+            surfaceWeather:createSurfaceWeather(), resumed:false, chapterEntry:false, routeHintShown:false, tutorial:null, won:false, impactContact:null, endCause:null, stageAge:0, refuge:null, arrival:null, afterCountdown:'playing', medal:false,
             scoreBreakdown:{passage:0,fruit:0,quiz:0,route:0}, routes:new Map(), powerSchedule:{nextAny:8,nextShield:14,nextFeather:24,nextPepper:36},
             mode, state: 'menu', elapsed: 0, sceneTime: 0, distance: 0, score: 0, fruits: 0, correct: 0,
             shield: false, feather: 0, pepper: 0, invincible: 0, held: false, holdAge: 0,
@@ -223,6 +224,16 @@ export class Game {
         return (p.speed + gain) * (this.pepper > 0 ? 1.35 : 1) * (1 + wind * .06);
     }
     start(mode = 'aventura', reviewIds = [], seed = Math.floor(Math.random()*4294967296)) { this.seed=seed>>>0; this.reset(mode); this.reviewIds = [...reviewIds]; this.state = 'countdown'; }
+
+    resumeChapter(value,reviewIds=[]){
+        const checkpoint=normalizeCheckpoint(value);if(!checkpoint)return false;
+        this.start('tranquilo',reviewIds,checkpoint.seed);
+        for(const key of ['distance','elapsed','stage','sequence','snakeSequence','hawkSequence','foodSequence'])this[key]=checkpoint[key];
+        this.sceneTime=this.elapsed;this.resumed=true;this.chapterEntry=true;this.postHawkRecovery=true;
+        this.y=320;this.vy=0;this.nextSpawn=2.2;this.nextQuizAt=this.elapsed+QUIZ_INTERVAL;
+        this.powerSchedule={nextAny:this.elapsed+8,nextShield:this.elapsed+14,nextFeather:this.elapsed+24,nextPepper:this.elapsed+36};
+        advanceSurfaceWeather(this,0);this.snapshot();return true;
+    }
 
     startTutorial() {
         this.start('tranquilo');this.tutorial=createTutorial(320);this.y=320;this.snapshot();
@@ -329,7 +340,7 @@ export class Game {
         if(entity.kind==='boundary')for(const r of this.routes.values())r.failed=true;
         if(this.invincible>0)return;
         const boundary = entity.kind === 'boundary' ? entity.side : null;
-        this.hit = boundary ? null : {id:host.id, age:0};
+        this.hit = boundary ? null : {id:host.id, age:0,attackType:entity.kind==='snake'?host.snake?.attackType:undefined};
         if (!animal && !boundary && host.kind === 'wood') {
             this.hit.side = host.hitSide;
             if (host.fragileSide === host.hitSide && host.fragileSide) {
@@ -427,8 +438,9 @@ export class Game {
             route.collected++;
             if(route.collected===route.total) {
                 route.awarded=true;
-                this.addScore(POWER_BALANCE.routeBonus,multiplier,'route');
-                this.onEvent({type:'route-complete',points:POWER_BALANCE.routeBonus*multiplier});
+                const bonus=route.optional?POWER_BALANCE.optionalRouteBonus:POWER_BALANCE.routeBonus;
+                this.addScore(bonus,multiplier,'route');
+                this.onEvent({type:'route-complete',points:bonus*multiplier});
             }
         }
         this.onEvent({ type: 'fruit', fruit: FOODS[entity.variety ?? 0].id });
@@ -610,14 +622,14 @@ export class Game {
         const n = this.sequence++;
         const profile=FLIGHT[this.mode];
         const challenge=this.mode==='aventura'?challengeAt(this.elapsed):null;
-        const soloHawk = this.elapsed > profile.hawkAt && n % (challenge?.hawkEvery??3) === 1;
+        const soloHawk = !this.chapterEntry && this.elapsed > profile.hawkAt && n % (challenge?.hawkEvery??3) === 1;
         // Reserve the first encounters: finish the preceding wood before a
         // solo hawk, and let that hawk leave before presenting another trunk.
         const waitingForSolo = this.entities.some(e => e.kind === 'hawk' && e.solo && !e.harmless && e.x > this.x - 100);
         if (waitingForSolo || (soloHawk && this.entities.some(e => e.kind === 'wood' && e.x + 85 > this.x - 40))) {
             this.sequence--; this.nextSpawn = .4; return;
         }
-        if (n > 0 && n % (challenge?.quietEvery??6) === (challenge?.quietEvery??6)-1) {
+        if (!this.chapterEntry && n > 0 && n % (challenge?.quietEvery??6) === (challenge?.quietEvery??6)-1) {
             this.nextSpawn = 2.8;
             this.onEvent({ type: 'quiet' });
             return;
@@ -626,14 +638,14 @@ export class Game {
         const margin = this.viewWidth ? 180 : 80;
         const x = spawnWidth + margin;
         const travel = (x - this.x) / this.speed;
-        const plan=planEncounter({sequence:n,elapsed:this.elapsed,lastCenter:this.lastGap,lastPattern:this.lastPattern,profile,speed:this.speed,stage:this.stage,random:this.encounterRandom});
+        const plan=planEncounter({sequence:n,elapsed:this.elapsed,lastCenter:this.lastGap,lastPattern:this.lastPattern,profile,speed:this.speed,stage:this.stage,random:this.encounterRandom,recentPatterns:this.encounterHistory.map(e=>e.pattern)});
         const recovery=!soloHawk&&this.postHawkRecovery;
         if(recovery){
             // A marked predator can send the player to either edge of the sky.
             // Offer one central, wide passage before resuming narrow hazards.
             plan.center=this.mode==='tranquilo'?280:320;plan.gap=Math.max(plan.gap,340);
             plan.fruits=[{x:15,y:plan.center}];plan.optional=false;plan.variant='plain';
-            this.postHawkRecovery=false;
+            this.postHawkRecovery=false;this.chapterEntry=false;
         }
         let {gap,center}=plan;
         if(this.stage===2)plan.interval+=.15;
@@ -649,7 +661,7 @@ export class Game {
             const lane=Math.max(160,Math.min(480,this.y+(this.encounterRandom()-.5)*70));
             // Each encounter alternates a complete curved attack. The target
             // is marked once during warning; it never homes during the charge.
-            const attackKind=HAWK_ATTACK_ORDER[this.hawkSequence++%HAWK_ATTACK_ORDER.length];
+            const attackKind=attackAt(HAWK_ATTACK_ORDER,this.hawkSequence++,this.seed,0x51f15e);
             const dive=attackKind==='mergulho',ascent=attackKind==='rasante';
             const y=ascent?535:105;
             this.entities.push({ id:this.nextId++,kind:'hawk',solo:true,x,y,startX:x,
@@ -660,7 +672,7 @@ export class Game {
             const variants = ['plain', 'branch', 'plain'];
             const variant = plan.variant ?? (this.stage===1 && n%2===0?'branch':this.elapsed > 17 ? variants[n % variants.length] : 'plain');
             hasSnake=!recovery&&this.elapsed>profile.snakeAt&&(n%2===0||variant==='branch');
-            const attackType=hasSnake?SNAKE_ATTACK_ORDER[this.snakeSequence%SNAKE_ATTACK_ORDER.length]:null;
+            const attackType=hasSnake?attackAt(SNAKE_ATTACK_ORDER,this.snakeSequence,this.seed,0xa271):null;
             const gentle=this.mode==='tranquilo';
             encounterGap=gap+(hasSnake?Math.max(profile.snakeClearance??180,snakeAttack({attackType}).clearance):0);
             // Widen below the planned safe flight line. Changing the gap must
@@ -720,7 +732,10 @@ export class Game {
             this.entities.push({ id: this.nextId++, kind:'fruit', x:fx, y:fy,
                 variety:this.foodSequence++%FOODS.length, route:n, optional:!hawkAlone&&plan.optional });
         }
-        if(placedFruits.length>1)this.routes.set(n,{total:placedFruits.length,collected:0,awarded:false,failed:false});
+        if(placedFruits.length>1){
+            this.routes.set(n,{total:placedFruits.length,collected:0,awarded:false,failed:false,optional:!hawkAlone&&plan.optional});
+            if(plan.optional&&!this.routeHintShown){this.routeHintShown=true;this.onEvent({type:'route-offer',points:POWER_BALANCE.optionalRouteBonus});}
+        }
         const firstFruit = placedFruits[0];
         const kind=hawkAlone||!firstFruit?null:offerPower({elapsed:this.elapsed,shield:this.shield,feather:this.feather,pepper:this.pepper,entities:this.entities,schedule:this.powerSchedule,opportunity:placedFruits.length>1,random:this.powerRandom});
         if(kind)this.entities.push({id:this.nextId++,kind,x:firstFruit.x-125,y:firstFruit.y});

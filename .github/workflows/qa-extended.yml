@@ -30,6 +30,9 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null' EXIT
           LEARNING_BROWSER=firefox node tests/browser-learning-flow.cjs
           LEARNING_BROWSER=webkit node tests/browser-learning-flow.cjs
+          node tests/browser-gameplay-106.cjs
+          GAMEPLAY_BROWSER=firefox node tests/browser-gameplay-106.cjs
+          GAMEPLAY_BROWSER=webkit node tests/browser-gameplay-106.cjs
           node tests/browser-visual-polish.cjs
           POLISH_BROWSER=firefox node tests/browser-visual-polish.cjs
           POLISH_BROWSER=webkit node tests/browser-visual-polish.cjs
@@ -54,6 +57,7 @@ jobs:
             test-results/animal-weather/
             test-results/attacks-weather/
             test-results/visual-polish/
+            test-results/gameplay-106/
             test-results/mobile-home/
             test-results/editorial-ui/
           if-no-files-found: ignore

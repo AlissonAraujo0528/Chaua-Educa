@@ -66,5 +66,5 @@ test('canopy and floor respond to the current body, before its center crosses th
 });
 test('collision rules archive v12 preparation records without changing missions or their values',()=>{
  const memory=DB.memory,available=DB.storageAvailable;DB.memory=new Map([['db-chaua-floresta-v12',[{playerName:'Ana',mode:'aventura',score_val:400}]]]);DB.storageAvailable=false;
- try{assert.equal(DB.dbName,'db-chaua-floresta-v13');assert.ok(DB.previousScores().some(r=>r.ruleset==='floresta-v12'&&r.score_val===400));assert.deepEqual(DB.get(),[]);}finally{DB.memory=memory;DB.storageAvailable=available;}
+ try{assert.equal(DB.dbName,'db-chaua-floresta-v14');assert.ok(DB.previousScores().some(r=>r.ruleset==='floresta-v12'&&r.score_val===400));assert.deepEqual(DB.get(),[]);}finally{DB.memory=memory;DB.storageAvailable=available;}
 });
