@@ -2,7 +2,7 @@ import {TREE_WIDTH} from './forest-geometry.mjs';
 import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
 import {drawPackedSection} from './weather-art.mjs';
-import {winterOverlayStages} from './winter-vfx.mjs';
+import {clipSnowReveal} from './winter-vfx.mjs';
 
 
 // Repeat complete bark bands at the same scale as the authored cap.
@@ -93,7 +93,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if(rain>0){c.save();c.globalAlpha=rain*.42;
   drawPackedSection(c,'wet',`${kind}-${((variant%4)+4)%4}`,cx,upper?splice:cy,cw,(upper?f.endY:splice)-(upper?splice:cy),px,upper?join:py,cw*s,((upper?f.endY:splice)-(upper?splice:cy))*s);c.restore();}
 
- // Crossfade between the EXISTING four transparent snowfall WebP layers.
+ // Reveal solid authored snow progressively over the exposed surface.
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
  if(snow>0&&!fullSnow){
@@ -154,7 +154,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    const snowImage = images.get('tree-variants-snow');
    if (snowImage) {
     c.save();
-    c.globalAlpha = Math.min(1, snow);
+    c.globalAlpha = 1;
     // Keep the original snowy cut face, but do not tile the snowy bark
     // strip all the way to the ceiling: repeating it made vertical stripes.
     // Upper trunks are turned upside down. Mirroring this white cut-face
@@ -162,6 +162,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
     // falling crystals are handled separately by drawSnowContact().
     if (!upper) {
      // Include the first 8px of cap snow while keeping the original wood anchor.
+     clipSnowReveal(c,left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale,snow);
      c.drawImage(snowImage,sx,sy,TREE_CELL,splice,
       left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
     }
@@ -310,25 +311,30 @@ export function prepareTreeWeather(context){
  }
 }
 function snowOverlay(kind,amount){
- amount=Math.round(amount*256)/256;
- const level=Math.min(4,Math.max(0,amount*4)),base=Math.floor(level),fraction=level-base;
- const a=base?images.get(`trees-${kind}-overlay-0${base}`):null;
- const b=images.get(`trees-${kind}-overlay-0${Math.min(4,base+1)}`);
- if(!b)return a;
+ amount=Math.round(Math.min(1,Math.max(0,amount))*256)/256;
+ const image=images.get(`trees-${kind}-overlay-04`);
+ if(!image)return null;
  let buffer=snowMixBuffers.get(kind);
  if(!buffer){
   const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(1024,1024):typeof document!=='undefined'?document.createElement('canvas'):null;
-  if(!canvas)return b;
-  canvas.width=1024;canvas.height=1024;buffer={canvas,c:canvas.getContext('2d'),amount:-1};snowMixBuffers.set(kind,buffer);
+  // Without a canvas, skip partial cover rather than show full winter at entry.
+  if(!canvas)return amount>=1?image:null;
+  canvas.width=1024;canvas.height=1024;buffer={canvas,c:canvas.getContext('2d'),amount:-1,image};snowMixBuffers.set(kind,buffer);
  }
- // The environmental cover advances once per simulation tick; all trunks reuse it.
- if(buffer.amount!==amount){
-  const c=buffer.c;c.clearRect(0,0,1024,1024);c.globalCompositeOperation='lighter';
-  for(const {stage,alpha} of winterOverlayStages(amount)){
-   const image=images.get(`trees-${kind}-overlay-0${stage}`);
-   if(image){c.globalAlpha=alpha;c.drawImage(image,0,0);}
+ // One shared surface per orientation, rebuilt only when coverage changes.
+ // The final overlay retains authored opacity, shading and antialiased edges.
+ if(buffer.amount!==amount||buffer.image!==image){
+  const c=buffer.c;c.clearRect(0,0,1024,1024);
+  c.save();c.globalAlpha=1;c.globalCompositeOperation='source-over';
+  for(const f of FOREST_ART[kind]){
+   const [sx,sy]=f.rect;
+   const top=kind==='upper'?f.spliceY:0;
+   const bottom=kind==='upper'?Math.min(512,f.endY+30):f.spliceY;
+   c.save();clipSnowReveal(c,sx,sy+top,512,bottom-top,amount);
+   c.drawImage(image,sx,sy+top,512,bottom-top,sx,sy+top,512,bottom-top);
+   c.restore();
   }
-  c.globalAlpha=1;c.globalCompositeOperation='source-over';buffer.amount=amount;
+  c.restore();buffer.amount=amount;buffer.image=image;
  }
  return buffer.canvas;
 }
