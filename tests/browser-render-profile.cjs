@@ -78,7 +78,7 @@ const {chromium}=require('playwright');
      const draw=resolution=>{r.setVisualProfile({resolution,decoration});commands=[];r.game(g,false,50);return JSON.stringify(commands);};
      const high=draw('high'),highSize=r.canvas.width*r.canvas.height;
      const low=draw('low'),lowSize=r.canvas.width*r.canvas.height;
-     check(high===low,`resolution changed decoration or geometry: ${decoration}; first difference ${JSON.parse(high).findIndex((cmd,i)=>JSON.stringify(cmd)!==JSON.stringify(JSON.parse(low)[i]))}`);
+     check(high===low,`resolution changed decoration or geometry: ${decoration}`);
      check(lowSize<highSize,'resolution did not reduce backing pixels');
      checks.push({decoration,highPixels:highSize,lowPixels:lowSize});
     }
