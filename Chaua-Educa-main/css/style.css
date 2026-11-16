@@ -4530,7 +4530,7 @@ html:has(dialog[open]), html:has(dialog[open]) body {
   }
 }
 /* Pointer targets on desktop stay comfortable without inflating the small window. */
-.home-links button {
+.home-links button, .home-footer button {
   min-height: 28px;
 }
 
