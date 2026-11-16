@@ -45,13 +45,32 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
  c.restore();
 }
 
-// Tiny crystals settle on an exposed branch/cap and then fade. Existing winter
-// WebP layers supply the substantial snow; these are just contact feedback.
+// Grow coverage instead of fading the whole snow sheet through translucent white.
+// Stable column delays give an uneven edge; every column grows downward and
+// reaches the exact authored extent at full cover. No RNG or pixel readback.
+export function snowRevealHeight(intensity,column=0){
+ const amount=clamp01(intensity);
+ const progress=1-Math.pow(1-amount,1.6);
+ const delay=((Math.imul(column+1,73)>>>0)%101)/101*.18;
+ return clamp01((progress-delay)/(1-delay));
+}
+export function clipSnowReveal(c,x,y,width,height,intensity){
+ c.beginPath();
+ const columns=32;
+ for(let i=0;i<columns;i++){
+  const reach=snowRevealHeight(intensity,i);
+  if(reach>0)c.rect(x+i*width/columns,y,width/columns,height*reach);
+ }
+ c.clip();
+}
+
+// Visible contact crystals supplement the authored snow without covering the
+// flight corridor. Low detail keeps the same contrast with fewer particles.
 export function drawSnowContact(c,x,y,intensity,time,seed=0,reduced=false,low=false,falling=false){
  const snow=clamp01(intensity);
  if(snow<=.15||reduced)return;
  const count=low?2:4;
- c.save();c.globalAlpha=Math.min(.48,(snow-.15)*.4);
+ c.save();c.globalAlpha=Math.min(.92,.55+(snow-.15)*.44);
  c.fillStyle='#eaf8fb';c.beginPath();
  for(let i=0;i<count;i++){
   const phase=wrap(time*.23+seed*.17+i*.31,1);
@@ -59,7 +78,7 @@ export function drawSnowContact(c,x,y,intensity,time,seed=0,reduced=false,low=fa
   // Downward release from an upper hanging tree must follow gravity.
   // Lower tree caps can collect flakes that flutter just above the surface.
   const sy=falling?y+phase*15:y-2-Math.sin(phase*Math.PI)*3;
-  const r=(.65+(i%2)*.3)*Math.min(1,snow*1.2);
+  const r=(1.25+(i%2)*.45)*(.7+snow*.3);
   c.moveTo(sx+r,sy);
   c.arc(sx,sy,r,0,Math.PI*2);
  }
