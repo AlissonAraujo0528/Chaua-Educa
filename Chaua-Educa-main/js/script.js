@@ -125,8 +125,8 @@ function resize() {
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
-    const preview=$('.home-preview'),slot=preview.getBoundingClientRect();
-    renderer.homePreview=slot.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170)}:null;
+    const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
+    renderer.homePreview=slot?.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170)}:null;
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(!openingFlight && lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');

@@ -167,7 +167,7 @@ A matriz de regressão verifica os dez painéis em Chromium, Firefox e WebKit, e
 
 Auditoria, matriz de falhas, validação e procedimento para publicar no fork: [confiabilidade-1.0.9.md](confiabilidade-1.0.9.md). Continuam pendentes os ensaios com pessoas e aparelhos físicos da beta.
 
-### Refino das três telas na 1.0.9 · interface 1.0.9-ui5
+### Refino das três telas na 1.0.9 · interface 1.0.9-ui6
 
 - Inicial de telefone em retrato com espaço próprio para o Chauá ao lado do título, usando a mesma arte e o mesmo desenho único do Canvas. Telas muito pequenas e o teclado mantêm o arranjo compacto anterior. Menu com agrupamento e foco mais claros.
 - Pausa com prioridade para Continuar, seguida de Controles e som e Início. O aviso nativo do Chrome sobre sair da tela cheia pertence ao navegador. A entrada em tela cheia aguarda o tamanho se estabilizar antes da contagem, para evitar que a rotação de abertura seja tratada como rotação durante o voo. Mudanças de orientação em voo continuam pausando.
