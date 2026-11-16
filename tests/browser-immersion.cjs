@@ -19,7 +19,7 @@ const root=process.env.GAME_URL||'http://127.0.0.1:5501/',out=process.env.SCREEN
  }
  const p=await browser.newPage({viewport:{width:844,height:390},isMobile:true,hasTouch:true});await p.goto(root,{waitUntil:'networkidle'});await p.mouse.move(810,320);await p.mouse.wheel(0,900);await p.waitForTimeout(300);
  const rect=await p.locator('#btnStart').boundingBox();assert.ok(rect.y>=0&&rect.y+rect.height<=390,'start remains unreachable in landscape');await p.screenshot({path:path.join(out,'paisagem-rolagem.png')});await p.close();
- const art=await browser.newPage({viewport:{width:1440,height:960}});await art.route('**/js/script.js',r=>r.fulfill({contentType:'text/javascript',body:''}));await art.goto(root,{waitUntil:'networkidle'});
+ const art=await browser.newPage({viewport:{width:1440,height:960}});await art.route(/\/js\/script\.js(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:''}));await art.goto(root,{waitUntil:'networkidle'});
  await art.evaluate(async()=>{
   const {Renderer}=await import('/js/render.mjs'),{Game}=await import('/js/engine.mjs');const canvas=document.createElement('canvas');canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh';document.body.replaceChildren(canvas);const r=new Renderer(canvas);await r.ready;window.scene={r,Game};
  });

@@ -7,7 +7,7 @@ const fs=require('node:fs/promises');
  try{
   const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
-  await page.route('**/js/script.js',route=>route.fulfill({body:'',contentType:'text/javascript'}));
+  await page.route(/\/js\/script\.js(?:\?.*)?$/,route=>route.fulfill({body:'',contentType:'text/javascript'}));
   await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
   const measured=await page.evaluate(async()=>{
    const [{Renderer},{AnimalWeather,animalContactPoints},{ANIMAL_CONTACTS},{Game}]=await Promise.all([

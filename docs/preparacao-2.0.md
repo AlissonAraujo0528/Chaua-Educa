@@ -166,3 +166,12 @@ A matriz de regressão verifica os dez painéis em Chromium, Firefox e WebKit, e
 - Regras v14, identificadores das perguntas e coleções, dados clássicos e arquivos de arte preservados. Não há migração destrutiva ou reset obrigatório.
 
 Auditoria, matriz de falhas, validação e procedimento para publicar no fork: [confiabilidade-1.0.9.md](confiabilidade-1.0.9.md). Continuam pendentes os ensaios com pessoas e aparelhos físicos da beta.
+
+### Refino das três telas na 1.0.9 · interface 1.0.9-ui1
+
+- Inicial de telefone em retrato com espaço próprio para o Chauá ao lado do título, usando a mesma arte e o mesmo desenho único do Canvas. Telas muito pequenas e o teclado mantêm o arranjo compacto anterior. Menu com agrupamento e foco mais claros.
+- Pausa com prioridade para Continuar, seguida de Controles e som e Início. O aviso nativo do Chrome sobre sair da tela cheia pertence ao navegador. A entrada em tela cheia aguarda o tamanho se estabilizar antes da contagem, para evitar que a rotação de abertura seja tratada como rotação durante o voo. Mudanças de orientação em voo continuam pausando.
+- Resultado mantém título e três estatísticas fora da região rolável; o resumo educativo e as explicações permanecem completos na leitura interna. Em telas horizontais baixas, reinício e ações secundárias compartilham uma linha; uma retomada disponível continua acessível.
+- HTML identifica a revisão da interface. CSS e o grafo de módulos usam a mesma revisão no endereço, com import map anterior à entrada. Isso evita misturar arquivos novos com respostas antigas de cache ao abrir um HTML novo. A entrada da raiz e as artes permanecem nos endereços anteriores. A auditoria verifica a coerência; `node scripts/set-game-version.mjs VERSAO [REVISAO]` regenera os endereços e o mapa. HTML antigo ainda requer atualização da página/CDN; não há limpeza ou migração de progresso.
+
+Regressão dedicada nos três motores: retrato semelhante às capturas (384×706 e 393×727), 320×568, 844×390, 568×320 e PC 1280×575; abertura com rotação atrasada, rotação em voo, revisão coerente dos módulos e estatísticas visíveis após rolar o resumo. Capturas em `three-screen-refinement`.

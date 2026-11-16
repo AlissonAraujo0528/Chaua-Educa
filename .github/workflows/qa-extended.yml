@@ -129,3 +129,31 @@ jobs:
             test-results/release-audit.json
           if-no-files-found: ignore
           retention-days: 7
+
+  three-screen-refinement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify home, pause, result and launch rotation
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-refinement.log 2>&1 &
+          refinement_pid=$!
+          trap 'kill "$refinement_pid" 2>/dev/null' EXIT
+          node tests/browser-three-screen-refinement.cjs
+          REFINEMENT_BROWSER=firefox node tests/browser-three-screen-refinement.cjs
+          REFINEMENT_BROWSER=webkit node tests/browser-three-screen-refinement.cjs
+      - name: Save three-screen screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: three-screen-refinement
+          path: test-results/three-screen-refinement/
+          if-no-files-found: ignore
+          retention-days: 7

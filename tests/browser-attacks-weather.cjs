@@ -9,7 +9,7 @@ const browserName=process.env.WEATHER_BROWSER||'chromium';
   for(const [width,height] of [[1366,768],[844,390],[390,844]]){
    const page=await browser.newPage({viewport:{width,height}}),errors=[];
    page.on('pageerror',e=>errors.push(e.message));
-   await page.route('**/js/script.js',r=>r.fulfill({body:'',contentType:'text/javascript'}));
+   await page.route(/\/js\/script\.js(?:\?.*)?$/,r=>r.fulfill({body:'',contentType:'text/javascript'}));
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});
    const visibility=await page.evaluate(async()=>{
     const [{Renderer},{Game},weather,{drawSnowfall}]=await Promise.all([import('/js/render.mjs'),import('/js/engine.mjs'),import('/js/weather.mjs'),import('/js/winter-vfx.mjs')]);

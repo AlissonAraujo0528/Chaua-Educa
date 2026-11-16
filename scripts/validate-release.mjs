@@ -28,7 +28,7 @@ const htmlPath=resolve(app,'index.html'),cssPath=resolve(app,'css/style.css'),ht
 const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 const dynamicIds=new Set([...modules].flatMap(p=>[...read(p).matchAll(/\.id\s*=\s*['"]([^'"]+)['"]/g)].map(m=>m[1])));
 for(const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)){
- const url=m[1];if(url.startsWith('https:'))external(url);else if(url.startsWith('#')){if(!ids.has(url.slice(1)))fail(`Missing fragment: ${url}`);}else if(!url.includes(':')){const p=resolve(app,url);if(url.endsWith('/'))requireFile(resolve(p,'index.html'),url);else requireFile(p,url);}
+ const url=m[1];if(url.startsWith('https:'))external(url);else if(url.startsWith('#')){if(!ids.has(url.slice(1)))fail(`Missing fragment: ${url}`);}else if(!url.includes(':')){const local=url.split(/[?#]/)[0],p=resolve(app,local);if(local.endsWith('/'))requireFile(resolve(p,'index.html'),url);else requireFile(p,url);}
 }
 for(const m of html.matchAll(/\b(?:for|aria-labelledby|aria-controls)="([^"]+)"/g))for(const id of m[1].split(/\s+/))if(!ids.has(id)&&!dynamicIds.has(id))fail(`Missing control/label: ${id}`);
 for(const m of read(cssPath).matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g))if(!m[1].startsWith('data:'))requireFile(resolve(dirname(cssPath),m[1]),'CSS URL');
@@ -42,6 +42,14 @@ for(const s of [...Object.values(SOURCES),...Object.values(CONSERVATION_SOURCES)
 for(const font of ['Baloo2','Nunito']){const p=resolve(app,`Fonts/${font}/OFL.txt`);requireFile(p,'font license');if(existsSync(p)&&!read(p).includes('SIL OPEN FONT LICENSE'))fail(`Invalid license: ${font}`);}
 for(const credit of ['Duncan Rawlinson','CC BY 2.0','Lívia Teodosio','Marilia Teodosio','Flávia Gomes','IFAL'])if(!html.includes(credit))fail(`Missing credit: ${credit}`);
 const entry=resolve(root,'index.html');requireFile(entry,'Pages root');if(existsSync(entry)&&!read(entry).includes('url=./Chaua-Educa-main/'))fail('Root entry does not point to the game');
+const build=html.match(/<meta name="chaua-build" content="([^"]+)"/)[1];
+try {
+ const map=JSON.parse(html.match(/<script type="importmap" id="chaua-modules">([\s\S]*?)<\/script>/)[1]).imports;
+ for(const p of modules){const key='./js/'+relative(js,p);if(map[key]!==key+'?v='+build)fail('Missing/incoherent module revision: '+key);}
+ for(const [key,value] of Object.entries(map)){if(!key.startsWith('./js/')||value!==key+'?v='+build)fail('Invalid revisioned module: '+key);requireFile(resolve(app,key),'import map');}
+ if(!html.includes('css/style.css?v='+build)||!html.includes('js/script.js?v='+build))fail('Entry/stylesheet revisions differ');
+ if(build!==GAME_VERSION&&!build.startsWith(GAME_VERSION+'-'))fail('Interface revision differs from package');
+} catch(error){fail('Invalid/missing module import map: '+error.message);}
 const pkg=JSON.parse(read(resolve(root,'package.json'))),lock=JSON.parse(read(resolve(root,'package-lock.json')));
 if(pkg.version!==GAME_VERSION||lock.version!==GAME_VERSION||lock.packages[''].version!==GAME_VERSION)fail('Package/runtime versions differ');
 const walk=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(resolve(dir,e.name)):[resolve(dir,e.name)]);

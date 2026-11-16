@@ -29,7 +29,7 @@ const median=xs=>[...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
    }
    for(const [label,url] of [['before',baseline],['after',current]]){
     const page=await browser.newPage({viewport,deviceScaleFactor:1}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-    await page.route('**/js/script.js',r=>r.fulfill({contentType:'text/javascript',body:''}));
+    await page.route(/\/js\/script\.js(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:''}));
     await page.goto(url,{waitUntil:'networkidle'});await page.evaluate(()=>document.fonts.ready);
     const result=await page.evaluate(async()=>{
      const {Renderer}=await import(new URL('./js/render.mjs',location.href).href),{Game}=await import(new URL('./js/engine.mjs',location.href).href);

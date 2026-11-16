@@ -4274,3 +4274,258 @@ html:has(dialog[open]), html:has(dialog[open]) body {
 #asset-status {
   overflow-wrap: anywhere;
 }
+
+/* Same approved character, given its own space beside the portrait greeting. */
+.home-preview {
+  display: none;
+}
+
+@media (orientation: portrait) and (min-width: 350px) and (max-width: 600px) and (min-height: 650px) {
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 108px;
+    gap: 4px 10px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-copy > .eyebrow,
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-copy > .intro {
+    display: none;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home h1 {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 28px;
+    align-self: center;
+    margin: 0;
+    line-height: 1.06;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-preview {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    width: 108px;
+    height: 106px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .start-card {
+    grid-column: 1/-1;
+    margin-top: 4px;
+    padding: 10px 12px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-links {
+    grid-column: 1/-1;
+    margin-top: 4px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .mode-picker {
+    margin: 8px 0;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) #start-training {
+    margin-top: 0;
+  }
+}
+.app.mobile-device:not(.in-flight) .home-links {
+  padding: 4px;
+  border: 1px solid #d5dfc0;
+  box-shadow: 0 2px 8px rgba(36, 72, 52, 0.031372549);
+  gap: 4px;
+}
+
+.app.mobile-device:not(.in-flight) .home-links button {
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.app.mobile-device:not(.in-flight) .home-links button:focus-visible {
+  outline-offset: -3px;
+}
+
+#pause-dialog {
+  max-width: min(560px, 100vw - var(--safe-left) - var(--safe-right) - 24px);
+}
+
+#pause-dialog .compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 22px;
+  gap: 10px 12px;
+}
+
+#pause-dialog .round-icon {
+  width: 38px;
+  height: 38px;
+  margin: 0 auto;
+  grid-column: 1/-1;
+}
+
+#pause-dialog .round-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+#pause-dialog .eyebrow {
+  display: none;
+}
+
+#pause-dialog h2 {
+  grid-column: 1/-1;
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+#pause-message {
+  grid-column: 1/-1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+#pause-dialog #resume-button {
+  grid-column: 1/-1;
+  grid-row: auto;
+  min-height: 48px;
+  padding: 10px 14px;
+  margin: 2px 0 0;
+  font-size: 18px;
+}
+
+#pause-dialog .text-button {
+  grid-row: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #d9e2c8;
+  border-radius: 12px;
+  background: #eef2e3;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-height: 500px) {
+  #pause-dialog .compact {
+    padding: 16px;
+    gap: 8px 12px;
+  }
+  #pause-dialog .round-icon {
+    display: none;
+  }
+  #pause-dialog h2 {
+    font-size: 25px;
+  }
+  #pause-message {
+    font-size: 13px;
+  }
+}
+#result-dialog .result-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dce1c9;
+}
+
+#result-dialog .result-overview .panel-heading {
+  padding: 12px;
+}
+
+#result-dialog .result-overview h2 {
+  font-size: 26px;
+}
+
+#result-dialog .result-overview .result-bird {
+  display: none;
+}
+
+#result-dialog .result-overview .eyebrow {
+  display: none;
+}
+
+#result-dialog .result-overview .result-stats {
+  margin: 0;
+  gap: 6px;
+}
+
+#result-dialog .result-overview .result-stats > div {
+  padding: 8px 4px;
+  min-width: 0;
+}
+
+#result-dialog .result-overview .result-stats strong {
+  font-size: 28px;
+}
+
+#result-dialog .result-overview .result-stats span {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+}
+
+#result-dialog .result-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#result-dialog .result-actions button {
+  text-decoration: none;
+  border: 1px solid #d7e1c6;
+  font-weight: 800;
+  line-height: 1.25;
+  border-radius: 10px;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  #result-dialog .result-overview {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  #result-dialog .result-overview .panel-heading {
+    padding: 10px;
+  }
+  #result-dialog .result-overview h2 {
+    font-size: 24px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  #result-dialog .result-overview {
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+  #result-dialog .result-overview .panel-heading {
+    padding: 8px;
+  }
+  #result-dialog .result-overview h2 {
+    font-size: 22px;
+  }
+  #result-dialog .result-overview .result-stats strong {
+    font-size: 24px;
+  }
+  #result-dialog .result-overview .result-stats span {
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+  #result-dialog .panel-actions {
+    display: grid;
+    grid-template-columns: minmax(155px, 1fr) minmax(0, 1.4fr);
+    gap: 6px;
+    padding-top: 8px;
+  }
+  #result-dialog .panel-actions > .primary {
+    width: 100%;
+    min-height: 48px;
+    padding: 8px;
+    font-size: 16px;
+  }
+  #result-dialog .result-actions {
+    width: auto;
+    gap: 4px;
+  }
+  #result-dialog .result-actions button {
+    font-size: 11px;
+  }
+  #result-dialog #storage-note {
+    grid-column: 1/-1;
+  }
+  #result-dialog .panel-actions:has(#continue-chapter-result:not([hidden])) .result-actions {
+    grid-column: 1/-1;
+  }
+}

@@ -32,7 +32,8 @@ window.addEventListener('storage',event=>{
     if(game.state==='menu')updateChapterButtons();
 });
 const versionLabel=$('#build-version');
-if(versionLabel)versionLabel.textContent=`Versão ${GAME_VERSION} · preparação para a 2.0`;
+const interfaceBuild=$('meta[name=chaua-build]')?.content||GAME_VERSION;
+if(versionLabel)versionLabel.textContent=`Versão ${GAME_VERSION} · interface ${interfaceBuild} · preparação para a 2.0`;
 // Mobile browsers can expose a desktop-sized layout viewport even with a
 // portrait phone display. Use the device signals in addition to CSS widths.
 const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
@@ -124,8 +125,10 @@ function resize() {
     const style=getComputedStyle(app);
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
+    const preview=$('.home-preview'),slot=preview.getBoundingClientRect();
+    renderer.homePreview=slot.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170)}:null;
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
-    if(lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
+    if(!openingFlight && lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');
     }
     lastOrientation=orientation;
@@ -143,6 +146,7 @@ const layoutObserver=new ResizeObserver(()=>{
 });
 layoutObserver.observe(app);
 layoutObserver.observe($('#forest'));
+layoutObserver.observe($('.home-preview'));
 window.addEventListener('resize', resize);
 // Dynamic browser bars and the software keyboard can resize the visible area
 // without changing the layout viewport (notably on iOS). Never resize on pinch zoom.
@@ -177,6 +181,19 @@ function openDialog(id) {
     if(probe)probe.end('ui.dialogOpen',at,{dialog:id});
 }
 
+function settleOpeningViewport() {
+    return new Promise(resolve=>{
+        const started=performance.now();let changedAt=started,lastSize='',frame;
+        const finish=()=>{clearTimeout(limit);cancelAnimationFrame(frame);resolve();};
+        const check=()=>{
+            const now=performance.now(),size=`${innerWidth}x${innerHeight}:${window.visualViewport?.height||innerHeight}`;
+            if(size!==lastSize){lastSize=size;changedAt=now;}
+            if(document.hidden||(now-started>=400&&now-changedAt>=160)){finish();return;}
+            frame=requestAnimationFrame(check);
+        };
+        const limit=setTimeout(finish,1500);frame=requestAnimationFrame(check);
+    });
+}
 // Start only after the optional browser orientation request. This prevents
 // the normal resize-on-rotation safeguard from pausing the countdown itself.
 async function launchFlight(training = false, checkpoint = null) {
@@ -186,7 +203,7 @@ async function launchFlight(training = false, checkpoint = null) {
     if(mobileDevice)document.activeElement?.blur();
     const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
     try {
-        if(mobile) await requestFlightLandscape(app, document, screen);
+        if(mobile){await requestFlightLandscape(app, document, screen);await settleOpeningViewport();resize();}
     } finally {
         openingFlight = false;
     }
@@ -438,7 +455,7 @@ function result() {
     clearInputs();
     const record = !game.resumed&&DB.upsertPlayerScore(player, game.score, selectedMode);
     const panel = $('#result-dialog .result'); panel.classList.toggle('victory', game.won);
-    $('#result-title').textContent = game.won ? 'A floresta celebra: você encontrou o bando!' : 'Opa! Vamos de novo?';
+    $('#result-title').textContent = game.won ? 'A floresta celebra!' : 'Opa! Vamos de novo?';
     $('#result-eyebrow').textContent = game.won ? 'O BANDO ESTÁ REUNIDO' : 'CADA VOO É UM COMEÇO';
     $('#result-reason').textContent = game.reason;
     $('#result-advice').textContent = resultAdvice(game);
