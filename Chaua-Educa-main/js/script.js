@@ -41,6 +41,7 @@ app.classList.toggle('mobile-device', mobileDevice);
 document.documentElement.classList.toggle('mobile-device', mobileDevice);
 if(mobileDevice) $('.home-links').append($('#open-credits'));
 const renderer = new Renderer($('#forest'));
+renderer.homeMobileLayout=mobileDevice;
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 function applyVisualQuality() {
     if(quality.mode==='auto')renderer.setAutomaticQuality(quality.level);

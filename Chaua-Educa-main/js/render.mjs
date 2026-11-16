@@ -1068,7 +1068,7 @@ export class Renderer {
             const wash = c.createLinearGradient(0, this.h * .50, 0, this.h * .78); wash.addColorStop(0, '#f0f1da'); wash.addColorStop(1, '#f0f1da00');
             c.fillStyle = '#f0f1da'; c.fillRect(0, 0, this.w, this.h * .5); c.fillStyle = wash; c.fillRect(0, this.h * .5, this.w, this.h * .28);
         }
-        if(!this.homeHideCharacter){
+        if(!this.homeHideCharacter && (!this.homeMobileLayout || this.homePreview)){
         const {x,y,scale}=this.homePreview||homePerchLayout(this.w,this.h);
         c.save();
         if(this.homePreview?.clip){const r=this.homePreview.clip;c.beginPath();c.rect(r.x,r.y,r.width,r.height);c.clip();}

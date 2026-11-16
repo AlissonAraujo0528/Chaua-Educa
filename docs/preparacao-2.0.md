@@ -181,9 +181,9 @@ Regressão dedicada nos três motores: retrato semelhante às capturas (384×706
 
 - Controles explícitos de entrar/sair da tela cheia no início, voo, pausa e resultado. O rótulo acompanha o estado do navegador. Mudanças durante o voo pausam com segurança, sem retomar automaticamente. Negação ou ausência da API mantém o jogo utilizável.
 - Removidos os dois assobios sintetizados periódicos: não eram gravação nem reprodução validada de vocalização do chauá. Permanecem vento, clima e sinais abstratos das ações.
-- Inicial de telefone em retrato reorganizada: título central, personagem em área delimitada, cartão de início e navegação compacta. A árvore do personagem fica restrita à área de ilustração; o personagem é ocultado durante o teclado virtual. Mesmas artes, sem duplicação de sprite.
+- Inicial de telefone em retrato reorganizada: título central, personagem em área delimitada, cartão de início e navegação compacta. A árvore do personagem fica restrita à área de ilustração; o personagem é ocultado durante o teclado virtual e nos modos compactos sem área de ilustração. Mesmas artes, sem duplicação de sprite.
 - Proteção temporária após colisão não permite ignorar madeira: contatos corrigem posição e interpolação para a passagem livre, não renovam a proteção nem consomem outro escudo e não dão ponto por passagem limpa.
-- Identificação pública 1.0.9.1; pacote/runtime SemVer `1.0.9-1`, interface `1.0.9-1-ui1`. O gerador aceita sufixo numérico e a interface o apresenta com ponto. Sem alteração de regras do ranking, coleção ou progresso.
+- Identificação pública 1.0.9.1; pacote/runtime SemVer `1.0.9-1`, interface `1.0.9-1-ui2`. O gerador aceita sufixo numérico e a interface o apresenta com ponto. Sem alteração de regras do ranking, coleção ou progresso.
 - Regressões de lógica cobrem contatos com madeira após recuperação no chão/copa e ausência de vocalizações sintetizadas no ambiente. Navegador cobre saída/reentrada da tela cheia, pausa preservada, resultado, API negada e teclado virtual simulado nos três motores. Sessões reais continuam na beta.
 
 APK: pode ser planejado depois com um contêiner Android como Capacitor, empacotando os recursos locais. Não integra este polimento. É necessário validar armazenamento, áudio, orientação, ciclo de vida, assinatura e desempenho no aplicativo Android.
