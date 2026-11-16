@@ -231,6 +231,7 @@ jobs:
           python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-modular-trees.log 2>&1 &
           tree_server_pid=$!
           trap 'kill "$tree_server_pid" 2>/dev/null' EXIT
+          node tests/browser-climate-winter-v3.cjs
           node tests/browser-modular-trees-1101.cjs
           TREE_BROWSER=firefox node tests/browser-modular-trees-1101.cjs
           TREE_BROWSER=webkit node tests/browser-modular-trees-1101.cjs
@@ -238,5 +239,7 @@ jobs:
         if: always()
         with:
           name: modular-trees
-          path: test-results/modular-trees/
+          path: |
+            test-results/modular-trees/
+            test-results/climate-winter-v3/
           if-no-files-found: ignore
