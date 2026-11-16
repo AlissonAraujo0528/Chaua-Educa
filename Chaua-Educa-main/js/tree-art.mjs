@@ -42,6 +42,17 @@ function livingBark(image,kind,index,f){
  return barkTile(image,kind+'-'+index,f.rect[0]+f.core[0],f.rect[1]+(upper?splice:splice-height),
   f.core[1]-f.core[0],height,!upper);
 }
+const wetVariantCaps=new WeakMap();
+function wetVariantCap(image){
+ let canvas=wetVariantCaps.get(image);if(canvas)return canvas;
+ canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(256,256):document.createElement('canvas');
+ canvas.width=256;canvas.height=256;
+ const c=canvas.getContext('2d');
+ drawPackedSection(c,'wet','variants-0',0,0,256,256,0,0,256,256);
+ c.globalCompositeOperation='destination-in';
+ c.drawImage(image,0,0,256,256,0,0,256,256);
+ wetVariantCaps.set(image,canvas);return canvas;
+}
 function variantBark(image,index){
  return barkTile(image,'variant-'+index,(index%2)*TREE_CELL+(TREE_CELL-TREE_CORE_WIDTH)/2,
   Math.floor(index/2)*TREE_CELL+TREE_SPLICES[index]-96,TREE_CORE_WIDTH,96,true);
@@ -133,7 +144,10 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
 
   // Material highlight remains local to the cap; the WebP silhouette stays intact.
   if(rain>0&&breakAge===undefined)
-   {c.save();c.globalAlpha=rain*.42;drawPackedSection(c,'wet',`variants-${index}`,0,TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,left,0,TREE_CELL*scale,join);c.restore();}
+   {c.save();c.globalAlpha=rain*.42;
+    if(index===0)c.drawImage(wetVariantCap(image),0,TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,left,0,TREE_CELL*scale,join);
+    else drawPackedSection(c,'wet',`variants-${index}`,0,TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,left,0,TREE_CELL*scale,join);
+    c.restore();}
 
   // Snow variant transition
   if (snow > 0 && breakAge === undefined) {
@@ -289,6 +303,7 @@ export function prepareTreeWeather(context){
   });
  }
  const image=images.get('tree-variants');
+ if(image)wetVariantCap(image);
  if(image)for(let index=0;index<4;index++){
   const tile=variantBark(image,index);
   if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));

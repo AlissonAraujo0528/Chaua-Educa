@@ -196,3 +196,8 @@ A versão 1.0.10 disponibiliza **Participar da beta** em Sobre o projeto e nos A
 Roteiro, matriz física planejada, interpretação das métricas, privacidade, gravidades e critérios: [beta-1.0.10.md](beta-1.0.10.md). Registro de problemas vazio e pronto para preenchimento: [beta-registro.csv](beta-registro.csv).
 
 A 1.0.10 **não está concluída pela preparação da ferramenta**. Iniciantes, jogadores habituais e educadores em Android, iPhone e notebook ainda precisam realizar as sessões. Evidências geradas pelo CI são identificadas como simuladas. A 1.0.11 depende da revisão dos resultados, não da simples troca da versão.
+
+
+## 1.0.10.1 — composição das árvores e pausa em tela cheia
+
+Extensão da casca por faixas em cache, revisão da árvore podre e sua neve e proteção da ordem da pausa após tela cheia. Detalhes e limites em [arvores-1.0.10.1.md](arvores-1.0.10.1.md). A beta física da 1.0.10 continua pendente.
