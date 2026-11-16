@@ -614,7 +614,7 @@ export class Renderer {
     }
     initializeAssets() {
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
-            prepareTreeWeather();
+            prepareTreeWeather(this.c);
             // Warm up pickup radial caches during asset load so first spawn never stalls.
             getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
             getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);

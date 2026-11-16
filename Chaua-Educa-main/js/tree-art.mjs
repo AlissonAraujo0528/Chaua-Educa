@@ -5,8 +5,49 @@ import {drawPackedSection} from './weather-art.mjs';
 import {winterOverlayStages} from './winter-vfx.mjs';
 
 
-// Source sprites retain their authored proportions. Only an undecorated bark
-// strip extends toward the viewport edge; caps, knots and leaves never stretch.
+// Repeat complete bark bands at the same scale as the authored cap.
+// A reflected pair has matching edges at every join. Tiles and patterns are
+// prepared once per source image/context, never rebuilt for each tree/frame.
+const barkTiles=new WeakMap();
+function barkTile(image,key,sx,sy,width,height,reverse){
+ let entries=barkTiles.get(image);
+ if(!entries){entries=new Map();barkTiles.set(image,entries);}
+ if(entries.has(key))return entries.get(key);
+ const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(Math.ceil(width),height*2):document.createElement('canvas');
+ canvas.width=Math.ceil(width);canvas.height=height*2;
+ const c=canvas.getContext('2d');
+ for(let row=0;row<2;row++){
+  const reflected=reverse?row===0:row===1;
+  c.save();c.translate(0,row*height+(reflected?height:0));
+  if(reflected)c.scale(1,-1);
+  c.drawImage(image,sx,sy,width,height,0,0,canvas.width,height);
+  c.restore();
+ }
+ const tile={canvas,width:canvas.width,height:canvas.height,patterns:new WeakMap()};
+ entries.set(key,tile);return tile;
+}
+function fillBark(c,tile,x,join,width,scale,reach,upper){
+ if(reach<=0)return;
+ let pattern=tile.patterns.get(c);
+ if(!pattern){pattern=c.createPattern(tile.canvas,'repeat');if(!pattern)throw Error('Unable to prepare tree bark');tile.patterns.set(c,pattern);}
+ c.save();c.translate(x,join);
+ c.scale(width/tile.width,upper?-scale:scale);
+ c.fillStyle=pattern;
+ // The half-pixel overlap lies underneath the unchanged cap.
+ c.fillRect(0,-.5/scale,tile.width,(reach+.5)/scale);
+ c.restore();
+}
+function livingBark(image,kind,index,f){
+ const height=96,upper=kind==='upper',splice=upper?f.spliceY:f.spliceY-1;
+ return barkTile(image,kind+'-'+index,f.rect[0]+f.core[0],f.rect[1]+(upper?splice:splice-height),
+  f.core[1]-f.core[0],height,!upper);
+}
+function variantBark(image,index){
+ return barkTile(image,'variant-'+index,(index%2)*TREE_CELL+(TREE_CELL-TREE_CORE_WIDTH)/2,
+  Math.floor(index/2)*TREE_CELL+TREE_SPLICES[index]-96,TREE_CORE_WIDTH,96,true);
+}
+
+// Caps, knots, branches and foliage retain the authored proportions.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
  const fullSnow = snow >= 1 - 1e-6;
@@ -18,18 +59,19 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  const [sx, sy] = f.rect, [cx, cy, cw, ch] = f.content;
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
  const coreLeft = x + (f.core[0] - f.anchor[0]) * s;
- const stripLeft = f.core[0], stripWidth = f.core[1] - f.core[0];
+ const barkImage=images.get(`trees-${kind}`);
+ const bark=livingBark(barkImage,kind,((variant%4)+4)%4,f);
  const splice = upper ? f.spliceY : f.spliceY - 1;
  // Snow icicles may extend past original alpha bounds. Visual clip only.
  const snowyTipEnd=upper&&snow>0?Math.max(f.endY,Math.min(512,f.endY+30)):f.endY;
  const join = y + (splice - f.anchor[1]) * s;
  if (upper) {
   const start = y - length;
-  if (join > start) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, start, width, join - start + .5);
+  fillBark(c,bark,coreLeft,join,width,s,join-start,true);
   c.drawImage(image, sx + cx, sy + splice, cw, snowyTipEnd - splice, px, join, cw * s, (snowyTipEnd - splice) * s);
  } else {
   const end = y + length;
-  if (end > join) c.drawImage(image, sx + stripLeft, sy + splice, stripWidth, 1, coreLeft, join - .5, width, end - join + .5);
+  fillBark(c,bark,coreLeft,join,width,s,end-join,false);
   // Preserve the snow dome above the bare wood's y=20 content bound.
   const capTop=snow>0?0:cy;
   c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
@@ -83,21 +125,9 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  c.translate(x, y);
  if (upper) c.scale(1, -1);
  if (breakAge === undefined || breakAge < .055) {
-  // Repeat a reflected bark band at native scale. Stretching a scanline
-  // turned grooves and moss into long vertical stripes on portrait screens.
-  const bandHeight = 96, tileHeight = bandHeight * scale;
-  // Culling is presentation-only: include a margin for fractional camera
-  // transforms and wood sway. When called without the flight camera,
-  // preserve the complete source drawing for screenshots/tests.
+  // One cached pattern fill instead of a draw call per repeated band.
   const reach=Math.max(join,Math.min(1000,Number.isFinite(visibleReach)?visibleReach:1000));
-  for (let pos = join - .5, tile = 0; pos < reach; pos += tileHeight, tile++) {
-   c.save();
-   c.translate(0, pos + (tile % 2 === 0 ? tileHeight : 0));
-   if (tile % 2 === 0) c.scale(1, -1);
-   c.drawImage(image, sx + (TREE_CELL - TREE_CORE_WIDTH) / 2, sy + splice - bandHeight,
-    TREE_CORE_WIDTH, bandHeight, -TREE_WIDTH / 2, 0, TREE_WIDTH, tileHeight + .5);
-   c.restore();
-  }
+  fillBark(c,variantBark(image,index),-TREE_WIDTH/2,join,TREE_WIDTH,scale,reach-join,false);
   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
    left, 0, TREE_CELL * scale, join);
 
@@ -249,7 +279,21 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 }
 
 const snowMixBuffers=new Map();
-export function prepareTreeWeather(){for(const kind of ['lower','upper'])snowOverlay(kind,0);}
+export function prepareTreeWeather(context){
+ for(const kind of ['lower','upper']){
+  snowOverlay(kind,0);
+  const image=images.get('trees-'+kind);
+  if(image)FOREST_ART[kind].forEach((f,index)=>{
+   const tile=livingBark(image,kind,index,f);
+   if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+  });
+ }
+ const image=images.get('tree-variants');
+ if(image)for(let index=0;index<4;index++){
+  const tile=variantBark(image,index);
+  if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+ }
+}
 function snowOverlay(kind,amount){
  amount=Math.round(amount*256)/256;
  const level=Math.min(4,Math.max(0,amount*4)),base=Math.floor(level),fraction=level-base;

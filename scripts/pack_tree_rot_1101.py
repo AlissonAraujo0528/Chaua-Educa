@@ -44,6 +44,7 @@ box,center,core=registration(base)
 scale=min(128/core,200/(box[3]-box[1]))
 bottom=8+(box[3]-box[1])*scale
 report={}
+base_tile=None
 for snowy,source,path in [
     (False,'rot-1101.png','Chaua-Educa-main/assets/v9/tree-variants.webp'),
     (True,'rot-snow-1101.png','Chaua-Educa-main/assets/v10/tree-variants-snow.webp')
@@ -60,6 +61,16 @@ for snowy,source,path in [
     y=8 if not snowy else round(bottom-crop.height)
     assert 0<=y and 0<=x and x+crop.width<=256 and y+crop.height<=256,(x,y,crop.size)
     tile.paste(crop,(x,y))
+    if not snowy:
+        base_tile=tile.copy()
+    else:
+        # The snow source supplies only snow. Keep every exposed wood pixel
+        # from the registered bare sprite, avoiding a second generated base.
+        pixels=list(tile.getdata())
+        pixels=[(r,g,b,a if r>=150 and g>=160 and b>=170 and b>=r*.94 and g>=r*.94 else 0)
+                for r,g,b,a in pixels]
+        snow_only=Image.new('RGBA',tile.size);snow_only.putdata(pixels)
+        tile=Image.alpha_composite(base_tile,snow_only)
     atlas=original.copy();atlas.paste(tile,(0,0))
     assert atlas.crop((256,0,512,512)).tobytes()==original.crop((256,0,512,512)).tobytes()
     assert atlas.crop((0,256,256,512)).tobytes()==original.crop((0,256,256,512)).tobytes()
