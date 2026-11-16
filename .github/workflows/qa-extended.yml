@@ -160,3 +160,31 @@ jobs:
           path: test-results/three-screen-refinement/
           if-no-files-found: ignore
           retention-days: 7
+
+  beta-session:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify optional beta sessions and local reports
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-beta.log 2>&1 &
+          beta_pid=$!
+          trap 'kill "$beta_pid" 2>/dev/null' EXIT
+          node tests/browser-beta-110.cjs
+          BETA_BROWSER=firefox node tests/browser-beta-110.cjs
+          BETA_BROWSER=webkit node tests/browser-beta-110.cjs
+      - name: Save simulated beta evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: beta-110-simulated
+          path: test-results/beta-110/
+          if-no-files-found: ignore
+          retention-days: 7

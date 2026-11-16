@@ -32,6 +32,7 @@ const name=process.env.PANEL_BROWSER||'chromium';
    for(const [button,id] of [['#open-settings','#settings-dialog'],['#open-guide','#guide-dialog'],['#open-ranking','#ranking-dialog'],['#open-missions','#missions-dialog'],['#open-credits','#credits-dialog'],['#open-collection','#collection-dialog']]){
     await page.locator(button).click();const actions=[id+' .panel-heading-area .close-dialog'];if(['#settings-dialog','#guide-dialog'].includes(id))actions.push(id+' .panel-actions .primary');
     await panel(id,actions);await page.locator(id).screenshot({path:`${out}/${name}-${width}x${height}-${id.slice(1)}.png`});
+    if(id==='#credits-dialog'){await page.locator('#open-beta-about').click();await panel('#beta-dialog',['#beta-start','#beta-download','#beta-dialog .panel-heading-area .close-dialog']);await page.locator('#beta-dialog').screenshot({path:`${out}/${name}-${width}x${height}-beta.png`});await page.locator('#beta-dialog .panel-heading-area .close-dialog').click();}
     if(id==='#collection-dialog'){
      await page.locator('.journal-card').filter({has:page.locator('.visual-conservacao')}).locator('.journal-open').click();await target('#collection-dialog .panel-heading-area .close-dialog');
      assert.equal(await page.locator('#collection-dialog .panel-body').evaluate(e=>e.scrollTop),0);await page.locator('.journal-back').click();

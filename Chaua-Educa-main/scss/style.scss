@@ -2374,3 +2374,30 @@ html:has(dialog[open]),html:has(dialog[open]) body { overflow:hidden; overscroll
   #pause-dialog h2 { font-size:22px; }
   #pause-dialog #resume-button { min-height:44px; }
 }
+
+#beta-dialog { --panel-width:860px; }
+#beta-dialog h2 { font-size:28px; margin:4px 0; }
+#beta-dialog #beta-status { font-size:13px; line-height:1.35; margin:4px 0; }
+#beta-dialog .beta-fields { display:grid; grid-template-columns:minmax(140px,1fr) minmax(0,1.6fr); gap:10px 14px; border:1px solid #d7dfc7; border-radius:14px; margin:14px 0; padding:14px; }
+#beta-dialog legend { font-weight:800; padding:0 6px; }
+#beta-dialog label { font-size:13px; align-self:center; }
+#beta-dialog input:not([type=checkbox]),#beta-dialog select,#beta-dialog textarea { min-height:44px; min-width:0; max-width:100%; font:inherit; font-size:16px; padding:8px; border:1px solid #a7b990; border-radius:8px; background:#fffef8; color:#244834; }
+#beta-dialog textarea { resize:vertical; }
+#beta-dialog .beta-tasks { display:grid; gap:6px; border:0; padding:8px 0; }
+#beta-dialog .beta-tasks label { display:flex; gap:10px; min-height:44px; align-items:center; }
+#beta-dialog [type=checkbox] { width:22px; height:22px; }
+#beta-dialog .panel-actions { display:flex; flex-wrap:wrap; gap:8px; }
+#beta-dialog .panel-actions .primary { flex:1 1 180px; min-height:44px; padding:8px 12px; font-size:16px; }
+#beta-dialog .panel-actions .text-button { min-height:44px; margin:0; }
+.beta-entry { min-height:44px; padding:8px 12px; border:1px solid #b8cba0; border-radius:10px; background:#edf2df; text-decoration:none; font-weight:800; }
+@media(max-width:600px) {
+  #beta-dialog .beta-fields { grid-template-columns:1fr; gap:6px; padding:10px; }
+  #beta-dialog .beta-fields > label:not(:first-of-type) { margin-top:6px; }
+  #beta-dialog h2 { font-size:24px; }
+}
+@media(max-height:500px) {
+  #beta-dialog .panel-heading-area { padding-bottom:6px; }
+  #beta-dialog #beta-status { font-size:11px; }
+  #beta-dialog .panel-actions { gap:4px; }
+  #beta-dialog .panel-actions .primary { font-size:13px; flex-basis:120px; }
+}

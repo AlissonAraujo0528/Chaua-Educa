@@ -187,3 +187,12 @@ Regressão dedicada nos três motores: retrato semelhante às capturas (384×706
 - Regressões de lógica cobrem contatos com madeira após recuperação no chão/copa e ausência de vocalizações sintetizadas no ambiente. Navegador cobre saída/reentrada da tela cheia, pausa preservada, resultado, API negada e teclado virtual simulado nos três motores. Sessões reais continuam na beta.
 
 APK: pode ser planejado depois com um contêiner Android como Capacitor, empacotando os recursos locais. Não integra este polimento. É necessário validar armazenamento, áudio, orientação, ciclo de vida, assinatura e desempenho no aplicativo Android.
+
+
+## 1.0.10 — beta preparada; coleta real pendente
+
+A versão 1.0.10 disponibiliza **Participar da beta** em Sobre o projeto e nos Ajustes. A coleta é opcional e local; só começa por ação explícita. Relatórios incluem aparelho autodeclarado, intervalos de voo visível/com foco, trechos/perfis, tentativas e feedback de diversão, clareza, conforto, conteúdo e problemas classificados. Treino, pausas e menus não entram nos intervalos de voo. Não há upload, armazenamento do relatório ou exportação do nome do jogador. Sem coleta, o módulo nem é carregado no jogo comum.
+
+Roteiro, matriz física planejada, interpretação das métricas, privacidade, gravidades e critérios: [beta-1.0.10.md](beta-1.0.10.md). Registro de problemas vazio e pronto para preenchimento: [beta-registro.csv](beta-registro.csv).
+
+A 1.0.10 **não está concluída pela preparação da ferramenta**. Iniciantes, jogadores habituais e educadores em Android, iPhone e notebook ainda precisam realizar as sessões. Evidências geradas pelo CI são identificadas como simuladas. A 1.0.11 depende da revisão dos resultados, não da simples troca da versão.

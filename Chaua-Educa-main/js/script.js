@@ -23,6 +23,7 @@ import { Renderer, drawBird } from './render.mjs';
 
 const $ = selector => document.querySelector(selector);
 const app = $('#app');
+let betaRuntime=null,betaLoad=null;
 DB.onStorageChange=available=>{
     const notice=$('#persistence-status');notice.hidden=available;
     if(!available)notice.textContent='O salvamento neste navegador está indisponível. Novos avanços ficam apenas nesta aba até conseguir salvá-los; mantenha-a aberta.';
@@ -77,6 +78,7 @@ function toast(text) {
 }
 
 export const game = new Game({ onEvent(event) {
+    betaRuntime?.event(event.type);
     const probe=activeProbe;
     if(probe)probe.event('game:'+event.type,{
       gameSeconds:Math.round(game.elapsed*100)/100,stage:game.stage,
@@ -230,6 +232,7 @@ function start(training = false, checkpoint = null) {
     // immediately after changing classes and hiding the home screen.
     flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
     if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player));
+    if(betaRuntime?.active)betaRuntime.attempt();
     renderer.resetFlightPresentation();
     app.classList.toggle('training',training);
     previousState = ''; clock.reset(); lastTime = 0;
@@ -635,6 +638,7 @@ function syncUI() {
 function frame(time) {
     // Include update, UI, audio and drawing work within the RAF callback.
     // This elapsed JS wall time is diagnostic, not a GPU timing measurement.
+    const betaStateBefore=game.state;
     const frameWorkStart=performance.now();
     const probe=activeProbe;
     if(probe)probe.beginFrame(time,game.stage);
@@ -653,6 +657,7 @@ function frame(time) {
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){
+        if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
         quality.sample(delta,false);
         if(probe)probe.endFrame();
         requestAnimationFrame(frame);return;
@@ -673,6 +678,7 @@ function frame(time) {
         if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
+    if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
     const activeFlight=document.hasFocus()&&game.state==='playing';
     if(quality.sample(delta,activeFlight,performance.now()-frameWorkStart))applyVisualQuality();
     requestAnimationFrame(frame);
@@ -804,3 +810,16 @@ if(new URLSearchParams(location.search).get('perf-test')==='1'){
 $('#controls-side').addEventListener('change',event=>{app.dataset.controlsSide=event.target.value;saveSetting('chaua-controls-side',event.target.value);});
 $('#warning-sounds').addEventListener('change',event=>{warningSounds=event.target.checked;saveSetting('chaua-warning-sounds',warningSounds);});
 $('#settings-sound').addEventListener('change',event=>{soundOn=event.target.checked;DB.writeObject('chaua-sound',soundOn); forestAudio.setEnabled(soundOn);updateSoundButton();if(soundOn)sound('correct');});
+
+// Beta is opened deliberately; ordinary play never imports or starts a collector.
+async function openBeta(){
+    if(['playing','countdown','arrival'].includes(game.state))pauseFlight();
+    try{
+        if(!betaLoad)betaLoad=import('./beta-ui.mjs').then(({mountBeta})=>{
+            betaRuntime=mountBeta({game,quality,renderer,openDialog,instrumented:()=>!!activeProbe,onStart:()=>{closeDialogs();if(game.state==='paused')openDialog('#pause-dialog');}});return betaRuntime;
+        }).catch(error=>{betaLoad=null;throw error;});
+        (await betaLoad).open();
+    }catch{toast('Não foi possível abrir a beta agora. Tente novamente.');}
+}
+for(const button of document.querySelectorAll('.beta-entry'))button.addEventListener('click',openBeta);
+if(new URLSearchParams(location.search).get('beta')==='1')openBeta();

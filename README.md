@@ -1,6 +1,8 @@
 # Chaua-Educa
 
-## Preparação para a Versão 2.0 · versão 1.0.9.1
+## Preparação para a Versão 2.0 · versão 1.0.10
+
+Beta preparada para sessões reais: abra **Sobre o projeto → Participar da beta** ou o mesmo botão nos Ajustes. A coleta é opcional, fica na aba e gera um arquivo para baixar. Consulte o [roteiro da 1.0.10](docs/beta-1.0.10.md). A etapa só termina após avaliar os jogadores/aparelhos reais.
 
 Antes de publicar, execute `npm run audit:release`: a auditoria verifica o grafo de módulos, recursos locais, hashes, versões, créditos e licenças, e gera um inventário em `test-results/release-audit.json`. Consulte [a validação da 1.0.9](docs/confiabilidade-1.0.9.md).
 
