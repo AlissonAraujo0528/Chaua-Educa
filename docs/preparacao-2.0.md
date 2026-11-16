@@ -201,3 +201,9 @@ A 1.0.10 **não está concluída pela preparação da ferramenta**. Iniciantes, 
 ## 1.0.10.1 — composição das árvores e pausa em tela cheia
 
 Extensão da casca por faixas em cache, revisão da árvore podre e sua neve e proteção da ordem da pausa após tela cheia. Detalhes e limites em [arvores-1.0.10.1.md](arvores-1.0.10.1.md). A beta física da 1.0.10 continua pendente.
+
+## 1.0.11 — candidata em validação
+
+Funcionalidades congeladas; consolidação das correções de tela cheia, árvores e neve da 1.0.10.1. Corrigidas as oito falhas de manutenção identificadas na suíte anterior: simulações de Canvas, expectativas antigas de desenho dos troncos, assinatura de arte e inventário de workflows. As verificações de geometria, integridade e fluxo permanecem obrigatórias.
+
+Pacote, interface e grafo de módulos alinhados em 1.0.11. Escopo, requisitos, limitações, critérios e referência de retorno em [candidata-1.0.11.md](candidata-1.0.11.md). A validação desta revisão depende do CI do PR #78; a beta física e a aprovação para 2.0.0 continuam pendentes.

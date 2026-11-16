@@ -1,3 +1,4 @@
+import {canvasSpy,installCanvasMock} from './helpers/canvas.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Game} from '../Chaua-Educa-main/js/engine.mjs';
@@ -99,18 +100,21 @@ test('ascending hawk preserves the wingbeat action instead of inverted dive art'
  }
 });
 
-test('camera-bounded bark draws fewer repeated tiles without changing the original cap',t=>{
+test('camera-bounded bark keeps one cached pattern fill and the unchanged authored cap',t=>{
+ installCanvasMock(t);
  const backup=new Map(images);t.after(()=>{images.clear();for(const [k,v] of backup)images.set(k,v)});
- const art={id:'tree-variants'};
- images.set('tree-variants',art);
+ const art={id:'tree-variants'};images.set('tree-variants',art);
  for(const upper of [true,false]){
-  const full=spyCanvas(),cropped=spyCanvas();
+  const full=canvasSpy(),cropped=canvasSpy();
   drawTreeVariant(full.c,400,190,upper,'moss',undefined,0,0,2,1000);
   drawTreeVariant(cropped.c,400,190,upper,'moss',undefined,0,0,2,240);
-  const count=c=>c.events.filter(e=>e[0]==='image'&&e[1]===art).length;
-  assert.ok(count(full)>=9,'reference trunk not drawn completely');
-  assert.ok(count(cropped)<count(full),'camera culling failed');
-  assert.ok(count(cropped)>=2,'culling removed authored cap or entire bark');
+  assert.deepEqual(cropped.draws,full.draws,'camera culling must preserve the authored cap');
+  assert.equal(full.draws.length,1);assert.equal(full.fills.length,1);assert.equal(cropped.fills.length,1);
+  assert.ok(cropped.fills[0][3]<full.fills[0][3],'offscreen bark must be culled');
+  assert.ok(cropped.fills[0][3]>0,'visible bark must remain');
+  const patterns=cropped.patterns.length;
+  drawTreeVariant(cropped.c,400,190,upper,'moss',undefined,0,0,3,300);
+  assert.equal(cropped.patterns.length,patterns,'changing reach must reuse the warmed pattern');
  }
 });
 
