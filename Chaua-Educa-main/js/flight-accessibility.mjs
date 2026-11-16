@@ -8,6 +8,7 @@ export class FlightCues {
     constructor(){this.reset();}
     reset(){this.seen=new WeakSet();this.beat=null;}
     countdown(number){const changed=number!==null&&number!==this.beat;this.beat=number;return changed;}
+    hasWarnings(g){return ['playing','arrival'].includes(g.state)&&g.entities.some(e=>snakeActive(e)||hawkActive(e,g));}
     warnings(g){
         if(!['playing','arrival'].includes(g.state))return [];
         const cues=[];

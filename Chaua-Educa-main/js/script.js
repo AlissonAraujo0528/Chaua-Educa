@@ -182,7 +182,7 @@ async function launchFlight(training = false, checkpoint = null) {
 function start(training = false, checkpoint = null) {
     training = training === true;
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
-    closeDialogs(); clearInputs(); flightCues.reset();
+    closeDialogs(); clearInputs(); flightCues.reset(); $('#flight-alert').textContent='';
     cancelAnimationFrame(resultAnimation);
     // Reassess the quality profile before the layout-changing in-flight class.
     // Otherwise the renderer may synchronously measure DOM during this transition.
@@ -545,7 +545,9 @@ function syncUI() {
         const number=Math.max(1,Math.ceil(game.countdown));hudText('#count-number',number);
         if(flightCues.countdown(number)) { $('#screen-reader-status').textContent=`Prepare as asas: ${number}`; sound('countdown'); }
     } else flightCues.countdown(null);
-    for(const cue of flightCues.warnings(game)) { hudText('#flight-alert',cue.text); if(warningSounds)sound(cue.sound); }
+    const cues=flightCues.warnings(game);
+    if(cues.length) { hudText('#flight-alert',cues.map(cue=>cue.text).join(' ')); for(const cue of cues)if(warningSounds)sound(cue.sound); }
+    else if(!flightCues.hasWarnings(game))hudText('#flight-alert','');
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
     hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(journeyProgress(game)*100)}%`);

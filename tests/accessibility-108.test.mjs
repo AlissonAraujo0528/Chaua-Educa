@@ -6,8 +6,9 @@ const snake=()=>({kind:'wood',snake:{phase:'warning'}});
 const hawk=()=>({kind:'hawk',x:900});
 test('attack cues respect original active warnings and do not replay across pause',()=>{
  const c=new FlightCues(),s=snake(),h=hawk(),g={state:'playing',x:200,entities:[s,h,{kind:'hawk',x:800,harmless:true}]};
+ assert.equal(c.hasWarnings(g),true);
  assert.deepEqual(c.warnings(g).map(e=>e.sound),['snake-warning','hawk-warning']);assert.deepEqual(c.warnings(g),[]);
- g.state='paused';g.entities.push(snake());assert.deepEqual(c.warnings(g),[]);g.state='quiz';assert.deepEqual(c.warnings(g),[]);
+ g.state='paused';assert.equal(c.hasWarnings(g),false);g.entities.push(snake());assert.deepEqual(c.warnings(g),[]);g.state='quiz';assert.deepEqual(c.warnings(g),[]);
  g.state='playing';assert.equal(c.warnings(g).length,1);s.snake.phase='idle';s.snake.phase='warning';assert.deepEqual(c.warnings(g),[]);
  c.reset();assert.equal(c.warnings(g).length,3);
 });

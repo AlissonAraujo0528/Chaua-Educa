@@ -48,6 +48,10 @@ const playwright=require('playwright'),name=process.env.ACCESS_BROWSER||'chromiu
    await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
    await page.waitForTimeout(100);assert.deepEqual(await snapshot(),before);await page.locator('#resume-button').click();assert.equal((await snapshot())[0],'countdown');
   }
+  await stable();await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+  const hiddenState=await snapshot();assert.equal(hiddenState[0],'paused');
+  await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});await page.waitForTimeout(100);assert.deepEqual(await snapshot(),hiddenState);
+  await page.locator('#resume-button').click();
   await stable();await page.evaluate(async()=>{const g=(await import('/js/script.js')).game;g.state='playing';g.entities=[];g.invincible=99;g.y=320;g.vy=0;});
   await page.setViewportSize({width:height,height:width});await page.locator('#pause-dialog').waitFor({state:'visible'});assert.match(await page.locator('#pause-message').textContent(),/orientação/);
   await page.setViewportSize({width,height});
