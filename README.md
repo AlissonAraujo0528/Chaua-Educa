@@ -2,6 +2,8 @@
 
 ## Preparação para a Versão 2.0 · versão 1.0.8
 
+No GitHub Pages, a raiz do repositório abre automaticamente `Chaua-Educa-main/`. O arquivo `index.html` da raiz deve acompanhar a branch publicada, inclusive nos forks.
+
 Abra `Chaua-Educa-main/index.html` por um servidor HTTP. Para testar localmente, rode `npm start` na raiz e abra `http://127.0.0.1:5501/`. A Cobra A2 e as spritesheets oficiais de ação são obrigatórias. Arquivos faltando impedem o início e exibem um erro explícito; os antigos parâmetros de seleção de sprites foram removidos. Consulte [a documentação da arte atual](docs/arte-runtime.md).
 
 A preparação conserva os três ataques da cobra, as três investidas curvas do gavião e os efeitos climáticos do PR #77. [Relatório daquela revisão](docs/revisao-ataques-clima.md). Coleção e missões permanecem salvas.

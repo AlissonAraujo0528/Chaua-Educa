@@ -5,7 +5,7 @@ const expectedVersion=require('../package.json').version;
 // Reproduce the exact project-site URL hierarchy used by GitHub Pages.
 // No development server, Node process or prompt is needed by the visitor.
 const url = process.env.PAGES_PREVIEW_URL ||
-  'http://127.0.0.1:5502/Chaua-Educa/Chaua-Educa-main/';
+  'http://127.0.0.1:5502/Chaua-Educa/';
 
 (async () => {
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox']});
@@ -17,6 +17,7 @@ const url = process.env.PAGES_PREVIEW_URL ||
    if(response.status()>=400)badResponses.push(response.status()+' '+response.url());
   });
   await page.goto(url,{waitUntil:'networkidle',timeout:45000});
+  await page.waitForURL('**/Chaua-Educa/Chaua-Educa-main/',{timeout:12000});
   assert.equal(new URL(page.url()).pathname,'/Chaua-Educa/Chaua-Educa-main/');
   // Gameplay correctly requires a player name (at least 3 characters)
   // before enabling "Vamos voar". Previous test timed out before filling it.
@@ -56,6 +57,12 @@ const url = process.env.PAGES_PREVIEW_URL ||
   await page.waitForTimeout(1000);
   assert.deepEqual(errors,[],'No errors after starting a flight via GitHub Pages subpath');
   assert.deepEqual(badResponses,[],'No late-loading 404s during flight');
-  console.log('PASS GitHub Pages project subpath: CSS, local WebPs, gameplay and modules work without server-side services',loaded);
+  // The bookmarked game subdirectory must remain directly accessible too.
+  const directURL=new URL(page.url());
+  await page.goto(directURL.href,{waitUntil:'networkidle'});
+  await page.locator('#start-training:not([disabled])').waitFor({timeout:25000});
+  assert.equal(new URL(page.url()).pathname,'/Chaua-Educa/Chaua-Educa-main/');
+  assert.deepEqual(errors,[]);assert.deepEqual(badResponses,[]);
+  console.log('PASS GitHub Pages project root redirect and direct subpath: CSS, local WebPs, gameplay and modules work without server-side services',loaded);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
