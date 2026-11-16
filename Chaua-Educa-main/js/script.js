@@ -60,7 +60,7 @@ let warningSounds=DB.readObject('chaua-warning-sounds',true)!==false;
 let assetsReady = false, lastOrientation = null, openingFlight = false;
 let flightMissionIds = [];
 let flightLearning=createFlightLearning(),learningReturnFocus=null;
-try { const saved = localStorage.getItem('chaua-sound'); soundOn = saved === null ? true : saved === 'true'; } catch { soundOn = true; }
+{const saved=DB.readObject('chaua-sound',true);soundOn=typeof saved==='boolean'?saved:true;}
 
 const forestAudio=new ForestAudio();
 forestAudio.setEnabled(soundOn);
@@ -356,7 +356,7 @@ function updateSoundButton() {
     button.setAttribute('aria-label', soundOn ? 'Silenciar sons' : 'Ativar sons');
     $('.sound-slash').hidden = soundOn;
 }
-$('.sound-toggle').addEventListener('click', () => { soundOn = !soundOn; try { localStorage.setItem('chaua-sound', String(soundOn)); } catch { /* Optional. */ } updateSoundButton();
+$('.sound-toggle').addEventListener('click', () => { soundOn = !soundOn; DB.writeObject('chaua-sound',soundOn); updateSoundButton();
 
 sound('fruit'); });
 updateSoundButton();
@@ -755,4 +755,4 @@ if(new URLSearchParams(location.search).get('perf-test')==='1'){
 
 $('#controls-side').addEventListener('change',event=>{app.dataset.controlsSide=event.target.value;saveSetting('chaua-controls-side',event.target.value);});
 $('#warning-sounds').addEventListener('change',event=>{warningSounds=event.target.checked;saveSetting('chaua-warning-sounds',warningSounds);});
-$('#settings-sound').addEventListener('change',event=>{soundOn=event.target.checked;try{localStorage.setItem('chaua-sound',String(soundOn));}catch{} forestAudio.setEnabled(soundOn);updateSoundButton();if(soundOn)sound('correct');});
+$('#settings-sound').addEventListener('change',event=>{soundOn=event.target.checked;DB.writeObject('chaua-sound',soundOn); forestAudio.setEnabled(soundOn);updateSoundButton();if(soundOn)sound('correct');});
