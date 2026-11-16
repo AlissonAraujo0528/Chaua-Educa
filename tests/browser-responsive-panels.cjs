@@ -51,7 +51,7 @@ const name=process.env.PANEL_BROWSER||'chromium';
    const text=await page.locator('#answer-feedback').textContent();assert.ok(text.length>50);await page.locator('#quiz-dialog').screenshot({path:`${out}/${name}-${width}x${height}-feedback.png`});
    await page.locator('#quiz-continue').click();await page.evaluate(async()=>{const {game:g}=await import('/js/script.js');g.state='playing';g.end(false,'Você encostou na cobra do galho.');});
    await panel('#result-dialog',['#restart-button','#result-ranking','#result-missions','#result-dialog .back-home']);await page.locator('#result-dialog').screenshot({path:`${out}/${name}-${width}x${height}-result.png`});
-   await page.locator('#restart-button').click();await page.evaluate(async()=>{const {game:g}=await import('/js/script.js');g.state='trained';});await panel('#training-dialog',['#training-home','#training-again']);await page.locator('#training-home').click();
+   await page.locator('#restart-button').click();await page.waitForFunction(()=>document.querySelector('#app').dataset.state==='countdown'&&!document.querySelector('#result-dialog').open);await page.evaluate(async()=>{const {game:g}=await import('/js/script.js');g.state='trained';});await panel('#training-dialog',['#training-home','#training-again']);await page.locator('#training-home').click();
    assert.deepEqual(errors,[]);await context.close();console.log('PASS RESPONSIVE PANELS',name,{width,height,mobile});
   }
  }finally{await browser.close();}
