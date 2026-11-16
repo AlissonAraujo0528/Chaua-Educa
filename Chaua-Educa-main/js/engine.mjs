@@ -339,7 +339,11 @@ export class Game {
         if (this.state !== 'playing') return;
         const route=this.routes.get(host.route);if(route)route.failed=true;
         if(entity.kind==='boundary')for(const r of this.routes.values())r.failed=true;
-        if(this.invincible>0)return;
+        if(this.invincible>0){
+            // Grace prevents repeated damage, not contact with solid wood.
+            if(!animal && host.kind==='wood'){host.contacted=true;this.recover(host);}
+            return;
+        }
         const boundary = entity.kind === 'boundary' ? entity.side : null;
         this.hit = boundary ? null : {id:host.id, age:0,attackType:entity.kind==='snake'?host.snake?.attackType:undefined};
         if (!animal && !boundary && host.kind === 'wood') {

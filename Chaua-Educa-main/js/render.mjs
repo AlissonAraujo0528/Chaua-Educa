@@ -1068,11 +1068,15 @@ export class Renderer {
             const wash = c.createLinearGradient(0, this.h * .50, 0, this.h * .78); wash.addColorStop(0, '#f0f1da'); wash.addColorStop(1, '#f0f1da00');
             c.fillStyle = '#f0f1da'; c.fillRect(0, 0, this.w, this.h * .5); c.fillStyle = wash; c.fillRect(0, this.h * .5, this.w, this.h * .28);
         }
+        if(!this.homeHideCharacter){
         const {x,y,scale}=this.homePreview||homePerchLayout(this.w,this.h);
-        c.save(); c.translate(x, y);
+        c.save();
+        if(this.homePreview?.clip){const r=this.homePreview.clip;c.beginPath();c.rect(r.x,r.y,r.width,r.height);c.clip();}
+        c.translate(x, y);
         if(images.has('chaua-atlas'))drawRefugeTree(c,{x:0},scale*5+birdFoot(scale*1.3),time,scale*95,scale*1.3*9.65*27.7027/60);
         drawBird(c, { x: 0, y: scale * 5, scale: scale*1.3, perched: true, wing: reduced ? .08 : .07 + Math.sin(time * .9) * .06, time, reduced });
         c.restore();
+        }
         // Loose foreground leaves frame the diorama naturally.
         if (!mobile) {
             leaf(c, this.w * .985, this.h * .38, 75, -1.15, '#b0c16c', '#497e49');

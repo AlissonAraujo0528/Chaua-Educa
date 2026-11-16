@@ -4568,3 +4568,132 @@ html:has(dialog[open]), html:has(dialog[open]) body {
     display: none;
   }
 }
+/* 1.0.9.1: fullscreen remains reachable in flight and inside modal panels. */
+.hud > .fullscreen-toggle {
+  position: absolute;
+  top: calc(var(--safe-top) + 62px);
+  right: calc(var(--safe-right) + 12px);
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 251, 237, 0.9333333333);
+}
+
+#pause-dialog .fullscreen-toggle {
+  grid-column: 1/-1;
+  min-height: 44px;
+}
+
+#pause-dialog .round-icon {
+  display: none;
+}
+
+#pause-dialog .compact {
+  gap: 8px 12px;
+}
+
+#result-dialog .result-overview {
+  position: relative;
+}
+
+#result-dialog .result-overview > .fullscreen-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  z-index: 1;
+  background: #fffbed;
+}
+
+#result-dialog .result-overview .result-stats {
+  padding-right: 44px;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  #result-dialog .result-overview .result-stats {
+    padding-right: 0;
+  }
+  #result-dialog .result-overview .panel-heading {
+    padding-right: 48px;
+  }
+}
+/* A single invitation, a framed character and a calm launch card on phones. */
+@media (orientation: portrait) and (min-width: 350px) and (max-width: 600px) and (min-height: 650px) {
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-copy {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    max-width: 420px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home h1 {
+    grid-column: 1;
+    grid-row: 1;
+    text-align: center;
+    font-size: 30px;
+    line-height: 1.05;
+    margin: 8px 0 0;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-preview {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    height: 104px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .start-card {
+    grid-row: 3;
+    margin: 0;
+    padding: 14px;
+    border-radius: 20px;
+    background: rgba(255, 253, 245, 0.9607843137);
+    border: 1px solid #d4dfbd;
+    box-shadow: 0 6px 20px rgba(33, 75, 53, 0.1254901961);
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home-links {
+    grid-row: 4;
+    padding: 4px;
+    margin-top: 4px;
+    background: rgba(255, 253, 245, 0.9411764706);
+    border-radius: 16px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .start-card > label {
+    font-size: 12px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .name-field {
+    border-radius: 12px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .mode-picker label {
+    min-height: 58px;
+    background: #f7f8ee;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .mode-picker label:has(input:checked) {
+    background: #e7efda;
+    border-color: #5d8047;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) .home .start-button {
+    border-radius: 12px;
+    min-height: 48px;
+  }
+  .app.mobile-device:not(.in-flight):not(.keyboard-open) #start-training {
+    font-size: 12px;
+  }
+}
+.app.mobile-device.keyboard-open:not(.in-flight) .home-preview {
+  display: none;
+}
+
+.app.mobile-device:not(.in-flight) .top-actions {
+  gap: 4px;
+}
+
+@media (max-height: 400px) and (orientation: landscape) {
+  #pause-dialog .compact {
+    padding: 12px 16px;
+    gap: 6px 10px;
+  }
+  #pause-dialog h2 {
+    font-size: 22px;
+  }
+  #pause-dialog #resume-button {
+    min-height: 44px;
+  }
+}

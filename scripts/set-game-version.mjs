@@ -1,6 +1,6 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 const version=process.argv[2];
-if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version??''))
+if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[1-9]\d*)?$/.test(version??''))
  throw new Error('Informe a versão no formato 1.0.1');
 const revision=process.argv[3]||version;
 if(revision!==version&&(!revision.startsWith(version+'-')||!/^[0-9a-z.-]+$/.test(revision)))

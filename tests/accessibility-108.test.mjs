@@ -47,3 +47,10 @@ test('new warning tones obey volume and mute; unknown events stay silent',()=>{
  const {audio,tones}=audioSetup();audio.setVolume(.25);audio.play('snake-warning');assert.equal(tones.length,2);assert.equal(audio.master.gain.value,.25);
  audio.play('unknown');assert.equal(tones.length,2);audio.setEnabled(false);audio.play('countdown');assert.equal(tones.length,2);assert.equal(audio.master.gain.value,0);
 });
+
+test('ambient forest never synthesizes unverified bird calls; action cues remain available',()=>{
+ const {audio,ctx,tones}=audioSetup();audio.ensure();
+ for(let t=0;t<80;t++){ctx.currentTime=t;audio.update('playing',true,t,0);}
+ assert.equal(tones.length,0);
+ audio.play('fruit');assert.equal(tones.length,2);
+});

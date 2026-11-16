@@ -33,7 +33,7 @@ window.addEventListener('storage',event=>{
 });
 const versionLabel=$('#build-version');
 const interfaceBuild=$('meta[name=chaua-build]')?.content||GAME_VERSION;
-if(versionLabel)versionLabel.textContent=`Versão ${GAME_VERSION} · interface ${interfaceBuild} · preparação para a 2.0`;
+if(versionLabel)versionLabel.textContent=`Versão ${GAME_VERSION.replace(/-(\d+)$/,'.$1')} · interface ${interfaceBuild} · preparação para a 2.0`;
 // Mobile browsers can expose a desktop-sized layout viewport even with a
 // portrait phone display. Use the device signals in addition to CSS widths.
 const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
@@ -126,7 +126,7 @@ function resize() {
     renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
     renderer.resize();
     const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
-    renderer.homePreview=slot?.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170)}:null;
+    renderer.homePreview=slot?.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170),clip:{x:slot.x-app.getBoundingClientRect().x,y:slot.y-app.getBoundingClientRect().y,width:slot.width,height:slot.height}}:null;
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(!openingFlight && lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');
@@ -159,6 +159,7 @@ function syncMobileViewport() {
     if(app.style.getPropertyValue('--app-height')!==value)app.style.setProperty('--app-height',value);
     const typing=document.activeElement?.matches('input:not([type=radio]):not([type=range]),textarea');
     app.classList.toggle('keyboard-open',!!typing&&height<innerHeight*.8);
+    renderer.homeHideCharacter=app.classList.contains('keyboard-open');
 }
 window.visualViewport?.addEventListener('resize',syncMobileViewport);
 window.addEventListener('resize',syncMobileViewport);
@@ -246,6 +247,29 @@ function home() {
 
     resize(); if(!mobileDevice)$('#inputPlayer').focus({ preventScroll: true });
 }
+
+
+const fullscreenButtons=[...document.querySelectorAll('.fullscreen-toggle')];
+function syncFullscreenControls(){
+    const active=document.fullscreenElement===app;
+    for(const button of fullscreenButtons){
+        button.hidden=typeof app.requestFullscreen!=='function';
+        const label=active?'Sair da tela cheia':'Entrar em tela cheia';
+        button.setAttribute('aria-label',label);button.setAttribute('aria-pressed',String(active));button.title=label;
+        const text=button.querySelector('.fullscreen-label');if(text)text.textContent=label;
+        button.querySelector('use')?.setAttribute('href',active?'#i-collapse':'#i-expand');
+    }
+}
+for(const button of fullscreenButtons)button.addEventListener('click',async()=>{
+    if(['playing','countdown','arrival'].includes(game.state))pauseFlight('Ajuste a tela e continue quando estiver pronto.');
+    try{
+        if(document.fullscreenElement===app)await document.exitFullscreen();
+        else await app.requestFullscreen();
+    }catch{toast('Este navegador não permitiu alterar a tela cheia. Você pode continuar jogando.');}
+    syncFullscreenControls();
+});
+document.addEventListener('fullscreenchange',syncFullscreenControls);
+syncFullscreenControls();
 
 // Install menu controls exactly ONCE per page load, not whenever home() runs.
 // Re-registering from home() caused a dead first-click and stacked listeners

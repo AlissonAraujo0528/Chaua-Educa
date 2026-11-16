@@ -43,3 +43,19 @@ test('unprotected simultaneous contacts emit one defeat and pause freezes recove
  assert.equal(events.filter(e=>e.type==='lose').length,1);
  const {g:h}=setup();h.shield=true;h.boundaryContact('bottom');h.pause();const grace=h.invincible;for(let i=0;i<240;i++)h.tick(STEP);assert.equal(h.invincible,grace);
 });
+
+test('ground rebound grace still resolves solid trees without consuming another shield',()=>{
+ for(const side of ['top','bottom']){
+  const {g,events}=setup();g.shield=true;g.boundaryContact(side);
+  assert.equal(g.invincible,CONTACT.grace);g.shield=true;
+  const e={id:1,kind:'wood',x:g.x,top:220,bottom:420,variant:'plain'};g.entities=[e];
+  g.y=side==='top'?75:570;g.previous.y=g.y;g.vy=0;
+  g.tick(STEP);
+  assert.equal(g.state,'playing');assert.equal(g.shield,true);assert.equal(e.contacted,true);
+  assert.equal(g.previous.y,g.y,'recovery must not interpolate through wood');
+  assert.ok(g.woodRects(e).every(r=>!shapesHitRect(playerShapes(g.x,g.y,g.angle),r)));
+  assert.equal(events.filter(e=>e.type==='shield-break').length,1);
+  assert.equal(g.invincible,CONTACT.grace-STEP,'tree must not renew the grace window');
+  e.x=g.x-210;g.tick(STEP);assert.equal(g.score,0,'rescued tree cannot award clean passage');
+ }
+});

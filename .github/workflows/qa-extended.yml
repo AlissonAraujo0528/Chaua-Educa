@@ -149,6 +149,9 @@ jobs:
           node tests/browser-three-screen-refinement.cjs
           REFINEMENT_BROWSER=firefox node tests/browser-three-screen-refinement.cjs
           REFINEMENT_BROWSER=webkit node tests/browser-three-screen-refinement.cjs
+          node tests/browser-polish-1091.cjs
+          REFINEMENT_BROWSER=firefox node tests/browser-polish-1091.cjs
+          REFINEMENT_BROWSER=webkit node tests/browser-polish-1091.cjs
       - name: Save three-screen screenshots
         if: always()
         uses: actions/upload-artifact@v6

@@ -2,7 +2,7 @@
 export class ForestAudio {
     constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)()) {
         this.contextFactory=contextFactory;this.enabled=false;this.context=null;
-        this.liveTones=new Set();this.volume=.7;this.voices=0;this.nextFilter=0;this.visible=true;this.nextChirp=0;this.active=false;this.lastFlap=-Infinity;
+        this.liveTones=new Set();this.volume=.7;this.voices=0;this.nextFilter=0;this.visible=true;this.active=false;this.lastFlap=-Infinity;
     }
     setVolume(value) {
         this.volume=Number.isFinite(value)?Math.max(0,Math.min(1,value)):.7;
@@ -105,11 +105,6 @@ export class ForestAudio {
             this.filter.frequency.setTargetAtTime(windFrequency + rain * 1450 + storm * 450,c.currentTime,.5);
             const rumble = Math.pow(.5 + .5 * Math.sin(time * 1.55), 4);
             this.thunder.gain.setTargetAtTime(storm * rumble * .8, c.currentTime, .25);
-        }
-        if(storm<.25 && c.currentTime>=this.nextChirp) {
-            this.nextChirp=c.currentTime+5+(Math.sin(time)*.5+.5)*5;
-            this.tone(1650,c.currentTime,.13,.06,'sine',2300);
-            this.tone(2100,c.currentTime+.18,.16,.05,'sine',1450);
         }
         } catch { /* Device interruption must not stop the rendering loop. */ }
     }
