@@ -55,6 +55,9 @@ const playwright=require('playwright'),name=process.env.ACCESS_BROWSER||'chromiu
   await stable();await page.evaluate(async()=>{const g=(await import('/js/script.js')).game;g.state='playing';g.entities=[];g.invincible=99;g.y=320;g.vy=0;});
   await page.setViewportSize({width:height,height:width});await page.locator('#pause-dialog').waitFor({state:'visible'});assert.match(await page.locator('#pause-message').textContent(),/orientação/);
   await page.setViewportSize({width,height});
+  if(height<=500){
+   for(const selector of ['#resume-button','#pause-settings','#pause-dialog .back-home']){const b=await page.locator(selector).boundingBox();assert.ok(b.y>=0&&b.y+b.height<=height&&b.height>=44,'Short pause action must be visible: '+JSON.stringify({selector,b,width,height}));}
+  }
   await page.locator('#pause-dialog').screenshot({path:`${out}/${name}-${width}-pause.png`});
   await page.locator('#resume-button').click();await stable();
   await page.evaluate(()=>document.dispatchEvent(new Event('fullscreenchange')));await page.locator('#pause-dialog').waitFor({state:'visible'});assert.match(await page.locator('#pause-message').textContent(),/tela cheia/);
