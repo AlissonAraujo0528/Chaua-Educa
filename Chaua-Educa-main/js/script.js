@@ -272,7 +272,23 @@ for(const button of fullscreenButtons)button.addEventListener('click',async()=>{
     }catch{toast('Este navegador não permitiu alterar a tela cheia. Você pode continuar jogando.');}
     syncFullscreenControls();
 });
-document.addEventListener('fullscreenchange',syncFullscreenControls);
+// Fullscreen promotes the app into the browser's top layer. Some desktop
+// browsers leave a modal opened before that promotion underneath the app.
+// Reinsert only the pause modal after the native transition; its close event
+// has no navigation side effects. Never resume the simulation here.
+function restoreFullscreenPause(){
+    if(document.fullscreenElement!==app || game.state!=='paused')return;
+    const pause=$('#pause-dialog');
+    // Another modal (for example settings) may intentionally cover the pause.
+    if(dialogs.some(dialog=>dialog!==pause&&dialog.open))return;
+    if(pause.open)pause.close();
+    openDialog('#pause-dialog');
+    $('#resume-button').focus({preventScroll:true});
+}
+document.addEventListener('fullscreenchange',()=>{
+    syncFullscreenControls();
+    restoreFullscreenPause();
+});
 syncFullscreenControls();
 
 // Install menu controls exactly ONCE per page load, not whenever home() runs.
