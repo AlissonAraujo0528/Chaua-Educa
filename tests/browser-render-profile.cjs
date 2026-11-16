@@ -56,10 +56,10 @@ const {chromium}=require('playwright');
     let commands=[];const context=r.c;
     const serial=value=>value&&typeof value==='object'?value.constructor.name:value;
     const record=(key,args)=>{
-     // Context-bound gradients are now cached. Their constructor frequency
+     // Context-bound gradients and bark patterns are cached. Constructor frequency
      // is an allocation detail, not logical geometry; compare their actual
      // fillStyle/draw commands instead (and still compare all preset pixels).
-     if(key==='createLinearGradient'||key==='createRadialGradient')return;
+     if(key==='createLinearGradient'||key==='createRadialGradient'||key==='createPattern')return;
      // Seasonal surfaces are blitted in physical pixels under the identity
      // transform. Check their pixel snapping, then compare logical placement.
      if(key==='drawImage' && [...r.seasonalBackdrop.frames.values()].includes(args[0])){
@@ -78,7 +78,7 @@ const {chromium}=require('playwright');
      const draw=resolution=>{r.setVisualProfile({resolution,decoration});commands=[];r.game(g,false,50);return JSON.stringify(commands);};
      const high=draw('high'),highSize=r.canvas.width*r.canvas.height;
      const low=draw('low'),lowSize=r.canvas.width*r.canvas.height;
-     check(high===low,`resolution changed decoration or geometry: ${decoration}`);
+     check(high===low,`resolution changed decoration or geometry: ${decoration}; first difference ${JSON.parse(high).findIndex((cmd,i)=>JSON.stringify(cmd)!==JSON.stringify(JSON.parse(low)[i]))}`);
      check(lowSize<highSize,'resolution did not reduce backing pixels');
      checks.push({decoration,highPixels:highSize,lowPixels:lowSize});
     }
