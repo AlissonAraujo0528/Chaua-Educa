@@ -1,3 +1,4 @@
+import {FlightCues, nativeKeyboardTarget} from './flight-accessibility.mjs';
 import {OBSERVATION_DETAILS} from './chapter-learning.mjs';
 import {JOURNAL_PHOTOS} from './journal-content.mjs';
 import {chapterCheckpoint} from './chapter-checkpoints.mjs';
@@ -43,7 +44,11 @@ const dialogs = [...document.querySelectorAll('dialog')];
 let player = '', selectedMode = 'aventura', previousState = '', board = 'aventura';
 let returnToMissionsResult = false;
 let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0;
-let resultAnimation = null, soundOn = true;
+let resultAnimation = null, soundOn = true, audioInterrupted = false;
+const flightCues = new FlightCues();
+const controlsSide=DB.readObject('chaua-controls-side','right');
+app.dataset.controlsSide=controlsSide==='left'?'left':'right';
+let warningSounds=DB.readObject('chaua-warning-sounds',true)!==false;
 let assetsReady = false, lastOrientation = null, openingFlight = false;
 let flightMissionIds = [];
 let flightLearning=createFlightLearning(),learningReturnFocus=null;
@@ -52,7 +57,7 @@ try { const saved = localStorage.getItem('chaua-sound'); soundOn = saved === nul
 const forestAudio=new ForestAudio();
 forestAudio.setEnabled(soundOn);
 forestAudio.setVolume(DB.readObject('chaua-volume',.7));
-function sound(type) { forestAudio.setEnabled(soundOn);forestAudio.play(type); }
+function sound(type) { forestAudio.setEnabled(soundOn);if(!audioInterrupted&&!document.hidden)forestAudio.play(type); }
 
 function toast(text) {
     $('#toast').textContent = text;
@@ -113,7 +118,7 @@ function resize() {
     renderer.resize();
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
-        clearInputs(); game.pause(); clock.reset(); syncUI();
+        pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');
     }
     lastOrientation=orientation;
     const view = renderer.getViewport();
@@ -168,6 +173,7 @@ async function launchFlight(training = false, checkpoint = null) {
     } finally {
         openingFlight = false;
     }
+    if(document.hidden)return;
     start(training,checkpoint);
     if(mobile && window.innerHeight > window.innerWidth)
         toast('Para ampliar a visão, ative a rotação automática e vire o celular.');
@@ -176,7 +182,7 @@ async function launchFlight(training = false, checkpoint = null) {
 function start(training = false, checkpoint = null) {
     training = training === true;
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
-    closeDialogs(); clearInputs();
+    closeDialogs(); clearInputs(); flightCues.reset();
     cancelAnimationFrame(resultAnimation);
     // Reassess the quality profile before the layout-changing in-flight class.
     // Otherwise the renderer may synchronously measure DOM during this transition.
@@ -194,12 +200,12 @@ function start(training = false, checkpoint = null) {
     $('#score-bonus').textContent = ''; $('#toast').classList.remove('visible'); toastUntil = 0;
     $('#screen-reader-status').textContent = checkpoint?`Retomando ${STAGES[game.stage]}. Novos pontos nesta tentativa; seu recorde permanece preservado.`:'O voo vai começar. Toque, seta para cima ou espaço para bater asas. Solte para descer.';
     // Remove focus from the submitting/restarting button, avoiding Space clicks.
-    document.activeElement?.blur();
+    $('#flap-button').focus({preventScroll:true});
     syncUI();
 }
 function home() {
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
-    game.reset(); previousState = ''; clock.reset(); lastTime = 0;
+    game.reset(); flightCues.reset(); previousState = ''; clock.reset(); lastTime = 0;
     releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
     app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();updateChapterButtons();
@@ -289,17 +295,23 @@ $('#continue-chapter-result').addEventListener('click',()=>{
 $('#restart-button').addEventListener('click', () => { void launchFlight(); });
 $('.brand').addEventListener('click', event => { event.preventDefault(); home(); });
 document.querySelectorAll('.back-home').forEach(button => button.addEventListener('click', home));
-$('#pause-button').addEventListener('click', () => { clearInputs(); game.pause(); syncUI(); });
-$('#resume-button').addEventListener('click', () => { $('#pause-dialog').close(); clearInputs(); game.resume(); syncUI(); });
+function pauseFlight(message='Seu voo e seus poderes estão pausados.') {
+    clearInputs(); game.pause(); clock.reset(); lastTime=0;
+    if(game.state==='paused')$('#pause-message').textContent=message;
+    syncUI();
+}
+$('#pause-button').addEventListener('click', () => pauseFlight());
+$('#resume-button').addEventListener('click', () => { $('#pause-dialog').close(); clearInputs(); game.resume(); clock.reset(); lastTime=0; syncUI(); $('#flap-button').focus({preventScroll:true}); });
 $('#pause-dialog').addEventListener('cancel', event => { event.preventDefault(); $('#resume-button').click(); });
 $('#quiz-dialog').addEventListener('cancel', event => event.preventDefault());
 $('#result-dialog').addEventListener('cancel', event => { event.preventDefault(); home(); });
 
 $('#flap-button').addEventListener('pointerdown', event => {
+    if(event.button!==0)return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); hold(`pointer-${event.pointerId}`);
 });
 $('#forest').addEventListener('pointerdown', event => {
-    if (!app.classList.contains('in-flight')) return;
+    if (!app.classList.contains('in-flight') || event.button!==0) return;
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold(`pointer-${event.pointerId}`);
 });
 window.addEventListener('pointerup', event => release(`pointer-${event.pointerId}`));
@@ -308,17 +320,22 @@ $('#flap-button').addEventListener('lostpointercapture', event => flightInput.ca
 $('#forest').addEventListener('lostpointercapture', event => flightInput.cancel(`pointer-${event.pointerId}`));
 $('#flap-button').addEventListener('click', event => { if (event.detail === 0) { hold('activation'); release('activation'); } });
 window.addEventListener('keydown', event => {
+    if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing)return;
     if (game.state === 'quiz') {
-        if(game.observationOpen)return;
+        if(game.observationOpen||event.target?.closest?.('input,select,textarea,[contenteditable="true"]'))return;
         if (['v', 'f'].includes(event.key.toLowerCase()) && !event.repeat) { event.preventDefault(); answer(event.key.toLowerCase() === 'v'); }
         return;
     }
     if (!['playing', 'countdown','arrival'].includes(game.state)) return;
-    if (['Escape', 'p', 'P'].includes(event.key) && !event.repeat) { event.preventDefault(); clearInputs(); game.pause(); syncUI(); return; }
+    if (['Escape', 'p', 'P'].includes(event.key) && !event.repeat) { event.preventDefault(); pauseFlight(); return; }
+    if(nativeKeyboardTarget(event.target)&&event.target!==$('#flap-button'))return;
     if (['ArrowUp', 'Space'].includes(event.code)) { event.preventDefault(); if (!event.repeat) hold(event.code); }
 });
 window.addEventListener('keyup', event => { if (['ArrowUp', 'Space'].includes(event.code)) release(event.code); });
-function autoPause() { clearInputs(); game.pause(); forestAudio.update('paused',false,game.elapsed,game.stage); syncUI(); }
+function autoPause() { audioInterrupted=true; pauseFlight('Você saiu do jogo. O voo está seguro e pausado; continue quando estiver pronto.'); forestAudio.update('paused',false,game.elapsed,game.stage); }
+window.addEventListener('pagehide',autoPause);
+window.addEventListener('pageshow',event=>{if(event.persisted){autoPause();syncMobileViewport();resize();}});
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app.classList.contains('in-flight'))pauseFlight('A tela cheia foi encerrada. Seu voo continua pausado.');});
 window.addEventListener('blur', autoPause);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 
@@ -334,6 +351,9 @@ sound('fruit'); });
 updateSoundButton();
 
 const unlockAudio = () => {
+    if(document.hidden)return;
+    audioInterrupted=false;
+    forestAudio.visible=true;
     if (soundOn) {
         forestAudio.ensure();
         if (forestAudio.context && forestAudio.context.state === 'suspended') {
@@ -341,7 +361,7 @@ const unlockAudio = () => {
         }
     }
 };
-['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true, once: true }));
+['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true }));
 
 
 function answer(value) {
@@ -499,7 +519,7 @@ function syncUI() {
     if (game.state !== previousState) {
         app.dataset.state = game.state;
         if (!(previousState === 'countdown' && game.state === 'playing')) clearInputs();
-        if (game.state === 'paused') openDialog('#pause-dialog');
+        if (game.state === 'paused') { openDialog('#pause-dialog'); $('#resume-button').focus({preventScroll:true}); }
         if (game.state === 'quiz') {
             const discovery=game.chapterDiscovery;$('#chapter-discovery').hidden=!discovery;$('#chapter-discovery').open=false;
             if(discovery){
@@ -521,7 +541,11 @@ function syncUI() {
     }
     const hideCountdown=game.state!=='countdown';
     if(hud('#countdown').hidden!==hideCountdown)hud('#countdown').hidden=hideCountdown;
-    if (game.state === 'countdown') hudText('#count-number',Math.max(1, Math.ceil(game.countdown)));
+    if (game.state === 'countdown') {
+        const number=Math.max(1,Math.ceil(game.countdown));hudText('#count-number',number);
+        if(flightCues.countdown(number)) { $('#screen-reader-status').textContent=`Prepare as asas: ${number}`; sound('countdown'); }
+    } else flightCues.countdown(null);
+    for(const cue of flightCues.warnings(game)) { hudText('#flight-alert',cue.text); if(warningSounds)sound(cue.sound); }
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
     hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(journeyProgress(game)*100)}%`);
@@ -564,7 +588,7 @@ function frame(time) {
         syncUI();lastHudTime=time;
         if(probe)probe.end('ui.sync',hudAt);
     }
-    forestAudio.update(game.state,!document.hidden&&document.hasFocus(),time/1000,game.stage,
+    forestAudio.update(game.state,!audioInterrupted&&!document.hidden&&document.hasFocus(),time/1000,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){
@@ -671,6 +695,9 @@ function showSettings(fromPause=false){
     if(fromPause)$('#pause-dialog').close();
     $('#quality-mode').value=quality.mode;
     if($('#weather-mode')) $('#weather-mode').value=getWeatherMode();
+    $('#controls-side').value=app.dataset.controlsSide;
+    $('#warning-sounds').checked=warningSounds;
+    $('#settings-sound').checked=soundOn;
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
     openDialog('#settings-dialog');
@@ -701,3 +728,7 @@ if(new URLSearchParams(location.search).get('perf-test')==='1'){
         .then(({mountPerformanceProbe})=>mountPerformanceProbe({game,quality,renderer}))
         .catch(error=>console.error('Falha ao iniciar diagnóstico local:',error));
 }
+
+$('#controls-side').addEventListener('change',event=>{app.dataset.controlsSide=event.target.value;saveSetting('chaua-controls-side',event.target.value);});
+$('#warning-sounds').addEventListener('change',event=>{warningSounds=event.target.checked;saveSetting('chaua-warning-sounds',warningSounds);});
+$('#settings-sound').addEventListener('change',event=>{soundOn=event.target.checked;try{localStorage.setItem('chaua-sound',String(soundOn));}catch{} forestAudio.setEnabled(soundOn);updateSoundButton();if(soundOn)sound('correct');});

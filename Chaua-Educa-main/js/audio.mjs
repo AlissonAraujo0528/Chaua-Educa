@@ -2,7 +2,7 @@
 export class ForestAudio {
     constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)()) {
         this.contextFactory=contextFactory;this.enabled=false;this.context=null;
-        this.volume=.7;this.voices=0;this.nextFilter=0;this.visible=true;this.nextChirp=0;this.active=false;this.lastFlap=-Infinity;
+        this.liveTones=new Set();this.volume=.7;this.voices=0;this.nextFilter=0;this.visible=true;this.nextChirp=0;this.active=false;this.lastFlap=-Infinity;
     }
     setVolume(value) {
         this.volume=Number.isFinite(value)?Math.max(0,Math.min(1,value)):.7;
@@ -13,7 +13,7 @@ export class ForestAudio {
         try {if(!enabled && this.master)this.master.gain.setTargetAtTime(0,this.context.currentTime,.025);} catch {}
     }
     ensure() {
-        if(!this.enabled)return false;
+        if(!this.enabled||!this.visible)return false;
         try {
             if(!this.context) {
                 const c=this.context=this.contextFactory();
@@ -36,7 +36,7 @@ export class ForestAudio {
                 this.wind.connect(thunderFilter).connect(this.thunder).connect(this.ambient);
                 this.wind.start();
             }
-            if(this.context.state==='suspended'&&this.visible)this.context.resume().catch(()=>{});
+            if(['suspended','interrupted'].includes(this.context.state)&&this.visible)this.context.resume().catch(()=>{});
             this.master.gain.setTargetAtTime(this.visible?this.volume:0,this.context.currentTime,.04);
             return true;
         } catch { this.context=null;return false; }
@@ -48,19 +48,19 @@ export class ForestAudio {
         let released=false;
         const release=()=>{
             if(released)return;released=true;this.voices=Math.max(0,this.voices-1);
-            o.disconnect();g.disconnect();
+            this.liveTones.delete(o);o.disconnect();g.disconnect();
         };
         try {
-            o.type=type;o.frequency.setValueAtTime(frequency,when);o.frequency.exponentialRampToValueAtTime(Math.max(30,end),when+duration);
+            this.liveTones.add(o);o.type=type;o.frequency.setValueAtTime(frequency,when);o.frequency.exponentialRampToValueAtTime(Math.max(30,end),when+duration);
             g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(volume,when+.012);g.gain.exponentialRampToValueAtTime(.0001,when+duration);
             o.connect(g).connect(this.master);o.onended=release;o.start(when);o.stop(when+duration+.015);
         } catch {release();}
 
     }
     play(type) {
-        if(!this.enabled)return;
+        if(!this.enabled||!this.visible)return;
         // UI-only events should never initialize an audio device.
-        const notes={fruit:[660,880],shield:[330,494,660],'shield-break':[220,147],feather:[523,659,784,1046],
+        const notes={countdown:[440],'snake-warning':[330,220],'hawk-warning':[740,494],fruit:[660,880],shield:[330,494,660],'shield-break':[220,147],feather:[523,659,784,1046],
             'feather-end':[660,440],pepper:[440,554,659,880,1108],'pepper-end':[880,659,440],'tutorial-step':[523,659],'tutorial-complete':[659,784,1046],correct:[660,880,990],incorrect:[260,196],lose:[392,330,220],win:[523,659,784,1046,1318]};
         if(type!=='flap'&&!notes[type])return;
         if(!this.ensure())return;
@@ -70,7 +70,7 @@ export class ForestAudio {
                 if(now-this.lastFlap<.15)return;
                 this.lastFlap=now;this.tone(210,now,.09,.15,'triangle',70);this.tone(140,now+.02,.07,.12,'sine',50);return;
             }
-            notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['feather-end','pepper-end'].includes(type) ? .08 : .18,type==='shield-break'?'triangle':'sine'));
+            notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['countdown','snake-warning','hawk-warning','feather-end','pepper-end'].includes(type) ? .08 : .18,type==='shield-break'?'triangle':'sine'));
         } catch { /* Audio failure never blocks the game. */ }
     }
     update(state,visible,time,stage,rain=0,storm=0,wind=0) {
@@ -78,6 +78,7 @@ export class ForestAudio {
         try {
         if(this.visible!==visible){
             this.visible=visible;
+            if(!visible){for(const oscillator of this.liveTones){try{oscillator.stop();}catch{}}}
             this.master.gain.setTargetAtTime(this.enabled&&visible?this.volume:0,this.context.currentTime,.025);
             // Muting a gain node does NOT stop Biquad processing. Suspend the
             // audio graph when hidden and resume it on focus restoration.

@@ -135,3 +135,16 @@ O lançamento público é **2.0.0**, sem uma etapa 1.1.0 substituindo esse objet
 ## Integração
 
 A branch parte do commit `79190a4` do PR #77, conservando os três botes e as três investidas do predador. A main e o endereço público não são atualizados automaticamente durante os incrementos de preparação. O PR de preparação funciona como integração revisável até o lançamento.
+
+
+## 1.0.8 — celular, teclado, pausa e áudio
+
+- Ajustes oferecem lado esquerdo/direito do botão de voo, sons do jogo e avisos sonoros de ataques, preservados neste navegador; sem armazenamento, valem para a sessão. O botão de som também fica acessível dentro da pausa por Ajustes.
+- Espaço mantém o botão nativo de pausa utilizável por teclado. O botão Voar recebe foco ao iniciar/retomar e mantém espaço/↑ seguráveis; Enter e ativação assistiva continuam disponíveis. Modificadores e composição de texto não acionam os atalhos do jogo. Seletores, resumos e elementos com tabindex recebem foco visível.
+- Saída do aplicativo (blur, visibilitychange e pagehide), restauração do histórico e saída da tela cheia mantêm o voo pausado, comandos limpos e retorno explícito com contagem. Rotação durante o voo explica a pausa. Áudio suspenso/interrompido é recuperado por interação, com tons antigos cancelados ao ocultar a página.
+- Contagem tem sinal curto e texto anunciado a cada número. Ataques oferecem sons distintos opcionais e anúncio textual, uma vez por encontro; os avisos visuais existentes continuam iguais com áudio desligado. Nenhum novo som antecipa as janelas de aviso existentes ou muda a dificuldade. Não há síntese de fala obrigatória.
+- Áreas seguras continuam reservadas em ambos os lados do controle; diálogos têm largura descontando recortes. Menu pequeno admite rolagem interna se necessário; durante o voo a página continua sem rolagem. Retrato continua utilizável quando o navegador nega rotação/tela cheia.
+
+Verificação: novos testes de lógica de deduplicação de avisos, contagem, áudio oculto/silenciado, cancelamento de tons e dispositivo interrompido/indisponível. Fluxo de navegador cobre preferências após recarga, teclado em controles nativos, captura/cancelamento do ponteiro, foco entre pausa/ajustes/voo, congelamento dos poderes, retorno do aplicativo/histórico, rotação, tela cheia e margens seguras simuladas. Matriz automatizada: Chromium, Firefox e WebKit; 1366×768, 320×568, 568×320, 390×844 e 844×390, com movimento reduzido. Capturas em `accessibility-108`.
+
+Limites: eventos de ciclo de vida e recortes são simulados onde indicado, não representam troca real de aplicativos ou recortes físicos. Android/iPhone, teclado virtual real, Bluetooth/áudio interrompido pelo SO, leitores de tela e conforto dos avisos com pessoas continuam pendentes. A interface acessível não transforma o voo visual em uma experiência integralmente jogável sem visão. A matriz de aparelhos da beta continua necessária.

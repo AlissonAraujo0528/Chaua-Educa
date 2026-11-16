@@ -2082,3 +2082,16 @@ html.mobile-device body { position: fixed; inset: 0; }
 .observation figcaption small { display:block; margin-top:4px; font-size:10px; }
 
 .observation-guides { position:absolute; inset:0; width:100%; height:100%; fill:none; pointer-events:none; }
+
+/* 1.0.8: controls remain reachable with cutouts, keyboard focus and either hand. */
+select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline:3px solid #7d9c37; outline-offset:3px; }
+#settings-dialog select, #settings-dialog input[type=range] { min-height:44px; width:100%; }
+.setting-check { display:flex; align-items:center; gap:12px; min-height:48px; margin:12px 0; font-weight:800; }
+.setting-check input { width:24px; height:24px; accent-color:#315e40; flex-shrink:0; }
+.app[data-controls-side=left] .hud .flap-button { left:calc(var(--safe-left) + 16px); right:auto; }
+.app[data-controls-side=left] .hud .flight-help { left:auto; right:calc(var(--safe-right) + 12px); }
+.app[data-controls-side=left] .flight-help > span:first-child { display:none; }
+.app.mobile-device dialog { width:calc(100% - var(--safe-left) - var(--safe-right) - 24px); }
+@media (max-width:700px) {
+  .app.mobile-device:not(.in-flight) .home { overflow-y:auto; overscroll-behavior:contain; }
+}
