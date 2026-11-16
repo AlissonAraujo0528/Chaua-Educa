@@ -9,6 +9,7 @@
 | Transferência ou decodificação sem resposta podia impedir o início indefinidamente | Limite de 20 segundos, limpeza de callbacks e nova tentativa explícita | Testes de transferência e decodificador pendentes |
 | Cache podia esconder atualização de outra aba | Invalidação dos registros duráveis por `storage`; memória não salva protegida | Duas abas, atualizações sequenciais, recarga e preservação dos dois nomes |
 | Falha posterior de leitura não preservava tudo que já fora lido | Snapshot de leituras válidas em memória e aviso de indisponibilidade | Bloqueio posterior e consulta dos dados já lidos |
+| WebKit podia sinalizar um ciclo de ResizeObserver durante mudanças de tamanho | Atualizações de Canvas agrupadas para o próximo quadro, fora da entrega do observador | Regressões de controles/rotação e sequência de tamanhos em três motores |
 | Publicação dependia de conferências separadas de arquivos | Comando único de auditoria, obrigatório no CI | `npm run audit:release` |
 
 ## Inventário de publicação

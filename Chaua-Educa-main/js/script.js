@@ -134,7 +134,13 @@ function resize() {
     game.viewLeft = Math.floor(view.worldLeft);
     if(resizeProbe)resizeProbe.end('ui.resize',resizeAt);
 }
-const layoutObserver=new ResizeObserver(resize);
+// Canvas mutations belong to the next animation frame, outside observer delivery.
+// Coalesce app/canvas notifications to avoid WebKit's undelivered resize loop.
+let observedResize=0;
+const layoutObserver=new ResizeObserver(()=>{
+    if(observedResize)return;
+    observedResize=requestAnimationFrame(()=>{observedResize=0;resize();});
+});
 layoutObserver.observe(app);
 layoutObserver.observe($('#forest'));
 window.addEventListener('resize', resize);

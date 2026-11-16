@@ -36,10 +36,11 @@ const name=process.env.RELIABILITY_BROWSER||'chromium',root=process.env.GAME_URL
   await page.locator('#inputPlayer').fill('Ana');await page.locator('input[name=mode][value=tranquilo]').check();await page.locator('#continue-chapter-menu:not([hidden])').click();
   assert.equal(await page.evaluate(async()=>(await import('/js/script.js')).game.resumed),true);assert.equal(await page.evaluate(async()=>(await import('/js/script.js')).game.stage),2);
   assert.deepEqual(errors,[]);await context.close();console.log('PASS persistence after reload, sequential tabs, legacy preservation and chapter resume',name);
-  const denied=await browser.newContext({viewport:{width:390,height:844}});await denied.addInitScript(()=>{Storage.prototype.getItem=()=>{throw Error('blocked storage');};Storage.prototype.setItem=()=>{throw Error('blocked storage');};});
+  const denied=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:name!=='firefox',userAgent:'Mozilla/5.0 (Linux; Android 16; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Mobile Safari/537.36'});await denied.addInitScript(()=>{Storage.prototype.getItem=()=>{throw Error('blocked storage');};Storage.prototype.setItem=()=>{throw Error('blocked storage');};});
   const blocked=await denied.newPage(),blockedErrors=[];blocked.on('pageerror',e=>blockedErrors.push(e.message));await blocked.goto(root,{waitUntil:'networkidle'});await blocked.locator('#start-training:not([disabled])').waitFor();
   await blocked.locator('#persistence-status:not([hidden])').waitFor();assert.match(await blocked.locator('#persistence-status').textContent(),/apenas nesta aba/);
   assert.deepEqual(await blocked.evaluate(async()=>{const {default:DB}=await import('/js/database.js');DB.upsertPlayerScore('Ana',42);DB.upsertPlayerScore('Ana',20);DB.unlock('Manga');return [DB.get()[0].score_val,DB.unlocked().includes('Manga'),DB.storageAvailable];}),[42,true,false]);
+  for(const viewport of [{width:320,height:568},{width:568,height:320},{width:390,height:844}]){await blocked.setViewportSize(viewport);await blocked.waitForTimeout(80);}
   assert.deepEqual(blockedErrors,[]);await denied.close();console.log('PASS blocked storage remains playable and explains session-only progress',name);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
