@@ -1,6 +1,8 @@
 # Chaua-Educa
 
-## Preparação para a Versão 2.0 · versão 1.0.8
+## Preparação para a Versão 2.0 · versão 1.0.9
+
+Antes de publicar, execute `npm run audit:release`: a auditoria verifica o grafo de módulos, recursos locais, hashes, versões, créditos e licenças, e gera um inventário em `test-results/release-audit.json`. Consulte [a validação da 1.0.9](docs/confiabilidade-1.0.9.md).
 
 No GitHub Pages, a raiz do repositório abre automaticamente `Chaua-Educa-main/`. O arquivo `index.html` da raiz deve acompanhar a branch publicada, inclusive nos forks.
 

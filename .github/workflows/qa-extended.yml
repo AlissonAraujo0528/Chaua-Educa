@@ -98,3 +98,34 @@ jobs:
           path: test-results/responsive-panels/
           if-no-files-found: ignore
           retention-days: 7
+
+  reliability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:release
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify loading recovery and durable progress
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-reliability.log 2>&1 &
+          reliability_pid=$!
+          trap 'kill "$reliability_pid" 2>/dev/null' EXIT
+          node tests/browser-reliability-109.cjs
+          RELIABILITY_BROWSER=firefox node tests/browser-reliability-109.cjs
+          RELIABILITY_BROWSER=webkit node tests/browser-reliability-109.cjs
+      - name: Save reliability evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reliability-109
+          path: |
+            test-results/reliability-109/
+            test-results/release-audit.json
+          if-no-files-found: ignore
+          retention-days: 7

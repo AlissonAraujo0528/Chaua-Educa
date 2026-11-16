@@ -1,3 +1,4 @@
+import {loadImage} from './image-loader.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
 // One cache for gameplay, menus and results. All files are local.
 export const ASSET_PATHS = Object.fromEntries([
@@ -24,25 +25,14 @@ export function loadAssets() {
  if(typeof Image==='undefined')return Promise.resolve([]);
  if(pending)return pending;
  pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
-  const img=new Image(),url=new URL(path,import.meta.url).href;
-  await new Promise((resolve,reject)=>{
-   img.onload=resolve;
-   img.onerror=()=>reject(new Error(`Não foi possível carregar ${key}: ${url}`));
-   img.src=url;
-  });
-  if(!img.naturalWidth||!img.naturalHeight)
-   throw new Error(`Imagem vazia ou inválida: ${key}`);
-  const expected=runtimeDimensions.get(key);
-  if(expected&&(img.naturalWidth!==expected[0]||img.naturalHeight!==expected[1]))
-   throw new Error(`Dimensões incorretas no atlas obrigatório: ${key}`);
-  // onload may precede decoding; await it, but do NOT claim GPU texture
-  // residency: the browser may upload textures on first actual drawing.
-  if(typeof img.decode==='function'){
-   try{await img.decode();}
-   catch(error){throw new Error(`Não foi possível decodificar ${key}: ${url}`,{cause:error});}
-  }
-  images.set(key,img);
-  return img;
- })).catch(error=>{images.clear();pending=null;throw error;});
+  const [width,height]=runtimeDimensions.get(key)||[];
+  const url=new URL(path,import.meta.url).href;
+  const image=await loadImage(url,{width,height,errorMessage:`Não foi possível carregar ${key}: ${url}`});
+  return [key,image];
+ })).then(entries=>{
+  // Publish only the complete attempt; late callbacks from a failed attempt stay local.
+  for(const [key,image] of entries)images.set(key,image);
+  return entries.map(([,image])=>image);
+ }).catch(error=>{pending=null;throw error;});
  return pending;
 }

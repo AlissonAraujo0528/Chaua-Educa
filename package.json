@@ -1,6 +1,6 @@
 {
   "name": "chaua-educa",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "type": "module",
   "description": "Uma aventura educativa do papagaio-chauá pela Mata Atlântica.",
@@ -36,7 +36,8 @@
     "benchmark:render-parts": "node scripts/benchmark-render-parts.cjs",
     "benchmark:background-passes": "node scripts/benchmark-background-passes.cjs",
     "test:surface-foods": "node tests/browser-surface-foods.cjs",
-    "art:build": "python scripts/build_runtime_art.py"
+    "art:build": "python scripts/build_runtime_art.py",
+    "audit:release": "node scripts/validate-release.mjs --json test-results/release-audit.json"
   },
   "engines": {
     "node": ">=22"

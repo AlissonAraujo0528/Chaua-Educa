@@ -39,6 +39,7 @@ jobs:
       - run: node scripts/calibrate-climate-journey.mjs
       - run: npm run build
       - run: git diff --exit-code -- Chaua-Educa-main/css/style.css
+      - run: npm run audit:release
       - run: npx playwright install --with-deps chromium
       - name: Verify GitHub Pages under the actual repository URL prefix
         run: |
@@ -117,6 +118,7 @@ jobs:
         with:
           name: auto-visual-captures
           path: |
+            test-results/release-audit.json
             test-results/startup-memory/
             test-results/learning-flow/
             test-results/collision-art/

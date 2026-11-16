@@ -609,6 +609,10 @@ export class Renderer {
         // so wind drift and 8-stripe transitions blit 1:1 without bilinear rescaling.
         this.scaledForestCacheEnabled = true;
         this.cachedView = null;
+        this.initializeAssets();
+        this.resize();
+    }
+    initializeAssets() {
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
             prepareTreeWeather();
             // Warm up pickup radial caches during asset load so first spawn never stalls.
@@ -636,7 +640,7 @@ export class Renderer {
             this.hawk({id:1,x:0,y:0,warning:0,phase:'crossing'},0,false);
             this.c.restore();
         });
-        this.resize();
+        return this.ready;
     }
     setQuality(level) {
         const next=level==='low'?'low':'high';

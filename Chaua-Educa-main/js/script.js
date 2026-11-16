@@ -23,6 +23,14 @@ import { Renderer, drawBird } from './render.mjs';
 
 const $ = selector => document.querySelector(selector);
 const app = $('#app');
+DB.onStorageChange=available=>{
+    const notice=$('#persistence-status');notice.hidden=available;
+    if(!available)notice.textContent='O salvamento neste navegador está indisponível. Novos avanços ficam apenas nesta aba até conseguir salvá-los; mantenha-a aberta.';
+};
+window.addEventListener('storage',event=>{
+    DB.invalidateStorage(event.key);
+    if(game.state==='menu')updateChapterButtons();
+});
 const versionLabel=$('#build-version');
 if(versionLabel)versionLabel.textContent=`Versão ${GAME_VERSION} · preparação para a 2.0`;
 // Mobile browsers can expose a desktop-sized layout viewport even with a
@@ -654,15 +662,26 @@ $('#collection-dialog').addEventListener('close',()=>{
  }
 });
 
-renderer.ready.then(() => {
-    assetsReady=true;updateChapterButtons();
-    updateTrainingButton();
-    $('#asset-status').hidden=true;
-    $('#btnStart').disabled=$('#inputPlayer').value.trim().length<3;
-}).catch(error => {
-    $('#asset-status').textContent=error.message;
-    $('#btnStart').disabled=true;
-});
+let loadingGameAssets=false;
+async function prepareGameAssets(retry=false) {
+    if(loadingGameAssets)return;
+    loadingGameAssets=true;assetsReady=false;
+    $('#retry-assets').hidden=true;$('#retry-assets').disabled=true;
+    $('#asset-status').hidden=false;$('#asset-status').textContent='Carregando as artes da floresta…';
+    $('#btnStart').disabled=true;updateTrainingButton();updateChapterButtons();
+    try {
+        await (retry?renderer.initializeAssets():renderer.ready);
+        assetsReady=true;$('#asset-status').hidden=true;
+        $('#btnStart').disabled=$('#inputPlayer').value.trim().length<3;
+    } catch(error) {
+        $('#asset-status').textContent=`As artes não carregaram. Verifique a conexão e tente novamente. ${error.message}`;
+        $('#retry-assets').hidden=false;$('#retry-assets').disabled=false;
+    } finally {
+        loadingGameAssets=false;updateTrainingButton();updateChapterButtons();
+    }
+}
+$('#retry-assets').addEventListener('click',()=>void prepareGameAssets(true));
+void prepareGameAssets();
 
 function showMissions(fromResult=false) {
     const name=(fromResult?player:$('#inputPlayer').value).trim();
@@ -709,8 +728,7 @@ function showSettings(fromPause=false){
     openDialog('#settings-dialog');
 }
 function saveSetting(key,value){
-    DB.memory.set(key,value);
-    try {localStorage.setItem(key,JSON.stringify(value));} catch {DB.storageAvailable=false;}
+    DB.writeObject(key,value);
 }
 $('#open-settings').addEventListener('click',()=>showSettings());
 $('#pause-settings').addEventListener('click',()=>showSettings(true));

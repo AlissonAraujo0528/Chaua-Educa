@@ -1,3 +1,4 @@
+import {loadImage} from './image-loader.mjs';
 import {SNAKE_ATTACK_ART} from './snake-attack-art.mjs';
 import {snakeAttack} from './attack-patterns.mjs';
 import {SNAKE_TIMING} from './animals.mjs';
@@ -197,23 +198,12 @@ export function preloadSnakeA2(){
  if(loading)return loading;
  prepareScaledFootprint('high');prepareScaledFootprint('sweep');
  loading=Promise.all(Object.entries(PATHS).map(async([key,path])=>{
-  const image=new Image(),url=new URL(path,import.meta.url).href;
-  await new Promise((resolve,reject)=>{
-   image.onload=resolve;
-   image.onerror=()=>reject(new Error(`Não foi possível carregar a cobra A2: ${url}`));
-   image.src=url;
-  });
-  if(image.naturalWidth!==SNAKE_A2_GRID.columns*SNAKE_A2_GRID.cell||
-     image.naturalHeight!==SNAKE_A2_GRID.rows*SNAKE_A2_GRID.cell)
-   throw new Error(`Sprite A2 inválido (${key}): dimensões inesperadas.`);
-  if(typeof image.decode==='function'){
-   try{await image.decode();}
-   catch(error){throw new Error(`Não foi possível decodificar cobra A2 (${key})`,{cause:error});}
-  }
-  images.set(key,image);
- })).then(()=>{
-  if(images.size!==SNAKE_SHEET_KEYS.length)throw new Error('A cobra A2 não está pronta.');
- }).catch(error=>{images.clear();loading=null;throw error;});
+  const url=new URL(path,import.meta.url).href;
+  const image=await loadImage(url,{width:SNAKE_A2_GRID.columns*SNAKE_A2_GRID.cell,height:SNAKE_A2_GRID.rows*SNAKE_A2_GRID.cell,
+   errorMessage:`Não foi possível carregar a cobra A2 (${key}): ${url}`});
+  return [key,image];
+ })).then(entries=>{for(const [key,image] of entries)images.set(key,image);})
+ .catch(error=>{loading=null;throw error;});
  return loading;
 }
 export function isSnakeA2Ready(){return images.size===SNAKE_SHEET_KEYS.length;}

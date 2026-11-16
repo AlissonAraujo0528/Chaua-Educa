@@ -2258,3 +2258,7 @@ html:has(dialog[open]),html:has(dialog[open]) body { overflow:hidden; overscroll
 #ranking-dialog td,#ranking-dialog th { overflow-wrap:anywhere; }
 /* The 44px marker stays outside the face even on the compact photograph. */
 #observation-dialog .observation-hotspot[data-observation-detail=cabeca] { transform:translate(-30%,-50%); }
+
+#retry-assets { min-height:44px; width:100%; margin:4px 0; }
+#persistence-status { font-size:12px; line-height:1.4; margin:6px 0; color:#794919; }
+#asset-status { overflow-wrap:anywhere; }

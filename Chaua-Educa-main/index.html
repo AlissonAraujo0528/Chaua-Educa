@@ -13,6 +13,7 @@
   <script type="module" src="js/script.js"></script>
 </head>
 <body>
+  <noscript><p>Para jogar o Chauá Educa, ative o JavaScript no navegador e abra esta página novamente.</p></noscript>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3C8 2 2 7 5 15c6 7 16 1 15-12Z"/><path d="m4 21 12-13M9 16l-1-5m5 1 5 1"/></symbol>
     <symbol id="i-wing" viewBox="0 0 24 24"><path d="M3 19C1 11 10 4 21 3c-1 4-3 7-7 9l4-1c-1 4-5 6-9 5l2 2c-3 2-6 2-8 1Z"/></symbol>
@@ -41,7 +42,7 @@
           <fieldset class="mode-picker"><legend>Escolha seu ritmo</legend><label><input type="radio" name="mode" value="aventura" checked><span><b>Desafio</b><small>Dificuldade crescente · erro encerra o voo</small></span><i></i></label><label><input type="radio" name="mode" value="tranquilo"><span><b>Amigável</b><small>Mais espaço e tempo · aprenda com erros</small></span><i></i></label></fieldset>
           <button id="btnStart" class="primary start-button" type="submit" disabled>Vamos voar <svg><use href="#i-arrow"/></svg></button>
           <button id="continue-chapter-menu" class="text-button" type="button" hidden disabled></button><p id="chapter-menu-note" class="chapter-note" hidden>A retomada começa com novos pontos e não altera seu recorde.</p>
-          <button id="start-training" class="text-button" type="button" disabled>Experimentar o voo · treino seguro</button><p id="asset-status" role="status">Carregando as artes da floresta…</p><p class="card-note"><svg><use href="#i-leaf"/></svg> Aprender também é uma aventura.</p>
+          <button id="start-training" class="text-button" type="button" disabled>Experimentar o voo · treino seguro</button><p id="asset-status" role="status">Carregando as artes da floresta…</p><button id="retry-assets" class="text-button" type="button" hidden disabled>Tentar carregar novamente</button><p id="persistence-status" role="status" hidden></p><p class="card-note"><svg><use href="#i-leaf"/></svg> Aprender também é uma aventura.</p>
         </form>
         <div class="home-links"><button id="open-ranking"><svg><use href="#i-cup"/></svg> Ranking da floresta</button><span>·</span><button id="open-guide">Como jogar</button><span>·</span><button id="open-collection">Chauapédia</button><span>·</span><button id="open-missions">Minhas missões</button><span>·</span><button id="open-settings">Ajustes</button></div>
       </div>
