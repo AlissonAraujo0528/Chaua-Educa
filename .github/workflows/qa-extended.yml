@@ -70,3 +70,31 @@ jobs:
             test-results/editorial-ui/
           if-no-files-found: ignore
           retention-days: 7
+
+  responsive-panels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify responsive panels on desktop and phones
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-panels.log 2>&1 &
+          panels_pid=$!
+          trap 'kill "$panels_pid" 2>/dev/null' EXIT
+          node tests/browser-responsive-panels.cjs
+          PANEL_BROWSER=firefox node tests/browser-responsive-panels.cjs
+          PANEL_BROWSER=webkit node tests/browser-responsive-panels.cjs
+      - name: Save responsive panel screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: responsive-panels
+          path: test-results/responsive-panels/
+          if-no-files-found: ignore
+          retention-days: 7

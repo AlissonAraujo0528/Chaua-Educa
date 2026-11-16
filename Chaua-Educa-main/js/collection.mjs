@@ -38,10 +38,10 @@ export function journalIllustration(id){
  return art;
 }
 export function renderCollection(container,unlocked,{foods=[],foodContainer,detailContainer}={}){
- let previousFocus=null;const buttons=new Map();
+ let previousFocus=null,previousScroll=0;const buttons=new Map();
  const openDetail=(entry,button)=>{
   if(!detailContainer)return;
-  previousFocus=button;detailContainer.closest('.journal-shell').classList.add('is-reading');
+  previousFocus=button;const scrollBody=detailContainer.closest('.panel-body')||detailContainer.closest('dialog');previousScroll=scrollBody.scrollTop;detailContainer.closest('.journal-shell').classList.add('is-reading');
   const back=document.createElement('button');back.type='button';back.className='journal-back';back.textContent='← Voltar às descobertas';
   const title=document.createElement('h3');title.id='journal-detail-title';title.textContent=entry.title;
   const category=document.createElement('span');category.className='journal-category';category.textContent=entry.category;
@@ -52,8 +52,8 @@ export function renderCollection(container,unlocked,{foods=[],foodContainer,deta
   }
   const note=document.createElement('p');note.className='journal-footnote';note.textContent=entry.source==='game'?'Esta ficha descreve elementos da aventura.':`Conteúdo revisado em ${CONTENT_REVIEWED.split('-').reverse().join('/')}.`;
   content.append(note);detailContainer.replaceChildren(back,journalIllustration(entry.id),content);detailContainer.hidden=false;container.hidden=true;if(foodContainer)foodContainer.hidden=true;
-  detailContainer.closest('dialog').scrollTop=0;back.focus({preventScroll:true});
-  back.addEventListener('click',()=>{detailContainer.closest('.journal-shell').classList.remove('is-reading');detailContainer.hidden=true;container.hidden=false;previousFocus?.focus({preventScroll:true});});
+  scrollBody.scrollTop=0;back.focus({preventScroll:true});
+  back.addEventListener('click',()=>{detailContainer.closest('.journal-shell').classList.remove('is-reading');detailContainer.hidden=true;container.hidden=false;scrollBody.scrollTop=previousScroll;previousFocus?.focus({preventScroll:true});});
  };
  container.replaceChildren(...ENTRIES.map(entry=>{
   const discovered=unlocked.includes(entry.id),card=document.createElement('article');card.className='journal-card';card.classList.toggle('is-locked',!discovered);

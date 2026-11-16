@@ -152,11 +152,14 @@ function clearInputs() { flightInput.clear(); }
 function hold(source) { flightInput.press(source); }
 function release(source) { flightInput.release(source); }
 function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
+function resetPanelScroll(dialog) {
+    dialog.scrollTop=0; const body=dialog.querySelector('.panel-body'); if(body)body.scrollTop=0;
+}
 function openDialog(id) {
     const dialog=$(id);
     if(dialog.open)return;
     const probe=activeProbe,at=probe?probe.begin('ui.dialogOpen'):0;
-    dialog.showModal();
+    dialog.showModal(); resetPanelScroll(dialog);
     if(probe)probe.end('ui.dialogOpen',at,{dialog:id});
 }
 
@@ -400,8 +403,8 @@ $('#open-observation').addEventListener('click',()=>{
     image.onerror=()=>{$('#observation-photo').hidden=true;$('#observation-photo-status').textContent='A foto não carregou. As descrições continuam disponíveis; você também pode voltar à pergunta.';};
     image.src=JOURNAL_PHOTOS.portrait.src;
     for(const marker of document.querySelectorAll('.observation-hotspot')){const detail=OBSERVATION_DETAILS[marker.dataset.observationDetail];marker.style.left=detail.left+'%';marker.style.top=detail.top+'%';}
-    openDialog('#observation-dialog');$('#observation-return').focus({preventScroll:true});$('#observation-dialog').scrollTop=0;
-    requestAnimationFrame(()=>{if($('#observation-dialog').open)$('#observation-dialog').scrollTop=0;});
+    openDialog('#observation-dialog');$('#observation-return').focus({preventScroll:true});resetPanelScroll($('#observation-dialog'));
+    requestAnimationFrame(()=>{if($('#observation-dialog').open)resetPanelScroll($('#observation-dialog'));});
 });
 for(const button of document.querySelectorAll('[data-observation-detail]'))button.addEventListener('click',()=>{
     const id=button.dataset.observationDetail;if(!game.observeDetail(id))return;
@@ -447,9 +450,9 @@ function result() {
     bc.setTransform(2,0,0,2,0,0);
     drawBird(bc, { x: 68, y: 53, scale: 1.05, perched: true, surprise: !game.won, reduced: true });
     if(birdProbe)birdProbe.end('ui.resultBird',birdAt);
-    openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); $('#result-dialog').scrollTop=0;
+    openDialog('#result-dialog'); $('#restart-button').focus({preventScroll:true}); resetPanelScroll($('#result-dialog'));
     // Native dialog focus can settle after showModal, especially on WebKit.
-    requestAnimationFrame(()=>{if($('#result-dialog').open&&game.state==='ended')$('#result-dialog').scrollTop=0;});
+    requestAnimationFrame(()=>{if($('#result-dialog').open&&game.state==='ended')resetPanelScroll($('#result-dialog'));});
     $('#screen-reader-status').textContent = `${game.won ? 'Vitória' : 'Fim de voo'}. ${game.score} pontos, ${game.fruits} alimentos, ${game.correct} respostas corretas. ${game.reason}`;
     const begin = performance.now(), target = game.score;
     function count(now) {
@@ -631,6 +634,7 @@ function showCollection(entryId=null) {
 }
 function setJournalTab(tab){
     const nature=tab==='nature';
+    resetPanelScroll($('#collection-dialog'));
     $('#collection-dialog .journal-shell').classList.remove('is-reading');
     $('#nature-items').hidden=!nature;$('#collection-items').hidden=nature;$('#journal-detail').hidden=true;
     $('#journal-nature-tab').setAttribute('aria-selected',String(nature));$('#journal-food-tab').setAttribute('aria-selected',String(!nature));
