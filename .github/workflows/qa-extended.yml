@@ -1,0 +1,159 @@
+name: Extended browser and real-art QA
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-browser-and-art:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/verify-current-spritesheets.cjs
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Assert real action sprite sheets and cross-browser parity
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-cross-browser.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null' EXIT
+          LEARNING_BROWSER=firefox node tests/browser-learning-flow.cjs
+          LEARNING_BROWSER=webkit node tests/browser-learning-flow.cjs
+          node tests/browser-accessibility-108.cjs
+          ACCESS_BROWSER=firefox node tests/browser-accessibility-108.cjs
+          ACCESS_BROWSER=webkit node tests/browser-accessibility-108.cjs
+          node tests/browser-learning-107.cjs
+          LEARNING_BROWSER=firefox node tests/browser-learning-107.cjs
+          LEARNING_BROWSER=webkit node tests/browser-learning-107.cjs
+          node tests/browser-gameplay-106.cjs
+          GAMEPLAY_BROWSER=firefox node tests/browser-gameplay-106.cjs
+          GAMEPLAY_BROWSER=webkit node tests/browser-gameplay-106.cjs
+          node tests/browser-visual-polish.cjs
+          POLISH_BROWSER=firefox node tests/browser-visual-polish.cjs
+          POLISH_BROWSER=webkit node tests/browser-visual-polish.cjs
+          WEATHER_BROWSER=webkit node tests/browser-attacks-weather.cjs
+          UI_BROWSER=webkit node tests/browser-editorial-ui.cjs
+          MOBILE_BROWSER=firefox node tests/browser-mobile-home-layout.cjs
+          MOBILE_BROWSER=webkit node tests/browser-mobile-home-layout.cjs
+          node tests/browser-action-sprites.cjs
+          node tests/browser-real-action-sprites.cjs
+          node tests/browser-v2-cross-browser.cjs
+          WEATHER_BROWSER=firefox node tests/browser-animal-weather.cjs
+          WEATHER_BROWSER=webkit node tests/browser-animal-weather.cjs
+      - name: Save real art and cross-browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: extended-browser-qa
+          path: |
+            test-results/learning-flow/
+            test-results/action-sprites/
+            test-results/v2-cross-browser/
+            test-results/animal-weather/
+            test-results/attacks-weather/
+            test-results/visual-polish/
+            test-results/gameplay-106/
+            test-results/learning-107/
+            test-results/accessibility-108/
+            test-results/mobile-home/
+            test-results/editorial-ui/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  responsive-panels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify responsive panels on desktop and phones
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-panels.log 2>&1 &
+          panels_pid=$!
+          trap 'kill "$panels_pid" 2>/dev/null' EXIT
+          node tests/browser-responsive-panels.cjs
+          PANEL_BROWSER=firefox node tests/browser-responsive-panels.cjs
+          PANEL_BROWSER=webkit node tests/browser-responsive-panels.cjs
+      - name: Save responsive panel screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: responsive-panels
+          path: test-results/responsive-panels/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  reliability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:release
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify loading recovery and durable progress
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-reliability.log 2>&1 &
+          reliability_pid=$!
+          trap 'kill "$reliability_pid" 2>/dev/null' EXIT
+          node tests/browser-reliability-109.cjs
+          RELIABILITY_BROWSER=firefox node tests/browser-reliability-109.cjs
+          RELIABILITY_BROWSER=webkit node tests/browser-reliability-109.cjs
+      - name: Save reliability evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reliability-109
+          path: |
+            test-results/reliability-109/
+            test-results/release-audit.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  three-screen-refinement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify home, pause, result and launch rotation
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-refinement.log 2>&1 &
+          refinement_pid=$!
+          trap 'kill "$refinement_pid" 2>/dev/null' EXIT
+          node tests/browser-three-screen-refinement.cjs
+          REFINEMENT_BROWSER=firefox node tests/browser-three-screen-refinement.cjs
+          REFINEMENT_BROWSER=webkit node tests/browser-three-screen-refinement.cjs
+      - name: Save three-screen screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: three-screen-refinement
+          path: test-results/three-screen-refinement/
+          if-no-files-found: ignore
+          retention-days: 7
