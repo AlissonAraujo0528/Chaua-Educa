@@ -4562,3 +4562,9 @@ html:has(dialog[open]), html:has(dialog[open]) body {
     margin-top: 4px;
   }
 }
+/* Short notebook windows keep the supporting introduction out of the action area. */
+@media (min-width: 701px) and (max-height: 650px) {
+  .app:not(.mobile-device) .home .intro {
+    display: none;
+  }
+}

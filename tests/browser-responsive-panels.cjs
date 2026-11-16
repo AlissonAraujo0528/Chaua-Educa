@@ -38,7 +38,7 @@ const name=process.env.PANEL_BROWSER||'chromium';
     }
     await page.locator(id+' .panel-heading-area .close-dialog').click();
    }
-   await page.locator('input[name=mode][value=tranquilo]').check();await page.locator('#btnStart').click();await page.waitForFunction(()=>document.querySelector('#app').classList.contains('in-flight'));
+   await page.locator('label:has(input[name=mode][value=tranquilo])').click();assert.equal(await page.locator('input[name=mode][value=tranquilo]').isChecked(),true);await page.locator('#btnStart').click();await page.waitForFunction(()=>document.querySelector('#app').classList.contains('in-flight'));
    await page.evaluate(async()=>{const {game:g}=await import('/js/script.js');g.state='playing';g.entities=[];g.nextSpawn=Infinity;g.elapsed=35;g.y=320;g.vy=0;g.quizPending=true;g.maybeOpenQuiz();const {QUESTIONS}=await import('/js/questions.mjs');g.question=QUESTIONS.reduce((a,b)=>a.text.length>b.text.length?a:b);});
    await panel('#quiz-dialog',['#answer-true','#answer-false','#open-observation']);
    const question=await page.locator('#question-text').evaluate(e=>{const r=e.getBoundingClientRect(),b=e.closest('.panel-body').getBoundingClientRect();return {top:r.top,bottom:r.bottom,bodyTop:b.top,bodyBottom:b.bottom};});
