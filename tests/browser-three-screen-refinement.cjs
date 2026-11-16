@@ -4,8 +4,8 @@ const name=process.env.REFINEMENT_BROWSER||'chromium',expectedVersion=require('.
  const browser=await playwright[name].launch({executablePath:name==='chromium'?process.env.CHROMIUM_PATH||undefined:undefined,args:name==='chromium'?['--no-sandbox']:[]});
  const out='test-results/three-screen-refinement';await fs.mkdir(out,{recursive:true});
  try{
-  for(const [width,height] of [[384,706],[393,727],[320,480],[320,568],[844,390],[568,320],[1280,575]]){
-   const mobile=width<1000,context=await browser.newContext({viewport:{width,height},hasTouch:mobile,isMobile:mobile&&name!=='firefox',reducedMotion:'reduce',...(mobile?{userAgent:'Mozilla/5.0 (Linux; Android 16; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Mobile Safari/537.36'}:{})});
+  for(const [width,height] of [[384,706],[393,727],[320,480],[320,568],[844,390],[568,320],[1280,575],[1366,638],[1280,600],[1024,600],[768,600]]){
+   const mobile=width<1000&&!(width===768&&height===600),context=await browser.newContext({viewport:{width,height},hasTouch:mobile,isMobile:mobile&&name!=='firefox',reducedMotion:'reduce',...(mobile?{userAgent:'Mozilla/5.0 (Linux; Android 16; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Mobile Safari/537.36'}:{})});
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.addInitScript(()=>{Element.prototype.requestFullscreen=async()=>{};Object.defineProperty(screen,'orientation',{configurable:true,value:{lock:async()=>{}}});});
    await page.goto(process.env.GAME_URL||'http://127.0.0.1:5501/',{waitUntil:'networkidle'});await page.locator('#start-training:not([disabled])').waitFor();await page.evaluate(()=>document.fonts.ready);
@@ -16,7 +16,7 @@ const name=process.env.REFINEMENT_BROWSER||'chromium',expectedVersion=require('.
    });
    assert.ok(moduleCheck.revision===expectedVersion||moduleCheck.revision.startsWith(expectedVersion+'-'));assert.equal(moduleCheck.game,'menu');assert.equal(moduleCheck.renderer,'function');assert.ok(moduleCheck.resources.every(url=>new URL(url).searchParams.get('v')===moduleCheck.revision));
    const target=async selector=>{const b=await page.locator(selector).boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1&&b.height>=(mobile?43:27),selector+' '+JSON.stringify({width,height,b}));};
-   for(const selector of ['#btnStart','#start-training','#open-ranking','#open-guide','#open-collection','#open-missions','#open-settings'])await target(selector);
+   for(const selector of ['#btnStart','#start-training','#open-ranking','#open-guide','#open-collection','#open-missions','#open-settings','#open-credits'])await target(selector);
    if(width>=350&&width<=600&&height>=650){
     const preview=await page.locator('.home-preview').boundingBox(),form=await page.locator('#start-form').boundingBox();assert.ok(preview&&preview.height>=90&&preview.y+preview.height<=form.y+1,'Portrait character slot must be separate from the form');
    }
