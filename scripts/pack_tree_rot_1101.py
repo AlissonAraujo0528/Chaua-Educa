@@ -88,3 +88,11 @@ for snowy,source,path in [
     print('TREE_FILE_END',flush=True)
 print('TREE_PACK_REPORT '+json.dumps(report),flush=True)
 (OUT/'registration.json').write_text(json.dumps(report,indent=2))
+
+bark=Image.open(SRC/'bark-1101.png').convert('RGBA').resize((256,512),Image.Resampling.LANCZOS)
+assert bark.getchannel('A').getextrema()==(255,255),'Bark must fill the texture'
+output=OUT/'tree-bark.webp';bark.save(output,'WEBP',lossless=True,method=6)
+encoded=base64.b64encode(output.read_bytes()).decode()
+print('TREE_FILE_BEGIN Chaua-Educa-main/assets/v11/tree-bark.webp',flush=True)
+for offset in range(0,len(encoded),8000):print('TREE_FILE_CHUNK '+encoded[offset:offset+8000],flush=True)
+print('TREE_FILE_END',flush=True)
