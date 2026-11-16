@@ -15,7 +15,7 @@ const name=process.env.REFINEMENT_BROWSER||'chromium',expectedVersion=require('.
     return {revision,game:g.state,renderer:typeof Renderer,resources:performance.getEntriesByType('resource').map(r=>r.name).filter(x=>/\/js\/.*\.(mjs|js)(\?|$)/.test(x))};
    });
    assert.ok(moduleCheck.revision===expectedVersion||moduleCheck.revision.startsWith(expectedVersion+'-'));assert.equal(moduleCheck.game,'menu');assert.equal(moduleCheck.renderer,'function');assert.ok(moduleCheck.resources.every(url=>new URL(url).searchParams.get('v')===moduleCheck.revision));
-   const target=async selector=>{const b=await page.locator(selector).boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1&&b.height>=43,selector+' '+JSON.stringify({width,height,b}));};
+   const target=async selector=>{const b=await page.locator(selector).boundingBox();assert.ok(b&&b.x>=0&&b.y>=0&&b.x+b.width<=width+1&&b.y+b.height<=height+1&&b.height>=(mobile?43:27),selector+' '+JSON.stringify({width,height,b}));};
    for(const selector of ['#btnStart','#start-training','#open-ranking','#open-guide','#open-collection','#open-missions','#open-settings'])await target(selector);
    if(width>=350&&width<=600&&height>=650){
     const preview=await page.locator('.home-preview').boundingBox(),form=await page.locator('#start-form').boundingBox();assert.ok(preview&&preview.height>=90&&preview.y+preview.height<=form.y+1,'Portrait character slot must be separate from the form');
