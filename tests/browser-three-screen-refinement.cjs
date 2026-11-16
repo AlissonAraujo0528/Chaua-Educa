@@ -4,7 +4,7 @@ const name=process.env.REFINEMENT_BROWSER||'chromium',expectedVersion=require('.
  const browser=await playwright[name].launch({executablePath:name==='chromium'?process.env.CHROMIUM_PATH||undefined:undefined,args:name==='chromium'?['--no-sandbox']:[]});
  const out='test-results/three-screen-refinement';await fs.mkdir(out,{recursive:true});
  try{
-  for(const [width,height] of [[384,706],[393,727],[320,568],[844,390],[568,320],[1280,575]]){
+  for(const [width,height] of [[384,706],[393,727],[320,480],[320,568],[844,390],[568,320],[1280,575]]){
    const mobile=width<1000,context=await browser.newContext({viewport:{width,height},hasTouch:mobile,isMobile:mobile&&name!=='firefox',reducedMotion:'reduce',...(mobile?{userAgent:'Mozilla/5.0 (Linux; Android 16; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Mobile Safari/537.36'}:{})});
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.addInitScript(()=>{Element.prototype.requestFullscreen=async()=>{};Object.defineProperty(screen,'orientation',{configurable:true,value:{lock:async()=>{}}});});
