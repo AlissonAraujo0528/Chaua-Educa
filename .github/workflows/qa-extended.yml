@@ -188,3 +188,29 @@ jobs:
           path: test-results/beta-110/
           if-no-files-found: ignore
           retention-days: 7
+
+  fullscreen-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Reproduce actual fullscreen top-layer failure
+        run: |
+          python3 -m http.server 5501 --bind 127.0.0.1 --directory Chaua-Educa-main > /tmp/chaua-fullscreen.log 2>&1 &
+          native_pid=$!
+          trap 'kill "$native_pid" 2>/dev/null' EXIT
+          FULLSCREEN_EXPECT_BLOCKED=1 xvfb-run -a -s "-screen 0 1600x1000x24" node tests/browser-fullscreen-native-1101.cjs
+      - name: Save native fullscreen evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fullscreen-native
+          path: test-results/fullscreen-native/
+          if-no-files-found: ignore
+          retention-days: 7
