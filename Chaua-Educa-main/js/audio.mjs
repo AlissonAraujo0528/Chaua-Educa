@@ -127,18 +127,19 @@ export class ForestAudio {
         if(!this.thunderBuffer){this.prewarmThunder();return;}
         try {
             const c=this.context,now=c.currentTime;
-            // Three genuinely different audible durations, not two samples
-            // presented under three names. The long clip retains both natural
-            // rumbling passages in the compact CC0 recording.
+            // Three real thunder excerpts, each fully inside its own source
+            // section. They never cross the separator in the packaged MP3.
+            // The short/medium/long categories stay inside the requested audible
+            // duration ranges even with the tiny deterministic pitch variation.
             const variant=((Math.trunc(strike.index||0)%3)+3)%3;
             const clips=[
-                {offset:.08,duration:1.30,delay:.12,gain:.72,rate:1}, // short / near
-                {offset:2.62,duration:2.75,delay:.32,gain:.61,rate:.97}, // medium
-                {offset:0,duration:5.43,delay:.54,gain:.53,rate:.98} // prolonged / distant
+                {offset:.08,duration:.90,delay:.12,gain:.72}, // short: ~0.87–0.93 s
+                {offset:2.62,duration:1.35,delay:.32,gain:.61}, // medium: ~1.31–1.39 s
+                {offset:.04,duration:2.45,delay:.54,gain:.53} // long: ~2.38–2.53 s
             ];
             const clip=clips[variant];
             const usable=Math.max(.1,Math.min(clip.duration,this.thunderBuffer.duration-clip.offset));
-            const playbackRate=Math.max(.86,Math.min(1.10,clip.rate*(strike.pitch??1)));
+            const playbackRate=Math.max(.97,Math.min(1.03,1+((strike.pitch??1)-1)*.28));
             const start=now+clip.delay;
             const gainValue=Math.min(.72,Math.max(.04,storm*clip.gain*(strike.amplitude??1)));
             const source=c.createBufferSource(),gain=c.createGain();

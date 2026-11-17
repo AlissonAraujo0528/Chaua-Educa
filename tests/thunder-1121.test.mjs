@@ -71,11 +71,19 @@ test('short, medium and prolonged real thunders have distinct durations and dela
  audio.update('playing',true,strikeTime(1),0,1,1,1);
  audio.update('playing',true,strikeTime(2),0,1,1,1);
  assert.equal(ctx.events.length,3);
- assert.deepEqual(ctx.events.map(event=>event.args[1]),[.08,2.62,0]);
- assert.deepEqual(ctx.events.map(event=>Math.round(event.args[2]*100)/100),[1.30,2.75,5.43]);
+ assert.deepEqual(ctx.events.map(event=>event.args[1]),[.08,2.62,.04]);
+ assert.deepEqual(ctx.events.map(event=>Math.round(event.args[2]*100)/100),[.90,1.35,2.45]);
  assert.ok(ctx.events[0].args[0]<ctx.events[1].args[0]);
  assert.ok(ctx.events[1].args[0]<ctx.events[2].args[0]);
- assert.ok(ctx.events[2].args[2]>ctx.events[1].args[2]*1.8);
+ const effective=ctx.events.map(event=>event.args[2]/event.source.playbackRate.value);
+ assert.deepEqual(effective.length,3);
+ assert.ok(effective[0]>=.8&&effective[0]<=1,'short must play within 0.8–1 s');
+ assert.ok(effective[1]>=1.2&&effective[1]<=1.5,'medium must play within 1.2–1.5 s');
+ assert.ok(effective[2]>=2&&effective[2]<=2.8,'long must play within 2–2.8 s');
+ // Every clip stays inside its own recording; no silence between packed takes.
+ assert.ok(ctx.events[0].args[1]+ctx.events[0].args[2]<=2.5);
+ assert.ok(ctx.events[1].args[1]+ctx.events[1].args[2]<=5.47);
+ assert.ok(ctx.events[2].args[1]+ctx.events[2].args[2]<=2.5);
 });
 test('pause, quiz, mute and focus loss fade real thunder without re-triggering',async()=>{
  const {audio,ctx}=await harness();
@@ -140,4 +148,17 @@ test('flight scene lighting occurs after actor/rain draw and before warnings',as
  const lighting=text.indexOf('drawLightningIllumination(c,this.w,this.h,sceneTime');
  const warnings=text.indexOf('const {boxes}=flightWarnings(game');
  assert.ok(rain>=0&&rain<lighting&&lighting<warnings);
+});
+
+test('all thunder pitch extremes preserve the requested short/medium/long ranges',async()=>{
+ const {audio,ctx}=await harness();
+ for(const [i,bounds] of [[0,[.8,1]],[1,[1.2,1.5]],[2,[2,2.8]]]){
+  for(const pitch of [.70,.89,1,1.10,1.30]){
+   audio.playThunder(1,{index:i,pitch,amplitude:1});
+   const event=ctx.events.at(-1),rate=event.source.playbackRate.value;
+   assert.ok(rate>=.97&&rate<=1.03);
+   const duration=event.args[2]/rate;
+   assert.ok(duration>=bounds[0]&&duration<=bounds[1],`variant ${i} pitch ${pitch}: ${duration.toFixed(3)} s`);
+  }
+ }
 });
