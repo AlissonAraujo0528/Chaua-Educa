@@ -12,6 +12,7 @@ import {drawTreeVariant} from '../Chaua-Educa-main/js/tree-art.mjs';
 import {images} from '../Chaua-Educa-main/js/assets.mjs';
 import {shapesHitRect,intersects,rectShape} from '../Chaua-Educa-main/js/collision.mjs';
 import {ForestAudio} from '../Chaua-Educa-main/js/audio.mjs';
+import {lightningStrikeAt,LIGHTNING_FLASH_SECONDS} from '../Chaua-Educa-main/js/lightning.mjs';
 
 function spyCanvas(){
  const events=[],gradients=[];
@@ -153,7 +154,7 @@ test('atmospheric gradient cache obeys context + dimensions and uses a single su
 
 test('lightning uses doubled strokes and never requests a Gaussian shadow blur',()=>{
  const {c,events}=spyCanvas();
- const time=(1-.15+.02)/.31;
+ const time=lightningStrikeAt(0).startsAt+LIGHTNING_FLASH_SECONDS*.2;
  drawLightning(c,900,600,time,1,false);
  assert.ok(events.filter(e=>e[0]==='stroke').length>=3,'lightning+fork strokes missing');
  assert.equal(c.shadowBlur,0);
