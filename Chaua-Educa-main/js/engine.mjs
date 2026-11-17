@@ -61,12 +61,14 @@ export class Game {
     snapshot() {
         if (!this._prevEntityMap) {
             Object.defineProperty(this, '_prevEntityMap', { value: new Map(), writable: true, enumerable: false });
+            Object.defineProperty(this, '_prevEntityList', { value: [], writable: true, enumerable: false });
             Object.defineProperty(this, '_prevEntityPool', { value: [], writable: true, enumerable: false });
             Object.defineProperty(this, '_previousObj', { value: {}, writable: true, enumerable: false });
         }
-        for (const item of this._prevEntityMap.values()) {
-            this._prevEntityPool.push(item);
+        for (let i = 0; i < this._prevEntityList.length; i++) {
+            this._prevEntityPool.push(this._prevEntityList[i]);
         }
+        this._prevEntityList.length = 0;
         this._prevEntityMap.clear();
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
@@ -80,6 +82,7 @@ export class Game {
             record.snakePhaseAge = e.snake?.phaseAge;
             record.snakeWarningAge = e.snake?.warningAge;
             record.hawkRetreatTime = e.retreatTime;
+            this._prevEntityList.push(record);
             this._prevEntityMap.set(e.id, record);
         }
         const prev = this._previousObj;
@@ -101,13 +104,34 @@ export class Game {
     visual(alpha) {
         if (!['playing','arrival'].includes(this.state) || !this.previous) return this;
         const lerp = (a,b) => a + (b-a) * Math.max(0, Math.min(1, alpha));
-        const view = Object.create(this);
-        if(this.refuge&&Number.isFinite(this.previous.refugeX))view.refuge={...this.refuge,x:lerp(this.previous.refugeX,this.refuge.x)};
-        if(this.arrival)view.arrival={...this.arrival,offset:lerp(this.previous.arrivalOffset,this.arrival.offset)};
+        if (!this._visualObj) {
+            Object.defineProperty(this, '_visualObj', { value: Object.create(this), writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualRefuge', { value: {}, writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualArrival', { value: {}, writable: true, enumerable: false });
+        }
+        const view = this._visualObj;
+        if(this.refuge&&Number.isFinite(this.previous.refugeX)){
+            const vr=this._visualRefuge;
+            Object.assign(vr,this.refuge);
+            vr.x=lerp(this.previous.refugeX,this.refuge.x);
+            view.refuge=vr;
+        }else{
+            view.refuge=this.refuge;
+        }
+        if(this.arrival){
+            const va=this._visualArrival;
+            Object.assign(va,this.arrival);
+            va.offset=lerp(this.previous.arrivalOffset,this.arrival.offset);
+            view.arrival=va;
+        }else{
+            view.arrival=this.arrival;
+        }
         view.y = lerp(this.previous.y, this.y);
         view.angle = lerp(this.previous.angle, this.angle);
         view.flapImpulse = lerp(this.previous.flapImpulse || 0, this.flapImpulse || 0);
-        for (const key of ['distance','elapsed','sceneTime']) view[key] = lerp(this.previous[key],this[key]);
+        view.distance = lerp(this.previous.distance, this.distance);
+        view.elapsed = lerp(this.previous.elapsed, this.elapsed);
+        view.sceneTime = lerp(this.previous.sceneTime, this.sceneTime);
         view.stageAge = this.previous.stage === this.stage ? lerp(this.previous.stageAge,this.stageAge) : this.stageAge;
         // A new impulse starts a beat; only interpolate decay within that beat.
         view.wing = this.wing > this.previous.wing ? this.wing : lerp(this.previous.wing,this.wing);
@@ -136,7 +160,9 @@ export class Game {
                 this._visualPool[i] = entity;
             }
             if (entity._lastId !== e.id) {
-                for (const k in entity) if (k !== '_lastId') delete entity[k];
+                entity.tumbleAngle=undefined;entity.retreatTime=undefined;entity.snake=undefined;
+                entity.grazed=undefined;entity.hitRect=undefined;entity.hitPart=undefined;entity.hitSide=undefined;
+                entity.scored=undefined;entity.contacted=undefined;entity.broken=undefined;
                 entity._lastId = e.id;
             }
             Object.assign(entity, e);
@@ -151,7 +177,7 @@ export class Game {
                     this._visualSnakePool[i] = snake;
                 }
                 if (snake._lastId !== e.id) {
-                    for (const k in snake) if (k !== '_lastId') delete snake[k];
+                    snake.phaseAge=undefined;snake.warningAge=undefined;snake.age=undefined;snake.retreatTime=undefined;
                     snake._lastId = e.id;
                 }
                 Object.assign(snake, e.snake);
@@ -613,27 +639,50 @@ export class Game {
         this.flapImpulse=Math.max(0,this.flapImpulse-dt*5.0);
         if(this.shakeTime>0){this.shakeTime=Math.max(0,this.shakeTime-dt);if(this.shakeTime===0){this.shakeDuration=0;this.shakeIntensity=0;}}
         let deadPopups=false;
-        for(const p of this.popups){
+        for(let i=0;i<this.popups.length;i++){
+            const p=this.popups[i];
             p.prevY=p.y;
             p.life-=dt;
             if(!this.reducedMotion)p.y-=24*dt;
             if(!(p.life>0))deadPopups=true;
         }
-        if(deadPopups)this.popups=this.popups.filter(p=>p.life>0);
-        for(const e of this.entities)if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.36)delete e.breakFx;}
+        if(deadPopups){
+            let write=0;
+            for(let read=0;read<this.popups.length;read++){
+                if(this.popups[read].life>0){
+                    if(write!==read)this.popups[write]=this.popups[read];
+                    write++;
+                }
+            }
+            this.popups.length=write;
+        }
+        for(let i=0;i<this.entities.length;i++){const e=this.entities[i];if(e.breakFx){e.breakFx.age+=dt;if(e.breakFx.age>=.36)e.breakFx=undefined;}}
         if(this.hit) {this.hit.age+=dt;if(this.hit.age>=.3)this.hit=null;}
         let deadParticles=false;
-        for(const p of this.particles) {
+        for(let i=0;i<this.particles.length;i++) {
+            const p=this.particles[i];
             p.prevX=p.x;p.prevY=p.y;
             if(Number.isFinite(p.rotation))p.prevRotation=p.rotation;
             p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
             if(p.feather||p.chip||p.seed) {p.vy+=(p.chip?380:p.seed?320:210)*dt;p.rotation+=p.spin*dt;}
             if(!(p.life>0))deadParticles=true;
         }
-        if(deadParticles)this.particles=this.particles.filter(p=>p.life>0);
+        if(deadParticles){
+            let write=0;
+            for(let read=0;read<this.particles.length;read++){
+                if(this.particles[read].life>0){
+                    if(write!==read)this.particles[write]=this.particles[read];
+                    write++;
+                }
+            }
+            this.particles.length=write;
+        }
     }
 
-    woodRects(entity) { return livingWoodRects(entity,HEIGHT); }
+    woodRects(entity) {
+        if(!this._woodRectsBuffer)Object.defineProperty(this,'_woodRectsBuffer',{value:[],writable:true,enumerable:false});
+        return livingWoodRects(entity,HEIGHT,this._woodRectsBuffer);
+    }
 
     snakeRects(entity) {
         if (!entity.snake || entity.snake.retreat) return [];
@@ -842,10 +891,25 @@ export class Game {
             }
             this.advanceEffects(dt);return;
         }
+        if(!this._playerShapesBuffer){
+            Object.defineProperty(this,'_playerShapesBuffer',{value:[],writable:true,enumerable:false});
+            Object.defineProperty(this,'_hawkShapesBuffer',{value:[],writable:true,enumerable:false});
+            Object.defineProperty(this,'_poseScratch',{value:{time:0,wing:0,flapImpulse:0,reduced:false,x:0,y:0,angle:0},writable:true,enumerable:false});
+        }
         const boundaryX=this.x,boundaryY=this.y,boundaryAngle=this.angle;
-        const boundaryBody=playerShapes(boundaryX,boundaryY,boundaryAngle,{time:this.sceneTime,wing:this.wing,flapImpulse:this.flapImpulse,reduced:this.reducedMotion});
+        const pose=this._poseScratch;
+        pose.time=this.sceneTime;pose.wing=this.wing;pose.flapImpulse=this.flapImpulse;pose.reduced=this.reducedMotion;
+        pose.x=boundaryX;pose.y=boundaryY;pose.angle=boundaryAngle;
+        const boundaryBody=playerShapes(boundaryX,boundaryY,boundaryAngle,pose,this._playerShapesBuffer);
         let bodyTop=Infinity,bodyBottom=-Infinity;
-        for(const polygon of boundaryBody)for(const p of polygon){bodyTop=Math.min(bodyTop,p.y);bodyBottom=Math.max(bodyBottom,p.y);}
+        for(let i=0;i<boundaryBody.length;i++){
+            const polygon=boundaryBody[i];
+            for(let j=0;j<polygon.length;j++){
+                const py=polygon[j].y;
+                if(py<bodyTop)bodyTop=py;
+                if(py>bodyBottom)bodyBottom=py;
+            }
+        }
         if (bodyTop<CONTACT.top || bodyBottom>CONTACT.bottom) {
             this.boundaryContact(bodyTop<CONTACT.top?'top':'bottom');
             if (this.state !== 'playing') return;
@@ -864,17 +928,19 @@ export class Game {
             const px = this.x, py = this.y, pa = this.angle;
             if (!cachedPlayerBody || cachedX !== px || cachedY !== py || cachedAngle !== pa) {
                 cachedX = px; cachedY = py; cachedAngle = pa;
-                cachedPlayerBody = playerShapes(px,py,pa,{time:this.sceneTime,wing:this.wing,flapImpulse:this.flapImpulse,reduced:this.reducedMotion});
+                pose.x=px;pose.y=py;pose.angle=pa;
+                cachedPlayerBody = playerShapes(px,py,pa,pose,this._playerShapesBuffer);
             }
             return cachedPlayerBody;
         };
 
-        for (const e of this.entities) {
+        for (let i = 0; i < this.entities.length; i++) {
+            const e = this.entities[i];
             if (this.state !== 'playing') break;
             const px = this.x;
             if (e.kind === 'hawk') {
                 advanceHawk(e,dt,speed,px,this.y);
-                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x-px)<180 && Math.abs(e.y-this.y)<140 && shapesIntersect(getPlayerBody(),hawkShapes(e,this.sceneTime,this.reducedMotion))) this.collide(e, true);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x-px)<180 && Math.abs(e.y-this.y)<140 && shapesIntersect(getPlayerBody(),hawkShapes(e,this.sceneTime,this.reducedMotion,this._hawkShapesBuffer))) this.collide(e, true);
                 continue;
             }
             e.x -= speed * dt;
@@ -894,7 +960,14 @@ export class Game {
                         }
                     }
                     const pBody = getPlayerBody();
-                    const woodHit = this.woodRects(e).find(rect => shapesHitRect(pBody,rect));
+                    const rects = this.woodRects(e);
+                    let woodHit = null;
+                    for (let ri = 0; ri < rects.length; ri++) {
+                        if (shapesHitRect(pBody, rects[ri])) {
+                            woodHit = rects[ri];
+                            break;
+                        }
+                    }
                     if (woodHit) { e.hitRect=woodHit; e.hitPart = woodHit.part; e.hitSide = woodHit.y >= e.bottom ? 'bottom' : 'top'; this.collide(e); }
                 }
                 if (this.state !== 'playing') break;
@@ -903,10 +976,35 @@ export class Game {
         }
         const minBound = (this.viewLeft !== undefined ? this.viewLeft : 0) - 260;
         const maxBound = Math.max(this.width, this.viewWidth || this.width) + 800;
-        if (this.entities.some(e => !(e.x > minBound && e.x < maxBound && !e.collected && !e.finished))) {
-            this.entities = this.entities.filter(e => e.x > minBound && e.x < maxBound && !e.collected && !e.finished);
+        let deadEntities=false;
+        for(let i=0;i<this.entities.length;i++){
+            const e=this.entities[i];
+            if(!(e.x > minBound && e.x < maxBound && !e.collected && !e.finished)){deadEntities=true;break;}
         }
-        for(const id of this.routes.keys())if(!this.entities.some(e=>e.kind==='fruit'&&e.route===id))this.routes.delete(id);
+        if (deadEntities) {
+            let write=0;
+            for(let read=0;read<this.entities.length;read++){
+                const e=this.entities[read];
+                if(e.x > minBound && e.x < maxBound && !e.collected && !e.finished){
+                    if(write!==read)this.entities[write]=e;
+                    write++;
+                }
+            }
+            this.entities.length=write;
+        }
+        if (this.routes.size > 0) {
+            this.routes.forEach((_, id) => {
+                let hasFruit = false;
+                for (let k = 0; k < this.entities.length; k++) {
+                    const ent = this.entities[k];
+                    if (ent.kind === 'fruit' && ent.route === id) {
+                        hasFruit = true;
+                        break;
+                    }
+                }
+                if (!hasFruit) this.routes.delete(id);
+            });
+        }
         this.advanceEffects(dt);
         this.maybeOpenQuiz();
         if(this.state==='playing')this.advanceJourney(dt);

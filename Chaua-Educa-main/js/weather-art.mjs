@@ -54,12 +54,13 @@ export class TreeDrips{
     if(p){dripOrigin(wood,time,wind,p);Object.assign(p,{active:true,id,age:0,vy:0,splashAge:-1});}
    }
   }
-  for(const id of this.emitters.keys())if(!activeIds.has(id))this.emitters.delete(id);
+  this.emitters.forEach((_, id) => { if (!activeIds.has(id)) this.emitters.delete(id); });
   for(let i=0;i<this.items.length;i++){
    const p=this.items[i];if(!p.active)continue;
    if(i>=limit){p.active=false;continue;}
    p.age+=dt;
-   const wood=game.entities.find(e=>e.id===p.id&&e.kind==='wood');
+   let wood = null;
+   for(let k=0;k<game.entities.length;k++){const ent=game.entities[k];if(ent.id===p.id&&ent.kind==='wood'){wood=ent;break;}}
    if(p.splashAge>=0){
     p.splashAge+=dt;p.x-=game.speed*dt;
     if(p.splashAge>=.28)p.active=false;

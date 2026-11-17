@@ -19,8 +19,25 @@ export function pickupShapes(e,time=0,reduced=false){
  const unit=size/16*p.pulse;
  return spans.map(([col,row,width])=>rectShape({x:e.x+(col-8)*unit,y:e.y+p.float*p.pulse+(row-8)*unit,w:width*unit,h:unit}));
 }
+const scratchSpanRect = {x: 0, y: 0, w: 0, h: 0};
 export function pickupHitsPlayer(e,player,time=0,reduced=false){
- const shapes=pickupShapes(e,time,reduced);
- if(e.kind==='pepper')return shapesIntersect(player,shapes);
- return shapes.some(p=>shapesHitRect(player,{x:p[0].x,y:p[0].y,w:p[1].x-p[0].x,h:p[2].y-p[0].y}));
+ if(e.kind==='pepper'){
+  const shapes=pickupShapes(e,time,reduced);
+  return shapesIntersect(player,shapes);
+ }
+ const p=pickupPose(e,time,reduced),size=e.kind==='fruit'?60:e.kind==='feather'?64:58;
+ const index=e.kind==='fruit'?(FOODS[e.variety]?.slot??0)*4+p.frame:0;
+ const spans=COLLISION_ART.pickups[e.kind]?.[index];
+ if(!spans)throw new Error(`Missing current pickup mask: ${e.kind}/${index}`);
+ const unit=size/16*p.pulse;
+ const baseY=e.y+p.float*p.pulse;
+ scratchSpanRect.h=unit;
+ for(let i=0;i<spans.length;i++){
+  const [col,row,width]=spans[i];
+  scratchSpanRect.x=e.x+(col-8)*unit;
+  scratchSpanRect.y=baseY+(row-8)*unit;
+  scratchSpanRect.w=width*unit;
+  if(shapesHitRect(player,scratchSpanRect))return true;
+ }
+ return false;
 }

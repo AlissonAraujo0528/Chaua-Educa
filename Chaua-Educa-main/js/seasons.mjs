@@ -48,16 +48,17 @@ export class SeasonalBackdrop {
    this.onTelemetry?.('cache-reset',{width:w,height:h,dpr});
    this.release();this.key=key;this.atlas=atlas;
   }
-  const needed=new Set(state.mix===1?[state.to]:[state.from,state.to]);
-  // Visual interpolation retains Game state on its prototype; copy explicit
-  // mode and seed when looking ahead, or the predicted season can be wrong.
+  const needed1=state.to,needed2=state.mix===1?-1:state.from;
   const ahead={elapsed:(game.elapsed||0)+this.prewarmSeconds,mode:game.mode,
    seed:game.seed,tutorial:game.tutorial};
-  if(this.prewarmEnabled && state.mix===1)needed.add(journeySeason(ahead).to);
-  for(const [id,surface] of this.frames)if(!needed.has(id)){
+  const needed3=(this.prewarmEnabled && state.mix===1)?journeySeason(ahead).to:-1;
+  const needed=[needed1];
+  if(needed2>=0&&needed2!==needed1)needed.push(needed2);
+  if(needed3>=0&&needed3!==needed1&&needed3!==needed2)needed.push(needed3);
+  for(const [id,surface] of this.frames)if(!needed.includes(id)){
    surface.width=0;surface.height=0;this.frames.delete(id);
   }
-  if(this.pending&&!needed.has(this.pending.id)){
+  if(this.pending&&!needed.includes(this.pending.id)){
    this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
   }
   // Shared per-frame budget covers all speculative surfaces, not each one
@@ -145,24 +146,34 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  const r=Math.max(0,Math.min(1,(rain-.5)/.35));
  const t=Math.max(0,Math.min(1,(storm-.3)/.5));
  const suppression=Math.max(r*r*(3-2*r),t*t*(3-2*t));
- const layers=[
-  // Spring keeps a few drifting petals; the dense shower belongs to autumn.
-  {row: 0, count: low?1:3, weight: weights[0]*(1-suppression)},
-  {row: 2, count: low?7:14, weight: weights[2]*(1-suppression*.85)}
- ];
- for(const {row, count, weight} of layers){
-  if(weight<=0)continue;
+ const w0=weights[0]*(1-suppression);
+ const w2=weights[2]*(1-suppression*.85);
+ if(w0>0){
+  const count=low?1:3,layerAlpha=Math.min(0.92,w0*.85);
   for(let i=0;i<count;i++){
-   const baseSize=row===0?32:38;
-   const size=baseSize+(i%4)*4;
+   const size=32+(i%4)*4;
    const travel=time*(15+i%3*4)+driftOffset*.028;
    const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
    const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
-   c.save();c.globalAlpha=Math.min(0.92, weight*.85);
+   c.save();c.globalAlpha=layerAlpha;
    c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
-   // A smooth tumble without swapping unrelated images or snapping scale.
    c.scale(.75+.25*Math.sin(time*1.4+i),1);
-   const frame=row+(i%2);
+   const frame=i%2;
+   c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
+   c.restore();
+  }
+ }
+ if(w2>0){
+  const count=low?7:14,layerAlpha=Math.min(0.92,w2*.85);
+  for(let i=0;i<count;i++){
+   const size=38+(i%4)*4;
+   const travel=time*(15+i%3*4)+driftOffset*.028;
+   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
+   const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
+   c.save();c.globalAlpha=layerAlpha;
+   c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
+   c.scale(.75+.25*Math.sin(time*1.4+i),1);
+   const frame=2+(i%2);
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();
   }

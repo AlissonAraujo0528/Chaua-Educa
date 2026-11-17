@@ -1,5 +1,19 @@
 import {lightningStrikeAt} from './lightning.mjs';
 
+const AUDIO_NOTES = Object.freeze({
+    countdown: [440], 'snake-warning': [330, 220], 'hawk-warning': [740, 494], fruit: [660, 880],
+    shield: [330, 494, 660], 'shield-break': [220, 147], feather: [523, 659, 784, 1046],
+    'feather-end': [660, 440], pepper: [440, 554, 659, 880, 1108], 'pepper-end': [880, 659, 440],
+    'tutorial-step': [523, 659], 'tutorial-complete': [659, 784, 1046], correct: [660, 880, 990],
+    incorrect: [260, 196], lose: [392, 330, 220], win: [523, 659, 784, 1046, 1318]
+});
+
+const THUNDER_CLIPS = Object.freeze([
+    Object.freeze({offset: .08, duration: .90, delay: .12, gain: .72}), // short: ~0.87–0.93 s
+    Object.freeze({offset: 2.62, duration: 1.35, delay: .32, gain: .61}), // medium: ~1.31–1.39 s
+    Object.freeze({offset: .04, duration: 2.45, delay: .54, gain: .53}) // long: ~2.38–2.53 s
+]);
+
 // Local wind ambience plus two CC0 real thunder recordings. No synthesized thunder crackle.
 export class ForestAudio {
     constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)(), fetchThunder=url=>fetch(url)) {
@@ -65,8 +79,7 @@ export class ForestAudio {
         if(!this.enabled||!this.visible)return;
         if(type==='thunder'){if(this.ensure())this.playThunder(1,lightningStrikeAt(0));return;}
         // UI-only events should never initialize an audio device.
-        const notes={countdown:[440],'snake-warning':[330,220],'hawk-warning':[740,494],fruit:[660,880],shield:[330,494,660],'shield-break':[220,147],feather:[523,659,784,1046],
-            'feather-end':[660,440],pepper:[440,554,659,880,1108],'pepper-end':[880,659,440],'tutorial-step':[523,659],'tutorial-complete':[659,784,1046],correct:[660,880,990],incorrect:[260,196],lose:[392,330,220],win:[523,659,784,1046,1318]};
+        const notes=AUDIO_NOTES;
         if(type!=='flap'&&!notes[type])return;
         if(!this.ensure())return;
         const now=this.context.currentTime;
@@ -132,12 +145,7 @@ export class ForestAudio {
             // The short/medium/long categories stay inside the requested audible
             // duration ranges even with the tiny deterministic pitch variation.
             const variant=((Math.trunc(strike.index||0)%3)+3)%3;
-            const clips=[
-                {offset:.08,duration:.90,delay:.12,gain:.72}, // short: ~0.87–0.93 s
-                {offset:2.62,duration:1.35,delay:.32,gain:.61}, // medium: ~1.31–1.39 s
-                {offset:.04,duration:2.45,delay:.54,gain:.53} // long: ~2.38–2.53 s
-            ];
-            const clip=clips[variant];
+            const clip=THUNDER_CLIPS[variant];
             const usable=Math.max(.1,Math.min(clip.duration,this.thunderBuffer.duration-clip.offset));
             const playbackRate=Math.max(.97,Math.min(1.03,1+((strike.pitch??1)-1)*.28));
             const start=now+clip.delay;

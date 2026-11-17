@@ -37,6 +37,16 @@ function spriteCellRect(place,col,row,flip=false){
  return {x:place.x+((flip?SNAKE_A2_GRID.anchorX-(col+1)*MASK_CELL:col*MASK_CELL-SNAKE_A2_GRID.anchorX)*place.factor),
   y:place.y+(row*MASK_CELL-SNAKE_A2_GRID.anchorY)*place.factor,w:side,h:side};
 }
+const scratchCellRect={x:0,y:0,w:0,h:0};
+function setSpriteCellRect(place,col,row,flip=false){
+ const side=MASK_CELL*place.factor;
+ scratchCellRect.x=place.x+((flip?SNAKE_A2_GRID.anchorX-(col+1)*MASK_CELL:col*MASK_CELL-SNAKE_A2_GRID.anchorX)*place.factor);
+ scratchCellRect.y=place.y+(row*MASK_CELL-SNAKE_A2_GRID.anchorY)*place.factor;
+ scratchCellRect.w=side;
+ scratchCellRect.h=side;
+ return scratchCellRect;
+}
+const singlePolyWrapper=[null];
 function candidateRange(value,halfSize,center,anchor,factor){
  const a=(value-halfSize-center)/factor+anchor,b=(value+halfSize-center)/factor+anchor;
  return [Math.max(0,Math.floor(Math.min(a,b)/MASK_CELL)),Math.min(MASK_SIDE-1,Math.floor(Math.max(a,b)/MASK_CELL))];
@@ -49,15 +59,35 @@ export function snakeA2HitsPlayer(wood,playerPolygons,reduced=false){
  const pose=snakeA2Pose(wood.snake,reduced),mask=collisionMasks[pose.key]?.[pose.frame];
  if(!mask)throw new Error(`A2 collision mask is missing: ${pose.key} frame ${pose.frame}`);
  const place=snakePlacement(wood),flip=snakeA2NeedsMirror(pose);place.factor*=snakeA2ArtScale(pose);
- for(const polygon of playerPolygons){
+ for(let pi=0;pi<playerPolygons.length;pi++){
+  const polygon=playerPolygons[pi];
   if(!polygon?.length)continue;
   let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
-  for(const vertex of polygon){left=Math.min(left,vertex.x);right=Math.max(right,vertex.x);top=Math.min(top,vertex.y);bottom=Math.max(bottom,vertex.y);}
-  const [colStart,colEnd]=candidateRange((left+right)/2,(right-left)/2,place.x,SNAKE_A2_GRID.anchorX,place.factor);
-  const [rowStart,rowEnd]=candidateRange((top+bottom)/2,(bottom-top)/2,place.y,SNAKE_A2_GRID.anchorY,place.factor);
-  const realCols=flip?[MASK_SIDE-1-colEnd,MASK_SIDE-1-colStart]:[colStart,colEnd];
-  for(let row=rowStart;row<=rowEnd;row++)for(let col=realCols[0];col<=realCols[1];col++)
-   if(mask[row*MASK_SIDE+col]&&shapesHitRect([polygon],spriteCellRect(place,col,row,flip)))return true;
+  for(let vi=0;vi<polygon.length;vi++){
+   const vertex=polygon[vi];
+   if(vertex.x<left)left=vertex.x;if(vertex.x>right)right=vertex.x;
+   if(vertex.y<top)top=vertex.y;if(vertex.y>bottom)bottom=vertex.y;
+  }
+  const cx=(left+right)*.5,ch=(right-left)*.5;
+  const ca1=(cx-ch-place.x)/place.factor+SNAKE_A2_GRID.anchorX,ca2=(cx+ch-place.x)/place.factor+SNAKE_A2_GRID.anchorX;
+  const colStart=Math.max(0,Math.floor(Math.min(ca1,ca2)/MASK_CELL));
+  const colEnd=Math.min(MASK_SIDE-1,Math.floor(Math.max(ca1,ca2)/MASK_CELL));
+
+  const cy=(top+bottom)*.5,cv=(bottom-top)*.5;
+  const cb1=(cy-cv-place.y)/place.factor+SNAKE_A2_GRID.anchorY,cb2=(cy+cv-place.y)/place.factor+SNAKE_A2_GRID.anchorY;
+  const rowStart=Math.max(0,Math.floor(Math.min(cb1,cb2)/MASK_CELL));
+  const rowEnd=Math.min(MASK_SIDE-1,Math.floor(Math.max(cb1,cb2)/MASK_CELL));
+
+  const c0=flip?MASK_SIDE-1-colEnd:colStart;
+  const c1=flip?MASK_SIDE-1-colStart:colEnd;
+
+  singlePolyWrapper[0]=polygon;
+  for(let row=rowStart;row<=rowEnd;row++){
+   const rowOffset=row*MASK_SIDE;
+   for(let col=c0;col<=c1;col++){
+    if(mask[rowOffset+col]&&shapesHitRect(singlePolyWrapper,setSpriteCellRect(place,col,row,flip)))return true;
+   }
+  }
  }
  return false;
 }
@@ -69,14 +99,21 @@ export function snakeA2FruitHasClearance(wood,x,y,radius=62){
  const place=snakePlacement(wood);
  const kind=snakeAttack(wood.snake).key;
  if(kind!=='attack')return scaledFruitClearance(kind,place,x,y,radius);
- const [colStart,colEnd]=candidateRange(x,radius,place.x,SNAKE_A2_GRID.anchorX,place.factor);
- const [rowStart,rowEnd]=candidateRange(y,radius,place.y,SNAKE_A2_GRID.anchorY,place.factor);
+ const ca1=(x-radius-place.x)/place.factor+SNAKE_A2_GRID.anchorX,ca2=(x+radius-place.x)/place.factor+SNAKE_A2_GRID.anchorX;
+ const colStart=Math.max(0,Math.floor(Math.min(ca1,ca2)/MASK_CELL));
+ const colEnd=Math.min(MASK_SIDE-1,Math.floor(Math.max(ca1,ca2)/MASK_CELL));
+ const cb1=(y-radius-place.y)/place.factor+SNAKE_A2_GRID.anchorY,cb2=(y+radius-place.y)/place.factor+SNAKE_A2_GRID.anchorY;
+ const rowStart=Math.max(0,Math.floor(Math.min(cb1,cb2)/MASK_CELL));
+ const rowEnd=Math.min(MASK_SIDE-1,Math.floor(Math.max(cb1,cb2)/MASK_CELL));
  const r2=radius*radius;
- for(let row=rowStart;row<=rowEnd;row++)for(let col=colStart;col<=colEnd;col++){
-  if(!allVisibleFramesMask[row*MASK_SIDE+col])continue;
-  const box=spriteCellRect(place,col,row);
-  const dx=Math.max(box.x-x,0,x-(box.x+box.w)),dy=Math.max(box.y-y,0,y-(box.y+box.h));
-  if(dx*dx+dy*dy<r2)return false;
+ for(let row=rowStart;row<=rowEnd;row++){
+  const rowOffset=row*MASK_SIDE;
+  for(let col=colStart;col<=colEnd;col++){
+   if(!allVisibleFramesMask[rowOffset+col])continue;
+   const box=setSpriteCellRect(place,col,row);
+   const dx=Math.max(box.x-x,0,x-(box.x+box.w)),dy=Math.max(box.y-y,0,y-(box.y+box.h));
+   if(dx*dx+dy*dy<r2)return false;
+  }
  }
  return true;
 }

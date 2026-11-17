@@ -629,8 +629,8 @@ function syncUI() {
     else if(!flightCues.hasWarnings(game))hudText('#flight-alert','');
     hudText('#score',game.score);
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
-    hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(journeyProgress(game)*100)}%`);
     const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,journeyProgress(game)*100);
+    hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(progress)}%`);
     if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
     hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
     hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');

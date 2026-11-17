@@ -7,11 +7,16 @@ const wrap=(v,span)=>((v%span)+span)%span;
 
 // Far and mid-distance snow are drawn beneath the animals. Near-camera flakes
 // are sparse and do not compete with fruits, HUD, warning labels or predators.
+const FOREGROUND_LAYERS_NORMAL = Object.freeze([{depth: 1, count: 18}]);
+const FOREGROUND_LAYERS_LOW = Object.freeze([{depth: 1, count: 6}]);
+const BACKGROUND_LAYERS_NORMAL = Object.freeze([{depth: .32, count: 48}, {depth: .68, count: 56}]);
+const BACKGROUND_LAYERS_LOW = Object.freeze([{depth: .32, count: 16}, {depth: .68, count: 16}]);
+
 export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0,foreground=false,motion=null){
  const amount=clamp01(intensity);
  if(amount<=.012||reduced||w<=0||h<=0||PERF_AB_VARIANT==='snow-flakes-off')return;
- const layers=foreground?[{depth:1,count:low?6:18}]:
-  [{depth:.32,count:low?16:48},{depth:.68,count:low?16:56}];
+ const layers=foreground?(low?FOREGROUND_LAYERS_LOW:FOREGROUND_LAYERS_NORMAL):
+  (low?BACKGROUND_LAYERS_LOW:BACKGROUND_LAYERS_NORMAL);
  c.save();c.beginPath();c.rect(0,0,w,h);c.clip();
  for(const {depth,count} of layers){
   c.fillStyle='#ffffff';
@@ -63,7 +68,7 @@ export function clipSnowReveal(c,x,y,width,height,intensity){
  const columns=32;
  if(typeof Path2D!=='undefined'&&PERF_AB_VARIANT!=='legacy-snow-clips'){
   const step=Math.round(clamp01(intensity)*256);
-  const key=[x,y,width,height,step].join(':');
+  const key=`${x}:${y}:${width}:${height}:${step}`;
   let path=revealPaths.get(key);
   if(!path){
    path=new Path2D();

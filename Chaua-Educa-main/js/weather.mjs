@@ -5,7 +5,18 @@ import {seasonFromFlight,seasonWeights} from './climate-timeline.mjs';
 
 // All VISUAL weather in the active game reads the same seasonal clock.
 // Numeric-distance inputs remain for existing world-physics wind and tests.
-const visualWeights=source=>seasonWeights(seasonFromFlight(source));
+const visualWeights=source=>{
+    if (source && typeof source === 'object' && Number.isFinite(source.elapsed)) {
+        if (source._vWeights && source._vWeightsElapsed === source.elapsed) {
+            return source._vWeights;
+        }
+        const w = seasonWeights(seasonFromFlight(source));
+        source._vWeights = w;
+        source._vWeightsElapsed = source.elapsed;
+        return w;
+    }
+    return seasonWeights(seasonFromFlight(source));
+};
 
 const rainStart = JOURNEY[1].start + 1500;
 const rainEnd = JOURNEY[2].start - 1000;
@@ -223,6 +234,7 @@ export function drawLightningIllumination(context,width,height,time,storm,reduce
 // opaque white lines. Coordinates are deterministic in active flight time.
 const rainWrap=(value,span)=>((value%span)+span)%span;
 const rainClamp=x=>Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
+const rainScratch=[];
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250,motion=null){
  if(w<=0||h<=0)return;
  const bands=foreground?[{depth:1,count:low?10:38}]:
@@ -248,6 +260,10 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
    const x=rainWrap(seed*23.79-(time*14+(motion?.wind??time*wind)*48+(motion?.storm??time*storm)*14)*depth,w+64)-32;
    const length=(foreground?10:6)+depth*8+(i%3)*1.5;
    const sideways=-(wind*.55+storm*.26+speed*.0016)*length;
+   const item=rainScratch[i]||(rainScratch[i]={x:0,y:0,length:0,tipX:0,radius:0});
+   item.x=x;item.y=y;item.length=length;
+   item.radius=(foreground?.95:.48)+depth*.52+(i%3)*.08;
+   item.tipX=x-(wind*.55+storm*.26+speed*.0016)*length*.42;
    c.moveTo(x,y);
    c.quadraticCurveTo(x+sideways*.22,y+length*.5,x+sideways*.42,y+length);
   }
@@ -259,14 +275,9 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
   // horizontal screen-space streaks. One batch fill per depth band.
   c.beginPath();
   for(let i=0;i<visibleCount;i++){
-   const seed=(i+1)*67.17+depth*119.7;
-   const y=rainWrap(seed*11.17+time*(230+depth*270+(i%4)*27)+(motion?.storm??time*storm)*120+(motion?.speed??time*speed)*.1,h+64)-32;
-   const x=rainWrap(seed*23.79-(time*14+(motion?.wind??time*wind)*48+(motion?.storm??time*storm)*14)*depth,w+64)-32;
-   const radius=(foreground?.95:.48)+depth*.52+(i%3)*.08;
-   const length=(foreground?10:6)+depth*8+(i%3)*1.5;
-   const tipX=x-(wind*.55+storm*.26+speed*.0016)*length*.42;
-   c.moveTo(tipX+radius,y+length);
-   c.ellipse(tipX,y+length,radius,radius*1.28,-.1,0,Math.PI*2);
+   const item=rainScratch[i];
+   c.moveTo(item.tipX+item.radius,item.y+item.length);
+   c.ellipse(item.tipX,item.y+item.length,item.radius,item.radius*1.28,-.1,0,Math.PI*2);
   }
   c.fill();
  }

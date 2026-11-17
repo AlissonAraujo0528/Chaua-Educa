@@ -124,6 +124,7 @@ export function woodContactPosition(game,progress=0,reduced=false){
 function birdFoot(scale){
     const f=SPRITES.chaua.frames[12];return (f.content[1]+f.content[3]-5-f.anchor[1])*27.7027*scale/SPRITES.chaua.landmarkWidth;
 }
+const birdPlacementScratch={x:0,y:0,angle:0};
 function animatedBird(c,p){
     const {x,y,scale=1,angle=0,time=0,reduced=false,reaction=0,defeated=false,impactProgress=0,turbo=false,stamina=1,perched=false,surprise=false,won=false,landing=null,snow=0,rain=0,low=false}=p;
     const clip=birdAnimation({wing:p.wing,time,perched:perched&&!surprise,landing,defeated:defeated||surprise,impactProgress:surprise?1:impactProgress,reduced});
@@ -140,12 +141,12 @@ function animatedBird(c,p){
     }
     else {
         if(!perched&&!surprise&&!defeated&&landing===null){
-            const placement=playerFlightPlacement(p);
+            const placement=playerFlightPlacement(p,birdPlacementScratch);
             c.translate(placement.x-x,placement.y-y);c.rotate(placement.angle);
         }else c.rotate(angle);
     }
     if(turbo&&!perched&&!reduced)drawTurboFlames(c,size,time);
-    const action=parrotAction({...p,time,wing:p.wing,reduced,perched,landing,defeated,surprise,impactProgress});
+    const action=parrotAction(p);
     const newSprite=action ? drawActionSheet(c,action.sheet,action.frame,-77*scale,-77*scale,154*scale,154*scale) : false;
     if(!action){ // Explicitly authored v6: perch, landing, reduced-motion and surprise.
         if(perched&&!surprise&&!defeated&&landing===null)perchedSprite(c,clip,factor);
@@ -206,11 +207,88 @@ function leaf(c, x, y, size, rotation, light = '#87b36a', dark = '#3d7349') {
     c.restore();
 }
 
+const seedSprites = new Map();
+function getSeedSprite(color = '#a0582c') {
+    let sprite = seedSprites.get(color);
+    if (!sprite) {
+        const sw = 7, sh = sw * 1.65;
+        const width = 36, height = 48;
+        const cx = 18, cy = 24;
+        const canvas = typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(width, height)
+            : document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const c = canvas.getContext('2d');
+
+        // 1. Sombra suave de relevo 3D
+        c.fillStyle = 'rgba(0,0,0,0.28)';
+        c.beginPath();
+        c.ellipse(cx + 1.5, cy + 2.5, sw * 0.9, sh * 0.9, 0, 0, Math.PI * 2);
+        c.fill();
+
+        // 2. Casca anatômica de argila em gota
+        c.fillStyle = color;
+        c.beginPath();
+        c.moveTo(cx, cy - sh);
+        c.bezierCurveTo(cx + sw * 1.05, cy - sh * 0.25, cx + sw * 1.05, cy + sh * 0.65, cx, cy + sh);
+        c.bezierCurveTo(cx - sw * 1.05, cy + sh * 0.65, cx - sw * 1.05, cy - sh * 0.25, cx, cy - sh);
+        c.fill();
+
+        // 3. Contorno sutil de profundidade
+        c.strokeStyle = 'rgba(40, 20, 8, 0.45)';
+        c.lineWidth = 1.2;
+        c.stroke();
+
+        // 4. Embrião / núcleo interno com textura de argila
+        c.fillStyle = 'rgba(255, 235, 175, 0.38)';
+        c.beginPath();
+        c.ellipse(cx - sw * 0.22, cy - sh * 0.15, sw * 0.42, sh * 0.5, -0.15, 0, Math.PI * 2);
+        c.fill();
+
+        // 5. Brilho especular de polpa úmida
+        c.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        c.beginPath();
+        c.ellipse(cx - sw * 0.32, cy - sh * 0.35, sw * 0.25, sh * 0.28, -0.2, 0, Math.PI * 2);
+        c.fill();
+
+        // 6. Cicatriz do ápice (hilo)
+        c.fillStyle = 'rgba(45, 20, 10, 0.7)';
+        c.beginPath();
+        c.arc(cx, cy - sh + 1.8, sw * 0.22, 0, Math.PI * 2);
+        c.fill();
+
+        sprite = canvas;
+        seedSprites.set(color, sprite);
+    }
+    return sprite;
+}
+
+const featherSprites = new Map();
+function getFeatherSprite(color) {
+    let sprite = featherSprites.get(color);
+    if (!sprite) {
+        const size = 10;
+        const width = 24, height = 30;
+        const cx = 12, cy = 14;
+        const canvas = typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(width, height)
+            : document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const c = canvas.getContext('2d');
+        c.beginPath();c.moveTo(cx,cy-size);c.bezierCurveTo(cx+size*.8,cy-size*.4,cx+size*.55,cy+size*.5,cx,cy+size);
+        c.bezierCurveTo(cx-size*.55,cy+size*.4,cx-size*.6,cy-size*.5,cx,cy-size);c.fillStyle=color;c.fill();
+        c.strokeStyle='#eff6cbb0';c.lineWidth=1;c.beginPath();c.moveTo(cx,cy+size*1.2);c.lineTo(cx,cy-size*.8);c.stroke();
+        sprite = canvas;
+        featherSprites.set(color, sprite);
+    }
+    return sprite;
+}
+
 function feather(c,x,y,size,rotation,color) {
+    const sprite = getFeatherSprite(color);
     c.save();c.translate(x,y);c.rotate(rotation);
-    c.beginPath();c.moveTo(0,-size);c.bezierCurveTo(size*.8,-size*.4,size*.55,size*.5,0,size);
-    c.bezierCurveTo(-size*.55,size*.4,-size*.6,-size*.5,0,-size);c.fillStyle=color;c.fill();
-    c.strokeStyle='#eff6cbb0';c.lineWidth=1;c.beginPath();c.moveTo(0,size*1.2);c.lineTo(0,-size*.8);c.stroke();
+    const s = size / 10;
+    c.drawImage(sprite, -12*s, -14*s, 24*s, 30*s);
     c.restore();
 }
 
@@ -620,6 +698,7 @@ export class Renderer {
             getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
             getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
             getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
+            getPickupCache('chaua-shield-aura', 78, [[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]);
             getPepperSprite();
             const particlesImg = images.get('season-particles');
             if (particlesImg && !particlesImg._rasterized) {
@@ -1124,6 +1203,7 @@ export class Renderer {
         const wind = journeyWind(game, game.mode, game.tutorial);
         const snow = surfaceSnow(game);
         const wet = game.surfaceWeather?.wet ?? rain;
+        const winter = winterAmount(game);
         const weatherMotion=this.weatherMotion.advance(sceneTime,{wind,storm,speed:game.speed||250,seed:`${game.seed}:${game.tutorial?'training':'flight'}`});
         const probe=activeProbe;
         const backgroundAt=probe?probe.begin('render.background'):0;
@@ -1137,7 +1217,10 @@ export class Renderer {
         this.cameraTop=advanceFlightCamera(baseView,game.y,
             resetCamera?undefined:this.cameraTop,sceneTime-(this.cameraTime??sceneTime),reduced);
         this.cameraTime=sceneTime;
-        const view={...baseView,worldTop:this.cameraTop};
+        if(!this._renderView)this._renderView={...baseView};
+        const view=this._renderView;
+        Object.assign(view,baseView);
+        view.worldTop=this.cameraTop;
         const s = view.scale;
         let shakeX = 0, shakeY = 0;
         if (!reduced && game.shakeTime > 0 && game.shakeDuration > 0) {
@@ -1154,10 +1237,11 @@ export class Renderer {
         // Physical screen clip extends to y=0 and y=canvas height, not just
         // the logical game viewport. Derive wood limits from the live camera,
         // including shake and a 64px guard for transformed/leaning bark.
-        this.animalWeather.begin(c,{time:sceneTime,seed:game.seed,speed:game.speed,wind,snow,snowfall:winterAmount(game),wet,rain,reduced,low:this.decoration==='low'});
+        this.animalWeather.begin(c,{time:sceneTime,seed:game.seed,speed:game.speed,wind,snow,snowfall:winter,wet,rain,reduced,low:this.decoration==='low'});
         const renderBounds={
             top:view.worldTop-(view.y+Math.abs(shakeY)+64)/s,
-            bottom:view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s
+            bottom:view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s,
+            winter, wind, rain
         };
         const treesAt=probe&&probe.deep?probe.begin('render.trees'):0;
         for (const e of game.entities) {
@@ -1231,10 +1315,10 @@ export class Renderer {
         // Collection trails suggest optional trajectories, never solid obstacles.
         this._routesMap ??= new Map();
         this._routesLists ??= [];
-        for (const list of this._routesMap.values()) {
+        this._routesMap.forEach(list => {
             list.length = 0;
             this._routesLists.push(list);
-        }
+        });
         this._routesMap.clear();
         for (const e of game.entities) if (e.kind === 'fruit' && e.route !== undefined && !e.collected) {
             let list = this._routesMap.get(e.route);
@@ -1244,13 +1328,15 @@ export class Renderer {
             }
             list.push(e);
         }
-        for (const fruit of this._routesMap.values()) if (fruit.length > 1) {
-            fruit.sort((a,b) => a.x - b.x);
-            c.save(); c.strokeStyle = fruit[0].optional ? '#f4d77caa' : '#e9f3cf99';
-            c.lineWidth = 2; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
-            for (let i = 1; i < fruit.length; i++) c.lineTo(fruit[i].x, fruit[i].y);
-            c.stroke(); c.restore();
-        }
+        this._routesMap.forEach(fruit => {
+            if (fruit.length > 1) {
+                fruit.sort((a,b) => a.x - b.x);
+                c.save(); c.strokeStyle = fruit[0].optional ? '#f4d77caa' : '#e9f3cf99';
+                c.lineWidth = 2; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
+                for (let i = 1; i < fruit.length; i++) c.lineTo(fruit[i].x, fruit[i].y);
+                c.stroke(); c.restore();
+            }
+        });
         const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
         for (const e of game.entities) {
             const margin=e.kind==='wood'?320:e.kind==='hawk'?180:100;
@@ -1266,7 +1352,7 @@ export class Renderer {
                     else {c.moveTo(e.targetX,e.targetY);c.lineTo(e.startX,e.startY);}
                     c.stroke(); c.restore();
                 }
-                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low',winterAmount(game));
+                if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low',winter);
             } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, wet);
         }
         const auraAt=probe&&probe.deep?probe.begin('render.shieldAura'):0;
@@ -1274,12 +1360,17 @@ export class Renderer {
             const r = 68;
             c.save();
             c.globalAlpha = game.shield ? 0.95 : 0.45;
-            const aura = c.createRadialGradient(game.x, game.y, 38, game.x, game.y, r + 10);
-            aura.addColorStop(0, 'rgba(46, 245, 195, 0.04)');
-            aura.addColorStop(0.7, 'rgba(46, 245, 195, 0.28)');
-            aura.addColorStop(1, 'rgba(46, 245, 195, 0)');
-            c.fillStyle = aura;
-            c.beginPath(); c.arc(game.x, game.y, r + 10, 0, TAU); c.fill();
+            const auraRadius = r + 10;
+            const auraSurface = getPickupCache('chaua-shield-aura', auraRadius, [[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]);
+            if (auraSurface) c.drawImage(auraSurface, game.x - auraRadius, game.y - auraRadius, auraRadius * 2, auraRadius * 2);
+            else {
+                const aura = c.createRadialGradient(game.x, game.y, 38, game.x, game.y, auraRadius);
+                aura.addColorStop(0, 'rgba(46, 245, 195, 0.04)');
+                aura.addColorStop(0.7, 'rgba(46, 245, 195, 0.28)');
+                aura.addColorStop(1, 'rgba(46, 245, 195, 0)');
+                c.fillStyle = aura;
+                c.beginPath(); c.arc(game.x, game.y, auraRadius, 0, TAU); c.fill();
+            }
             c.strokeStyle = '#2ef5c3aa'; c.lineWidth = 2;
             c.beginPath(); c.arc(game.x, game.y, r, 0, TAU); c.stroke();
             const shieldImg = images.get('shield');
@@ -1325,7 +1416,7 @@ export class Renderer {
         const birdAt=probe&&probe.deep?probe.begin('render.bird'):0;
         drawBird(c, {
             x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
-            cold: winterAmount(game), angle: game.angle, wing: reduced ? .2 : game.wing, time: (game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime,
+            cold: winter, angle: game.angle, wing: reduced ? .2 : game.wing, time: (game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime,
             landing: game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null,
             reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
             shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
@@ -1361,47 +1452,12 @@ export class Renderer {
                     c.restore();
                 }
                 else if(p.seed) {
+                    const sprite = getSeedSprite(p.color || '#a0582c');
                     c.save();
                     c.translate(p.x, p.y);
                     c.rotate(p.rotation);
-                    const sw = p.size || 6.5, sh = sw * 1.65;
-                    // 1. Sombra suave de relevo 3D
-                    c.fillStyle = 'rgba(0,0,0,0.28)';
-                    c.beginPath();
-                    c.ellipse(1.5, 2.5, sw * 0.9, sh * 0.9, 0, 0, Math.PI * 2);
-                    c.fill();
-
-                    // 2. Casca anatômica de argila em gota
-                    c.fillStyle = p.color || '#a0582c';
-                    c.beginPath();
-                    c.moveTo(0, -sh);
-                    c.bezierCurveTo(sw * 1.05, -sh * 0.25, sw * 1.05, sh * 0.65, 0, sh);
-                    c.bezierCurveTo(-sw * 1.05, sh * 0.65, -sw * 1.05, -sh * 0.25, 0, -sh);
-                    c.fill();
-
-                    // 3. Contorno sutil de profundidade
-                    c.strokeStyle = 'rgba(40, 20, 8, 0.45)';
-                    c.lineWidth = 1.2;
-                    c.stroke();
-
-                    // 4. Embrião / núcleo interno com textura de argila
-                    c.fillStyle = 'rgba(255, 235, 175, 0.38)';
-                    c.beginPath();
-                    c.ellipse(-sw * 0.22, -sh * 0.15, sw * 0.42, sh * 0.5, -0.15, 0, Math.PI * 2);
-                    c.fill();
-
-                    // 5. Brilho especular de polpa úmida
-                    c.fillStyle = 'rgba(255, 255, 255, 0.75)';
-                    c.beginPath();
-                    c.ellipse(-sw * 0.32, -sh * 0.35, sw * 0.25, sh * 0.28, -0.2, 0, Math.PI * 2);
-                    c.fill();
-
-                    // 6. Cicatriz do ápice (hilo)
-                    c.fillStyle = 'rgba(45, 20, 10, 0.7)';
-                    c.beginPath();
-                    c.arc(0, -sh + 1.8, sw * 0.22, 0, Math.PI * 2);
-                    c.fill();
-
+                    const scale = (p.size || 6.5) / 7;
+                    c.drawImage(sprite, -18 * scale, -24 * scale, 36 * scale, 48 * scale);
                     c.restore();
                 }
                 else if(p.puff) {
@@ -1431,7 +1487,7 @@ export class Renderer {
         }
         // Only a few flakes pass in front of the flight action. HUD and
         // predator/snake notices are drawn above them for legibility.
-        if(winterAmount(game)>.01)drawSnowfall(c,this.w,this.h,sceneTime,winterAmount(game),reduced,
+        if(winter>.01)drawSnowfall(c,this.w,this.h,sceneTime,winter,reduced,
             this.decoration==='low',wind,true,weatherMotion);
         // The original sky flash runs behind birds/trees. This second pass
         // illuminates the complete scene without whitening warning labels.
@@ -1462,9 +1518,10 @@ export class Renderer {
         const time = game.sceneTime ?? game.elapsed;
         const variant = (e.id ?? 0) % 3;
         const x = e.x + 29;
-        const wind = reduced ? 0 : journeyWind(game, game.mode, game.tutorial);
-        const rain = game.surfaceWeather?.wet ?? journeyRain(game, game.tutorial);
+        const wind = reduced ? 0 : (renderBounds?.wind ?? journeyWind(game, game.mode, game.tutorial));
+        const rain = game.surfaceWeather?.wet ?? (renderBounds?.rain ?? journeyRain(game, game.tutorial));
         const snow = surfaceSnow(game);
+        const winter = renderBounds?.winter ?? winterAmount(game);
         for (const side of ['top', 'bottom']) {
             const upper = side === 'top';
             const y = e[side];
@@ -1491,7 +1548,7 @@ export class Renderer {
             if(rain>.03&&!reduced)
                 drawSurfaceRainImpacts(c,x,upper?y+3:y-3,rain,time,e.id||0,
                     this.decoration==='low',reduced);
-            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time, this.decoration==='low',winterAmount(game));
+            if (!upper && e.snake) this.snake(e, reduced, snow, rain, time, this.decoration==='low', winter);
         }
     }
     trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0){
@@ -1545,7 +1602,8 @@ export class Renderer {
         if(!images.has('hawk-atlas'))return;
         const entity=e??{x,y,warning:warning?1:0,retreat,dive:false};
         const clip=hawkAnimation(entity,time,reduced),cAngle=retreat?0:angle;
-        const presentation=hawkPresentation(entity,time,reduced),action=presentation.action;
+        this._hawkPresScratch ??= {action:null,offsetY:0,angle:0};
+        const presentation=hawkPresentation(entity,time,reduced,this._hawkPresScratch),action=presentation.action;
         c.save();c.translate(x,y+presentation.offsetY);
         c.rotate(cAngle+presentation.angle);
         if(action){
