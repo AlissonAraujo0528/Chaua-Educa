@@ -6,7 +6,7 @@ import {drawLightning,drawLightningIllumination,lightningFlashStrength} from '..
 
 function fakeAudioContext(){
  const ctx={sampleRate:48000,currentTime:0,state:'running',events:[],decodeCalls:0,bufferCalls:0};
- const param=()=>({value:0,setTargetAtTime(){},setValueAtTime(){},cancelScheduledValues(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}});
+ const param=()=>({value:0,setTargetAtTime(){},setValueAtTime(value){this.value=value;},cancelScheduledValues(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}});
  const node=()=>{const n={gain:param(),frequency:param(),playbackRate:param(),connect(){return n;},disconnect(){}};return n;};
  ctx.destination=node();
  ctx.createGain=node;ctx.createBiquadFilter=node;
