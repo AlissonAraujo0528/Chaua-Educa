@@ -127,12 +127,17 @@ export class ForestAudio {
         if(!this.thunderBuffer){this.prewarmThunder();return;}
         try {
             const c=this.context,now=c.currentTime;
-            const variant=Math.abs(strike.index||0)%3;
-            // Near = Thunder #3, 2.50 s. Far = Thunder #5, 2.85 s.
-            // Both were edited with short fade-ins and natural decay.
-            const near={offset:0,duration:2.50,delay:.12,gain:.73,rate:1};
-            const far={offset:2.62,duration:2.85,delay:.40,gain:.62,rate:.97};
-            const clip=variant===1?far:near;
+            // Three genuinely different audible durations, not two samples
+            // presented under three names. The long clip retains both natural
+            // rumbling passages in the compact CC0 recording.
+            const variant=((Math.trunc(strike.index||0)%3)+3)%3;
+            const clips=[
+                {offset:.08,duration:1.30,delay:.12,gain:.72,rate:1}, // short / near
+                {offset:2.62,duration:2.75,delay:.32,gain:.61,rate:.97}, // medium
+                {offset:0,duration:5.43,delay:.54,gain:.53,rate:.98} // prolonged / distant
+            ];
+            const clip=clips[variant];
+            const usable=Math.max(.1,Math.min(clip.duration,this.thunderBuffer.duration-clip.offset));
             const playbackRate=Math.max(.86,Math.min(1.10,clip.rate*(strike.pitch??1)));
             const start=now+clip.delay;
             const gainValue=Math.min(.72,Math.max(.04,storm*clip.gain*(strike.amplitude??1)));
@@ -142,7 +147,10 @@ export class ForestAudio {
             gain.gain.setValueAtTime(0,now);
             gain.gain.setValueAtTime(0,start);
             gain.gain.linearRampToValueAtTime(gainValue,start+.035);
-            gain.gain.setTargetAtTime(0,start+clip.duration/playbackRate-.42,.15);
+            // Fade ends inside the requested source segment; no abrupt cutoff.
+            const playbackSeconds=usable/playbackRate;
+            const tail=Math.min(.55,Math.max(.16,playbackSeconds*.18));
+            gain.gain.setTargetAtTime(0,start+playbackSeconds-tail,Math.max(.035,tail*.19));
             source.connect(gain).connect(this.master);
             const voice={source,gain};
             this.thunderVoices.add(voice);
@@ -150,7 +158,7 @@ export class ForestAudio {
                 this.thunderVoices.delete(voice);
                 try{source.disconnect();gain.disconnect();}catch{}
             };
-            source.start(start,clip.offset,clip.duration);
+            source.start(start,clip.offset,usable);
         } catch { /* Browser audio interruption must not affect the game. */ }
     }
     update(state,visible,time,stage,rain=0,storm=0,wind=0) {

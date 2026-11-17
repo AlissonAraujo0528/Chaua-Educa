@@ -135,32 +135,35 @@ export function drawJourneyFog(context, width, height, fog) {
     context.restore();
 }
 
-// Visual lightning flash and electric bolt in the clouds during storms
-export function drawLightning(context, width, height, time, storm, reduced) {
-    if (storm <= 0.05 || reduced) return;
-
-    // Deterministic non-uniform strikes: exact same schedule as the audio.
+// Two natural pulses from one deterministic discharge. The same envelope
+// lights the background and, after actors are drawn, the entire flight scene.
+export function lightningFlashStrength(time, storm=1, reduced=false) {
+    if (storm<=.05||reduced)return 0;
     const strike=lightningStrikeAt(time);
-    if(!strike.active)return;
+    if(!strike.active)return 0;
     const phase=strike.phase;
-    let flash = 0;
-    if (phase < 0.35) {
-        flash = Math.sin(phase / 0.35 * Math.PI);
-    } else if (phase >= 0.42 && phase < 0.75) {
-        flash = Math.sin((phase - 0.42) / 0.33 * Math.PI) * 0.72;
-    }
-    if (flash <= 0.01) return;
+    let flash=0;
+    if(phase<.35)flash=Math.sin(phase/.35*Math.PI);
+    else if(phase>=.42&&phase<.75)flash=Math.sin((phase-.42)/.33*Math.PI)*.72;
+    return flash>.01?Math.min(1,flash*storm):0;
+}
+
+// Atmospheric brightness plus a visible electric bolt in the clouds.
+export function drawLightning(context, width, height, time, storm, reduced) {
+    const flash=lightningFlashStrength(time,storm,reduced);
+    if(!flash)return;
+    const strike=lightningStrikeAt(time);
 
     context.save();
 
     // 1. Sky and atmospheric illumination
-    context.globalAlpha = Math.min(0.85, flash * 0.78 * storm);
+    context.globalAlpha = Math.min(0.85, flash * 0.78);
     context.fillStyle = '#e2efff';
     context.fillRect(0, 0, width, height);
 
     // 2. Visible jagged electric lightning bolt tearing through the sky
     if (!reduced && flash > 0.25) {
-        context.globalAlpha = Math.min(1, flash * 1.1 * storm);
+        context.globalAlpha = Math.min(1, flash * 1.1);
         // Two opaque/transparent strokes preserve the bolt's authored
         // silhouette without an expensive Canvas shadowBlur gaussian pass.
         context.shadowBlur=0;
@@ -182,11 +185,11 @@ export function drawLightning(context, width, height, time, storm, reduced) {
             currY = targetY * progress;
             context.lineTo(currX, currY);
         }
-        context.globalAlpha=Math.min(.30,flash*.28*storm);
+        context.globalAlpha=Math.min(.30,flash*.28);
         context.strokeStyle='#93c5fd';
         context.lineWidth=9;
         context.stroke();
-        context.globalAlpha=Math.min(1,flash*1.1*storm);
+        context.globalAlpha=Math.min(1,flash*1.1);
         context.strokeStyle='#ffffff';
         context.lineWidth=2.8;
         context.stroke();
@@ -200,6 +203,19 @@ export function drawLightning(context, width, height, time, storm, reduced) {
         context.stroke();
     }
 
+    context.restore();
+}
+
+// Draw after forest, trunks, birds and weather so the flash actually lights
+// all visible artwork. One lightweight screen-blended fill, no blur/shaders.
+export function drawLightningIllumination(context,width,height,time,storm,reduced=false) {
+    const flash=lightningFlashStrength(time,storm,reduced);
+    if(!flash)return;
+    context.save();
+    context.globalCompositeOperation='screen';
+    context.globalAlpha=Math.min(.66,flash*.56);
+    context.fillStyle='#d9eaff';
+    context.fillRect(0,0,width,height);
     context.restore();
 }
 

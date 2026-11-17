@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ForestAudio} from '../Chaua-Educa-main/js/audio.mjs';
 import {lightningStrikeAt,LIGHTNING_CYCLE_SECONDS} from '../Chaua-Educa-main/js/lightning.mjs';
-import {drawLightning} from '../Chaua-Educa-main/js/weather.mjs';
+import {drawLightning,drawLightningIllumination,lightningFlashStrength} from '../Chaua-Educa-main/js/weather.mjs';
 
 function fakeAudioContext(){
  const ctx={sampleRate:48000,currentTime:0,state:'running',events:[],decodeCalls:0,bufferCalls:0};
@@ -64,17 +64,18 @@ test('menu and countdown do not play thunder, even with forced storm weather',as
  audio.update('playing',true,time,0,1,1,1);
  assert.equal(ctx.events.length,1);
 });
-test('near/distant recordings use different positions in one real MP3',async()=>{
+test('short, medium and prolonged real thunders have distinct durations and delays',async()=>{
  const {audio,ctx}=await harness();
  audio.beginFlight();
  audio.update('playing',true,strikeTime(0),0,1,1,1);
  audio.update('playing',true,strikeTime(1),0,1,1,1);
- assert.equal(ctx.events.length,2);
- assert.equal(ctx.events[0].args[1],0);
- assert.equal(ctx.events[0].args[2],2.5);
- assert.equal(ctx.events[1].args[1],2.62);
- assert.equal(ctx.events[1].args[2],2.85);
- assert.ok(ctx.events[1].args[0]>ctx.events[0].args[0]);
+ audio.update('playing',true,strikeTime(2),0,1,1,1);
+ assert.equal(ctx.events.length,3);
+ assert.deepEqual(ctx.events.map(event=>event.args[1]),[.08,2.62,0]);
+ assert.deepEqual(ctx.events.map(event=>Math.round(event.args[2]*100)/100),[1.30,2.75,5.43]);
+ assert.ok(ctx.events[0].args[0]<ctx.events[1].args[0]);
+ assert.ok(ctx.events[1].args[0]<ctx.events[2].args[0]);
+ assert.ok(ctx.events[2].args[2]>ctx.events[1].args[2]*1.8);
 });
 test('pause, quiz, mute and focus loss fade real thunder without re-triggering',async()=>{
  const {audio,ctx}=await harness();
@@ -112,4 +113,31 @@ test('flash and sound still share a reproducible timing window',()=>{
  calls.length=0;
  drawLightning(c,960,640,strikeTime(0)+.5,1,false);
  assert.equal(calls.some(x=>x[0]==='fillRect'),false);
+});
+
+test('storm illumination covers the entire flight with one low-cost screen blend',()=>{
+ const strike=lightningStrikeAt(strikeTime(0));
+ const time=strike.startsAt+.05;
+ assert.ok(lightningFlashStrength(time,1,false)>.1);
+ const operations=[],ctx=new Proxy({}, {
+  get:(target,key)=>key in target?target[key]:(...args)=>operations.push({name:key,args,blend:target.globalCompositeOperation,alpha:target.globalAlpha}),
+  set:(target,key,value)=>(target[key]=value,true)
+ });
+ drawLightningIllumination(ctx,960,640,time,1,false);
+ const fills=operations.filter(op=>op.name==='fillRect');
+ assert.equal(fills.length,1);
+ assert.deepEqual(fills[0].args,[0,0,960,640]);
+ assert.equal(fills[0].blend,'screen');
+ assert.ok(fills[0].alpha>.1&&fills[0].alpha<=.66);
+ operations.length=0;
+ drawLightningIllumination(ctx,960,640,time,1,true);
+ assert.equal(operations.length,0,'reduced motion must suppress the flash');
+});
+test('flight scene lighting occurs after actor/rain draw and before warnings',async()=>{
+ const fs=await import('node:fs');
+ const text=fs.readFileSync(new URL('../Chaua-Educa-main/js/render.mjs',import.meta.url),'utf8');
+ const rain=text.indexOf('drawForegroundRain(c,this.w,this.h,sceneTime');
+ const lighting=text.indexOf('drawLightningIllumination(c,this.w,this.h,sceneTime');
+ const warnings=text.indexOf('const {boxes}=flightWarnings(game');
+ assert.ok(rain>=0&&rain<lighting&&lighting<warnings);
 });

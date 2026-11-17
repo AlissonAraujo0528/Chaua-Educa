@@ -25,3 +25,13 @@ Branch: `preparacao-para-a-versao-2.0`. Sem merge automático para `main`.
 
 ## Validação
 `npm test` inclui `tests/thunder-1121.test.mjs`. O áudio deve ser conferido com fones e alto-falantes reais no navegador antes da homologação definitiva.
+
+## Revisão de durações e iluminação de cena
+- **Curto / próximo:** 1,30 s de gravação, começa 0,12 s após o relâmpago.
+- **Intermediário:** 2,75 s de gravação, começa 0,32 s após o relâmpago.
+- **Prolongado / distante:** 5,43 s, com os dois trechos reais preservados, começa 0,54 s após o relâmpago.
+- Os intervalos de fonte variam discretamente com o playbackRate determinístico (aprox. 0,89–1,10). Portanto os três tempos são distintos mas não valores cronométricos fixos no alto-falante.
+- O prolongado é formado pelos dois estrondos reais já agrupados no pacote; ainda não é uma terceira gravação independente.
+- O brilho agora ocorre na camada do céu **e** sobre a cena já desenhada (árvores, Chauá e efeitos climáticos) com composição `screen`; os avisos do jogo são desenhados depois, sem perda de legibilidade.
+- A preferência por movimento reduzido continua suprimindo clarões visuais, mas não impede o som.
+- Foram adicionados testes para durações distintas e iluminação em tela inteira.

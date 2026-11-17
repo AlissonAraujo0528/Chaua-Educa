@@ -21,7 +21,7 @@ import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
 import { flightViewport, advanceFlightCamera } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
-import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning } from './weather.mjs';
+import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination } from './weather.mjs';
 import {drawFood} from './food-art.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {WeatherMotion} from './weather-motion.mjs';
@@ -1433,6 +1433,9 @@ export class Renderer {
         // predator/snake notices are drawn above them for legibility.
         if(winterAmount(game)>.01)drawSnowfall(c,this.w,this.h,sceneTime,winterAmount(game),reduced,
             this.decoration==='low',wind,true,weatherMotion);
+        // The original sky flash runs behind birds/trees. This second pass
+        // illuminates the complete scene without whitening warning labels.
+        drawLightningIllumination(c,this.w,this.h,sceneTime,storm,reduced);
         // Natural viewport flight boundary
         const {boxes}=flightWarnings(game,view,reduced,shakeX,shakeY);
         if(boxes.length){
