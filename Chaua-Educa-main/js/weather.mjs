@@ -1,4 +1,5 @@
 import { JOURNEY,journeyReferenceDistance } from './journey.mjs';
+import {lightningStrikeAt} from './lightning.mjs';
 import { smoothstep } from './motion.mjs';
 import {seasonFromFlight,seasonWeights} from './climate-timeline.mjs';
 
@@ -138,11 +139,10 @@ export function drawJourneyFog(context, width, height, fog) {
 export function drawLightning(context, width, height, time, storm, reduced) {
     if (storm <= 0.05 || reduced) return;
 
-    // Strike occurs deterministically every ~3.2 seconds
-    const cycle = (time * 0.31 + 0.15) % 1;
-    if (cycle >= 0.09) return;
-
-    const phase = cycle / 0.09;
+    // Deterministic non-uniform strikes: exact same schedule as the audio.
+    const strike=lightningStrikeAt(time);
+    if(!strike.active)return;
+    const phase=strike.phase;
     let flash = 0;
     if (phase < 0.35) {
         flash = Math.sin(phase / 0.35 * Math.PI);
@@ -176,7 +176,7 @@ export function drawLightning(context, width, height, time, storm, reduced) {
 
         for (let s = 1; s <= steps; s++) {
             const progress = s / steps;
-            const seed = (Math.floor(time * 3) * 17 + s * 11);
+            const seed = (strike.index * 17 + s * 11);
             const jitter = (Math.sin(seed * 0.8) * 26);
             currX = startX + (targetX - startX) * progress + jitter;
             currY = targetY * progress;

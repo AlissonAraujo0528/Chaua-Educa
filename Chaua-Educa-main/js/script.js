@@ -232,6 +232,7 @@ function start(training = false, checkpoint = null) {
     // immediately after changing classes and hiding the home screen.
     flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
     if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player));
+    forestAudio.beginFlight();
     if(betaRuntime?.active)betaRuntime.attempt();
     renderer.resetFlightPresentation();
     app.classList.toggle('training',training);
