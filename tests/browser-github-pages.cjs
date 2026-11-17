@@ -63,6 +63,17 @@ const url = process.env.PAGES_PREVIEW_URL ||
   await page.locator('#start-training:not([disabled])').waitFor({timeout:25000});
   assert.equal(new URL(page.url()).pathname,'/Chaua-Educa/Chaua-Educa-main/');
   assert.deepEqual(errors,[]);assert.deepEqual(badResponses,[]);
-  console.log('PASS GitHub Pages project root redirect and direct subpath: CSS, local WebPs, gameplay and modules work without server-side services',loaded);
+  // Root bookmarks must retain performance diagnostics on phones as well.
+  // Only the path changes; query flags must survive the redirect.
+  const diagnosticUrl=new URL(url);
+  diagnosticUrl.search='?perf-test=1&perf-level=deep';
+  await page.goto(diagnosticUrl.href,{waitUntil:'networkidle'});
+  await page.waitForURL('**/Chaua-Educa/Chaua-Educa-main/?perf-test=1&perf-level=deep',{timeout:12000});
+  assert.equal(new URL(page.url()).search,'?perf-test=1&perf-level=deep');
+  await page.locator('#chaua-qa-panel').waitFor({timeout:15000});
+  assert.equal(await page.locator('#chaua-perf-level').inputValue(),'deep');
+  assert.deepEqual(errors,[],'Diagnostics must load without JavaScript errors');
+  assert.deepEqual(badResponses,[],'Diagnostics must not request missing files');
+  console.log('PASS GitHub Pages root preserves perf-test and perf-level, and game loads diagnostics',loaded);
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
