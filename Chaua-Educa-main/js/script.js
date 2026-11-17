@@ -669,7 +669,8 @@ function frame(time) {
         syncUI();lastHudTime=time;
         if(probe)probe.end('ui.sync',hudAt);
     }
-    forestAudio.update(game.state,!audioInterrupted&&!document.hidden&&document.hasFocus(),time/1000,game.stage,
+    const sceneTime = game.state === 'menu' ? time / 1000 : (game.sceneTime ?? game.elapsed);
+    forestAudio.update(game.state,!audioInterrupted&&!document.hidden&&document.hasFocus(),sceneTime,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){

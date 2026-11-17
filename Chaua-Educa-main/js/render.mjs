@@ -1081,7 +1081,6 @@ export class Renderer {
         if (!mobile) {
             leaf(c, this.w * .985, this.h * .38, 75, -1.15, '#b0c16c', '#497e49');
             leaf(c, this.w * .965, this.h * .34, 55, -.5, '#a5b96b', '#47794b');
-            leaf(c, this.w * .61, this.h * .76, 45, -.7, '#92af5d', '#436f40');
         }
     }
 
