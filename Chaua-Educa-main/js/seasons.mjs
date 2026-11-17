@@ -136,7 +136,7 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  // The original atlas contains only petals and leaves, not snow textures.
  drawSnowfall(c,w,h,time,weights[3],reduced,low,wind,false,motion);
  if(!atlas)return;
- const count=low?7:14, cell=(atlas.naturalWidth||atlas.width)/2;
+ const cell=(atlas.naturalWidth||atlas.width)/2;
  // Rain and storm are independent weather modes, not seasons. Suppress
  // decorative petals/foliage under severe precipitation instead of silently
  // remapping storm to winter or rain to autumn.
@@ -145,10 +145,11 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  const t=Math.max(0,Math.min(1,(storm-.3)/.5));
  const suppression=Math.max(r*r*(3-2*r),t*t*(3-2*t));
  const layers=[
-  {row: 0, weight: weights[0]*(1-suppression)},
-  {row: 2, weight: weights[2]*(1-suppression*.85)}
+  // Spring keeps a few drifting petals; the dense shower belongs to autumn.
+  {row: 0, count: low?1:3, weight: weights[0]*(1-suppression)},
+  {row: 2, count: low?7:14, weight: weights[2]*(1-suppression*.85)}
  ];
- for(const {row, weight} of layers){
+ for(const {row, count, weight} of layers){
   if(weight<=0)continue;
   for(let i=0;i<count;i++){
    const baseSize=row===0?32:38;

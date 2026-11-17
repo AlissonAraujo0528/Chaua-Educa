@@ -2,6 +2,8 @@
 
 ## 1.0.11 — candidata em validação
 
+- Reduz as pétalas da primavera para 3 no perfil detalhado e 1 no econômico; preserva o outono com 14/7 e mantém verão/inverno sem pétalas. Revisão de interface 1.0.11-ui2.
+
 - Consolida correções de tela cheia, casca modular, madeira podre e neve progressiva sólida da 1.0.10.1.
 - Atualiza simulações de Canvas e expectativas de geometria dos testes, assinatura do atlas da madeira podre e inventário de workflows; verificações de integridade e colisões mantidas.
 - Alinha pacote e interface e documenta congelamento de funcionalidades, requisitos, limites e retorno. Progresso e regras floresta-v14 preservados.

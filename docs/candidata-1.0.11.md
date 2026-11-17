@@ -6,6 +6,10 @@ Estado: preparação técnica em validação. A numeração não certifica a con
 
 Esta revisão consolida as correções da beta: pausa acessível após entrada nativa em tela cheia, casca modular em cache, nova madeira podre e neve que cresce por cobertura com opacidade da arte e gelo descendente. Mantém regras floresta-v14, física, dificuldade, perguntas, progresso, coleção, missões e retomadas. Novas funcionalidades ficam fora desta candidata.
 
+## Pétalas por estação
+
+Outono mantém as 14 partículas no perfil detalhado e 7 no econômico. Primavera passa a 3 e 1, respectivamente; verão e inverno permanecem sem pétalas. Quadros, cores, movimentos e transições do outono são preservados. A revisão de interface 1.0.11-ui2 identifica esse ajuste.
+
 ## Correções de manutenção
 
 - Simulações de Canvas passam a representar superfícies e padrões válidos. Os testes de troncos verificam proporção do topo, extensão contínua, alcance limitado pela câmera e reutilização dos padrões, substituindo expectativas da antiga extensão por uma linha esticada.
