@@ -44,11 +44,12 @@ const median=xs=>[...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
      const g=new Game({seed:104});g.state='countdown';g.elapsed=0;g.sceneTime=1;g.nextSpawn=Infinity;
      for(let cycle=0;cycle<3;cycle++){
       r.home(1,false);g.tutorial={step:0};r.game(g,false);snap('forest-'+cycle);
-      g.tutorial=null;r.game(g,false);snap('seasonal-'+cycle);if(cycle===0)hashes.push(await hash());
+      g.tutorial=null;r.game(g,false);snap('seasonal-'+cycle);hashes.push(await hash());
      }
      const old=surfaces();size={width:innerWidth+24,height:innerHeight+16};r.resize();snap('resize-before-draw');
      const released=old.every(s=>s.width===0&&s.height===0);
      r.game(g,false);hashes.push(await hash());snap('resized-seasonal');
+     r.game(g,false);hashes.push(await hash());
      return {snapshots,hashes,released};
     });
     assert.deepEqual(errors,[]);memory.push({label,viewport,...result});await page.close();
@@ -59,7 +60,16 @@ const median=xs=>[...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
   const summaries=[];
   for(const width of [1366,390]){
    const before=memory.find(r=>r.label==='before'&&r.viewport.width===width),after=memory.find(r=>r.label==='after'&&r.viewport.width===width);
-   assert.deepEqual(after.hashes,before.hashes,'cache lifecycle must preserve exact rendered pixels');
+   // Keep the old checkout as the transfer/readiness/cache-byte baseline.
+   // Approved art revisions can change its pixels; compare exact visual
+   // stability across cache lifecycles within EACH revision instead.
+   for(const revision of [before,after]){
+    assert.equal(revision.hashes.length,5);
+    assert.ok(revision.hashes.slice(0,3).every(hash=>hash===revision.hashes[0]),
+     'restarting the same frozen scene must preserve exact rendered pixels');
+    assert.equal(revision.hashes[3],revision.hashes[4],
+     'a rebuilt resized cache must preserve exact pixels on the next draw');
+   }
    assert.ok(after.released,'resize must release stale surfaces before another draw');
    const seasonal=r=>r.snapshots.filter(s=>s.label.startsWith('seasonal-'));
    assert.ok(seasonal(after).every(s=>s.bytes===seasonal(after)[0].bytes),'restarts must reach a stable backing-store plateau');
@@ -69,7 +79,7 @@ const median=xs=>[...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
     summaries.push({width,label,cache,readyMedianMs:Math.round(median(samples.map(r=>r.readyMs))),fontBodyBytes:median(samples.map(r=>r.resources.filter(s=>/\.(ttf|woff2)$/.test(s.name)).reduce((n,s)=>n+s.body,0))),transferBytes:median(samples.map(r=>r.resources.reduce((n,s)=>n+s.transfer,0)))});
    }
   }
-  const report={baseline:'f32ee403b493d5a25f86c1710223d96c0af106b1',browser:browser.version(),network:{mbps:throughput,latencyMs:latency},notes:'Same-runner Chromium headless diagnostic. Canvas bytes are width*height*4 estimates, not actual RAM/GPU. Readiness includes loaded fonts and required game art. Warm measurements include ordinary HTTP validation.',summaries,memory,rows};
+  const report={baseline:'f32ee403b493d5a25f86c1710223d96c0af106b1',browser:browser.version(),network:{mbps:throughput,latencyMs:latency},notes:'Visual hashes check repeated frozen frames within each revision; cross-version pixels can differ after approved art changes. Same-runner Chromium headless diagnostic. Canvas bytes are width*height*4 estimates, not actual RAM/GPU. Readiness includes loaded fonts and required game art. Warm measurements include ordinary HTTP validation.',summaries,memory,rows};
   fs.mkdirSync('test-results/startup-memory',{recursive:true});fs.writeFileSync('test-results/startup-memory/report.json',JSON.stringify(report,null,2));
   console.log('STARTUP_MEMORY_AB '+JSON.stringify({network:report.network,summaries,memory}));
  }finally{await browser.close();}
