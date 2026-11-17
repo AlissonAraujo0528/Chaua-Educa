@@ -1,18 +1,16 @@
 import {lightningStrikeAt} from './lightning.mjs';
 
-// Synthesized local ambience: no network audio, timers or autoplay before interaction.
+// Local wind ambience plus two CC0 real thunder recordings. No synthesized thunder crackle.
 export class ForestAudio {
-    constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)(), scheduleThunderChunk=fn=>{
-        if(typeof requestIdleCallback==='function')return requestIdleCallback(fn,{timeout:100});
-        return setTimeout(fn,0);
-    }) {
+    constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)(), fetchThunder=url=>fetch(url)) {
         this.contextFactory=contextFactory;this.enabled=false;this.context=null;
         this.liveTones=new Set();this.volume=.7;this.voices=0;this.nextFilter=0;this.visible=true;this.active=false;this.lastFlap=-Infinity;
         this.lastThunderStrike=-1;
         this.thunderBuffer=null;
-        this.thunderBuild=null;
+        this.thunderLoading=null;
+        this.thunderLoadFailed=false;
         this.thunderVoices=new Set();
-        this.scheduleThunderChunk=scheduleThunderChunk;
+        this.fetchThunder=fetchThunder;
     }
     setVolume(value) {
         this.volume=Number.isFinite(value)?Math.max(0,Math.min(1,value)):.7;
@@ -39,19 +37,13 @@ export class ForestAudio {
                 this.filter=c.createBiquadFilter();this.filter.type='lowpass';this.filter.frequency.value=900;
                 this.ambient=c.createGain();this.ambient.gain.value=0;
                 this.wind.connect(this.filter).connect(this.ambient).connect(this.master);
-                const thunderFilter = c.createBiquadFilter();
-                thunderFilter.type = 'lowpass';
-                thunderFilter.frequency.value = 135;
-                this.thunder = c.createGain();
-                this.thunder.gain.value = 0;
-                this.wind.connect(thunderFilter).connect(this.thunder).connect(this.ambient);
                 this.wind.start();
             }
             if(['suspended','interrupted'].includes(this.context.state)&&this.visible)this.context.resume().catch(()=>{});
             this.master.gain.setTargetAtTime(this.visible?this.volume:0,this.context.currentTime,.04);
             this.prewarmThunder();
             return true;
-        } catch { this.context=null;this.thunderBuffer=null;this.thunderBuild=null;return false; }
+        } catch { this.context=null;this.thunderBuffer=null;this.thunderLoading=null;return false; }
     }
     tone(frequency,when,duration=.18,volume=.045,type='sine',end=frequency) {
         if(this.voices>=24)return;
@@ -86,58 +78,32 @@ export class ForestAudio {
             notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['countdown','snake-warning','hawk-warning','feather-end','pepper-end'].includes(type) ? .08 : .18,type==='shield-break'?'triangle':'sine'));
         } catch { /* Audio failure never blocks the game. */ }
     }
-    // v1.0.12.1: build a single 24 kHz thunder buffer in bounded idle chunks.
-    // Never synthesize tens of thousands of samples inside the flight RAF.
+    // Real MP3 samples are fetched from this Pages deployment once and decoded
+    // asynchronously after a user interaction. Neither fetch nor decode runs
+    // synchronously inside a render frame.
     prewarmThunder() {
-        const c=this.context;
-        if(!c||this.thunderBuffer||this.thunderBuild||typeof c.createBuffer!=='function')return;
-        try {
-            const sampleRate=Math.min(24000,Math.max(8000,c.sampleRate||44100));
-            const buffer=c.createBuffer(1,Math.floor(sampleRate*2.8),sampleRate);
-            const data=buffer.getChannelData(0);
-            const leaders=[
-                {t:0,amp:.9},{t:.014,amp:.6},{t:.030,amp:1.1},{t:.048,amp:1.45}
-            ];
-            let index=0,lp1=0,lp2=0,lp3=0,hpIn=0,hpOut=0;
-            const build={context:c};this.thunderBuild=build;
-            const chunk=()=>{
-                if(this.thunderBuild!==build||this.context!==c)return;
-                try {
-                    const end=Math.min(index+2048,data.length);
-                    for(;index<end;index++){
-                        const t=index/sampleRate,white=Math.random()*2-1;
-                        const hp=.92*(hpOut+white-hpIn);
-                        hpIn=white;hpOut=hp;
-                        const cutoff=Math.max(50,240*Math.exp(-t*1.3));
-                        const alpha=1-Math.exp(-2*Math.PI*cutoff/sampleRate);
-                        lp1+=alpha*(white-lp1);lp2+=alpha*(lp1-lp2);lp3+=alpha*(lp2-lp3);
-                        const deep=lp3*4.6;
-                        let crackle=0;
-                        for(const leader of leaders){
-                            if(t>=leader.t&&t<leader.t+.09)
-                                crackle+=hp*Math.exp(-(t-leader.t)*60)*leader.amp;
-                        }
-                        let shock=0;
-                        if(t>=.048&&t<.75){
-                            const dt=t-.048;
-                            shock=deep*2.4*Math.pow(dt/.05,.8)*Math.exp(-dt*6.5);
-                        }
-                        let rumble=0;
-                        if(t>=.06){
-                            const dt=t-.06;
-                            const roll=(.5+.45*Math.sin(dt*6.8))*.45+
-                                (.5+.35*Math.cos(dt*11.5+.8))*.35+
-                                (.5+.25*Math.sin(dt*3.2+2.1))*.2;
-                            rumble=deep*Math.pow(dt/.2,.6)*Math.exp(-dt*1.35)*roll*3.2;
-                        }
-                        data[index]=Math.tanh((crackle*1.6+shock+rumble)*1.45)*.92;
-                    }
-                    if(index<data.length)this.scheduleThunderChunk(chunk);
-                    else {this.thunderBuffer=buffer;this.thunderBuild=null;}
-                } catch {this.thunderBuild=null;}
-            };
-            this.scheduleThunderChunk(chunk);
-        } catch {this.thunderBuild=null;}
+        if(!this.context||this.thunderBuffer||this.thunderLoadFailed)return this.thunderLoading;
+        if(this.thunderLoading)return this.thunderLoading;
+        const context=this.context;
+        const source=new URL('../sounds/thunder-real.mp3?v=1.0.11-real-thunder',import.meta.url);
+        this.thunderLoading=Promise.resolve()
+            .then(()=>this.fetchThunder(source.href))
+            .then(response=>{
+                if(!response?.ok)throw new Error('Thunder recording unavailable');
+                return response.arrayBuffer();
+            })
+            .then(bytes=>context.decodeAudioData(bytes))
+            .then(buffer=>{
+                // Two distinct real recordings are packed into a single MP3.
+                if(!buffer||buffer.duration<5.2)throw new Error('Truncated thunder recording');
+                if(this.context===context)this.thunderBuffer=buffer;
+                return buffer;
+            })
+            .catch(()=>{
+                this.thunderLoadFailed=true;
+                return null;
+            });
+        return this.thunderLoading;
     }
     beginFlight() {
         this.stopThunder();
@@ -153,35 +119,39 @@ export class ForestAudio {
             } catch { /* Already finished or interrupted by device */ }
         }
         this.thunderVoices.clear();
-        try {this.thunder?.gain.setTargetAtTime(0,now,.025);} catch {}
     }
     playThunder(storm=1,strike=lightningStrikeAt(0)) {
         if(!this.enabled||!this.visible||!this.context||this.context.state!=='running')return;
+        // No artificial hiss/white noise fallback. If still loading, skip only
+        // this strike rather than playing a late, out-of-sync sample.
+        if(!this.thunderBuffer){this.prewarmThunder();return;}
         try {
             const c=this.context,now=c.currentTime;
-            const stormGain=Math.min(1,Math.max(.2,storm));
-            if(!this.thunderBuffer){
-                this.prewarmThunder();
-                // Short, low-frequency ambience remains audible while the first
-                // buffer is prepared. Never synthesize synchronously here.
-                this.thunder?.gain.setTargetAtTime(.8*stormGain,now,.03);
-                return;
-            }
+            const variant=Math.abs(strike.index||0)%3;
+            // Near = Thunder #3, 2.50 s. Far = Thunder #5, 2.85 s.
+            // Both were edited with short fade-ins and natural decay.
+            const near={offset:0,duration:2.50,delay:.12,gain:.73,rate:1};
+            const far={offset:2.62,duration:2.85,delay:.40,gain:.62,rate:.97};
+            const clip=variant===1?far:near;
+            const playbackRate=Math.max(.86,Math.min(1.10,clip.rate*(strike.pitch??1)));
+            const start=now+clip.delay;
+            const gainValue=Math.min(.72,Math.max(.04,storm*clip.gain*(strike.amplitude??1)));
             const source=c.createBufferSource(),gain=c.createGain();
             source.buffer=this.thunderBuffer;
-            source.playbackRate.setValueAtTime(strike.pitch,now);
-            gain.gain.setValueAtTime(.65*stormGain*strike.amplitude,now);
+            source.playbackRate.setValueAtTime(playbackRate,now);
+            gain.gain.setValueAtTime(0,now);
+            gain.gain.setValueAtTime(0,start);
+            gain.gain.linearRampToValueAtTime(gainValue,start+.035);
+            gain.gain.setTargetAtTime(0,start+clip.duration/playbackRate-.42,.15);
             source.connect(gain).connect(this.master);
             const voice={source,gain};
             this.thunderVoices.add(voice);
             source.onended=()=>{
                 this.thunderVoices.delete(voice);
-                try {source.disconnect();gain.disconnect();} catch {}
+                try{source.disconnect();gain.disconnect();}catch{}
             };
-            source.start(now);
-            source.stop(now+3.3);
-            this.thunder?.gain.setTargetAtTime(.8*stormGain,now,.03);
-        } catch { /* Audio failures must not stop gameplay */ }
+            source.start(start,clip.offset,clip.duration);
+        } catch { /* Browser audio interruption must not affect the game. */ }
     }
     update(state,visible,time,stage,rain=0,storm=0,wind=0) {
         if(!this.context || this.context.state==='closed')return;
@@ -227,8 +197,6 @@ export class ForestAudio {
             this.nextFilter=c.currentTime+.1;
             const windFrequency = 750 + Math.sin(time * .6) * 180 + stage * 90 + wind * 350;
             this.filter.frequency.setTargetAtTime(windFrequency + rain * 1450 + storm * 450,c.currentTime,.5);
-            const rumble = Math.pow(.5 + .5 * Math.sin(time * 1.55), 4);
-            this.thunder.gain.setTargetAtTime(audibleStorm * rumble * .8, c.currentTime, .25);
         }
         } catch { /* Device interruption must not stop the rendering loop. */ }
     }

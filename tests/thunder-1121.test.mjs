@@ -5,92 +5,111 @@ import {lightningStrikeAt,LIGHTNING_CYCLE_SECONDS} from '../Chaua-Educa-main/js/
 import {drawLightning} from '../Chaua-Educa-main/js/weather.mjs';
 
 function fakeAudioContext(){
-    const context={sampleRate:48000,currentTime:0,state:'running',events:[],bufferCalls:[]};
-    const param=()=>({value:0,setTargetAtTime(){},setValueAtTime(){},cancelScheduledValues(){},exponentialRampToValueAtTime(){},linearRampToValueAtTime(){}});
-    const node=()=>{const n={gain:param(),frequency:param(),playbackRate:param(),connect(){return n;},disconnect(){}};return n;};
-    context.destination=node();
-    context.createGain=node;
-    context.createBiquadFilter=node;
-    context.createBuffer=(channels,length,rate)=>{
-        context.bufferCalls.push({channels,length,rate});
-        const data=new Float32Array(length);
-        return {getChannelData:()=>data};
-    };
-    context.createBufferSource=()=>{
-        const n=node();
-        n.start=()=>{if(!n.loop)context.events.push({kind:'thunder',source:n});};
-        n.stop=when=>{n.stoppedAt=when;};
-        return n;
-    };
-    return context;
+ const ctx={sampleRate:48000,currentTime:0,state:'running',events:[],decodeCalls:0,bufferCalls:0};
+ const param=()=>({value:0,setTargetAtTime(){},setValueAtTime(){},cancelScheduledValues(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}});
+ const node=()=>{const n={gain:param(),frequency:param(),playbackRate:param(),connect(){return n;},disconnect(){}};return n;};
+ ctx.destination=node();
+ ctx.createGain=node;ctx.createBiquadFilter=node;
+ ctx.createBuffer=(channels,len)=>{ctx.bufferCalls++;return {getChannelData:()=>new Float32Array(len)};};
+ ctx.decodeAudioData=async bytes=>{ctx.decodeCalls++;assert.ok(bytes.byteLength>0);return {duration:5.47};};
+ ctx.createBufferSource=()=>{
+  const n=node();
+  n.start=(...args)=>{if(!n.loop)ctx.events.push({source:n,args});};
+  n.stop=when=>{n.stoppedAt=when;};
+  return n;
+ };
+ return ctx;
 }
-function harness(){
-    const ctx=fakeAudioContext(),tasks=[];
-    const audio=new ForestAudio(()=>ctx,fn=>tasks.push(fn));
-    audio.setEnabled(true);audio.ensure();
-    const flush=()=>{let count=0;while(tasks.length){tasks.shift()();if(++count>1000)throw Error('prewarm never finished');}return count;};
-    return {ctx,tasks,audio,flush};
+const strikeTime=index=>lightningStrikeAt(index*LIGHTNING_CYCLE_SECONDS).startsAt+.08;
+async function harness({fail=false}={}){
+ const ctx=fakeAudioContext();
+ let requests=0;
+ const fetcher=async url=>{
+  requests++;
+  assert.ok(url.endsWith('/sounds/thunder-real.mp3?v=1.0.11-real-thunder'));
+  if(fail)throw Error('offline');
+  return {ok:true,arrayBuffer:async()=>new Uint8Array([73,68,51]).buffer};
+ };
+ const audio=new ForestAudio(()=>ctx,fetcher);
+ audio.setEnabled(true);
+ audio.ensure();
+ await audio.thunderLoading;
+ return {ctx,audio,requests:()=>requests};
 }
-const strikeTime=index=>{
-    for(let t=index*LIGHTNING_CYCLE_SECONDS;t<(index+1)*LIGHTNING_CYCLE_SECONDS;t+=.001){
-        const strike=lightningStrikeAt(t);
-        if(strike.active&&strike.phase>.12)return t;
-    }
-    throw Error('missing strike');
-};
-test('thunder prewarms in bounded chunks outside the game frame',()=>{
-    const {ctx,tasks,audio,flush}=harness();
-    assert.equal(audio.thunderBuffer,null);
-    assert.ok(tasks.length>0);
-    assert.equal(ctx.bufferCalls.length,2);
-    assert.equal(ctx.bufferCalls[1].rate,24000);
-    assert.ok(flush()>1);
-    assert.ok(audio.thunderBuffer);
-    assert.equal(audio.thunderBuild,null);
+test('CC0 thunder MP3 is fetched and decoded asynchronously only once',async()=>{
+ const {audio,ctx,requests}=await harness();
+ assert.equal(requests(),1);
+ assert.equal(ctx.decodeCalls,1);
+ assert.equal(ctx.bufferCalls,1,'one ambience buffer, no procedural thunder buffer');
+ audio.ensure();await audio.prewarmThunder();
+ assert.equal(requests(),1);
+ assert.equal(ctx.decodeCalls,1);
+ assert.ok(audio.thunderBuffer);
 });
-test('restart resets strike identity without rebuilding the noise buffer',()=>{
-    const {ctx,audio,flush}=harness();flush();
-    const t=strikeTime(0);
-    audio.beginFlight();audio.update('playing',true,t,0,1,1,1);
-    assert.equal(ctx.events.length,1);
-    const firstBuffer=audio.thunderBuffer;
-    audio.beginFlight();audio.update('playing',true,t,0,1,1,1);
-    assert.equal(ctx.events.length,2);
-    assert.equal(audio.thunderBuffer,firstBuffer);
+test('restart reuses decoded audio and allows same strike index in a fresh flight',async()=>{
+ const {audio,ctx}=await harness();
+ audio.beginFlight();audio.update('playing',true,strikeTime(0),0,1,1,1);
+ assert.equal(ctx.events.length,1);
+ const decoded=audio.thunderBuffer;
+ audio.beginFlight();audio.update('playing',true,strikeTime(0),0,1,1,1);
+ assert.equal(ctx.events.length,2);
+ assert.equal(audio.thunderBuffer,decoded);
 });
-test('menu and countdown never play storm strikes while scene has no lightning',()=>{
-    const {ctx,audio,flush}=harness();flush();
-    const t=strikeTime(0);
-    audio.update('menu',true,t,0,1,1,1);
-    audio.update('countdown',true,t,0,1,1,1);
-    assert.equal(ctx.events.length,0);
-    audio.update('playing',true,t,0,1,1,1);
-    assert.equal(ctx.events.length,1);
+test('menu and countdown do not play thunder, even with forced storm weather',async()=>{
+ const {audio,ctx}=await harness();
+ const time=strikeTime(0);
+ audio.update('menu',true,time,0,1,1,1);
+ audio.update('countdown',true,time,0,1,1,1);
+ assert.equal(ctx.events.length,0);
+ audio.update('playing',true,time,0,1,1,1);
+ assert.equal(ctx.events.length,1);
 });
-test('pause, quiz and mute stop the active thunder voices',()=>{
-    const {ctx,audio,flush}=harness();flush();
-    audio.update('playing',true,strikeTime(0),0,1,1,1);
-    const first=ctx.events[0].source;
-    assert.equal(audio.thunderVoices.size,1);
-    audio.update('quiz',true,strikeTime(0),0,1,1,1);
-    assert.equal(audio.thunderVoices.size,0);
-    assert.ok(first.stoppedAt<=ctx.currentTime+.1);
-    audio.update('playing',true,strikeTime(1),0,1,1,1);
-    const second=ctx.events[1].source;
-    audio.setEnabled(false);
-    assert.equal(audio.thunderVoices.size,0);
-    assert.ok(second.stoppedAt<=ctx.currentTime+.1);
+test('near/distant recordings use different positions in one real MP3',async()=>{
+ const {audio,ctx}=await harness();
+ audio.beginFlight();
+ audio.update('playing',true,strikeTime(0),0,1,1,1);
+ audio.update('playing',true,strikeTime(1),0,1,1,1);
+ assert.equal(ctx.events.length,2);
+ assert.equal(ctx.events[0].args[1],0);
+ assert.equal(ctx.events[0].args[2],2.5);
+ assert.equal(ctx.events[1].args[1],2.62);
+ assert.equal(ctx.events[1].args[2],2.85);
+ assert.ok(ctx.events[1].args[0]>ctx.events[0].args[0]);
 });
-test('visual lightning and audio share one deterministic nonuniform cycle',()=>{
-    const a=lightningStrikeAt(strikeTime(0)),b=lightningStrikeAt(strikeTime(1));
-    assert.equal(a.index,0);assert.equal(b.index,1);
-    assert.notEqual(a.startsAt+4,b.startsAt);
-    assert.notEqual(a.pitch,b.pitch);
-    const calls=[];
-    const c=new Proxy({},{get:(target,key)=>key in target?target[key]:(...args)=>{calls.push([key,...args]);},set:(target,key,value)=>(target[key]=value,true)});
-    drawLightning(c,960,640,strikeTime(0),1,false);
-    assert.ok(calls.some(call=>call[0]==='fillRect'),'expected visible flash during audio strike');
-    calls.length=0;
-    drawLightning(c,960,640,strikeTime(0)+.5,1,false);
-    assert.ok(!calls.some(call=>call[0]==='fillRect'),'no flash between strike windows');
+test('pause, quiz, mute and focus loss fade real thunder without re-triggering',async()=>{
+ const {audio,ctx}=await harness();
+ audio.update('playing',true,strikeTime(0),0,1,1,1);
+ const one=ctx.events[0].source;
+ audio.update('quiz',true,strikeTime(0),0,1,1,1);
+ assert.equal(audio.thunderVoices.size,0);
+ assert.ok(one.stoppedAt<=ctx.currentTime+.1);
+ audio.update('playing',true,strikeTime(1),0,1,1,1);
+ const two=ctx.events[1].source;
+ audio.setEnabled(false);
+ assert.equal(audio.thunderVoices.size,0);
+ assert.ok(two.stoppedAt<=ctx.currentTime+.1);
+ audio.setEnabled(true);
+ audio.update('playing',true,strikeTime(2),0,1,1,1);
+ const three=ctx.events[2].source;
+ audio.update('playing',false,strikeTime(2),0,1,1,1);
+ assert.ok(three.stoppedAt<=ctx.currentTime+.1);
+});
+test('network failure stays silent instead of synthesizing crackle',async()=>{
+ const {audio,ctx,requests}=await harness({fail:true});
+ assert.equal(requests(),1);
+ assert.equal(audio.thunderLoadFailed,true);
+ audio.update('playing',true,strikeTime(0),0,1,1,1);
+ assert.equal(ctx.events.length,0);
+ assert.equal(ctx.bufferCalls,1,'only wind buffer synthesized');
+});
+test('flash and sound still share a reproducible timing window',()=>{
+ const strike=lightningStrikeAt(strikeTime(0));
+ assert.ok(strike.active);
+ const calls=[];
+ const c=new Proxy({}, {get:(o,k)=>k in o?o[k]:(...args)=>calls.push([k,...args]),set:(o,k,v)=>(o[k]=v,true)});
+ drawLightning(c,960,640,strikeTime(0),1,false);
+ assert.ok(calls.some(x=>x[0]==='fillRect'));
+ calls.length=0;
+ drawLightning(c,960,640,strikeTime(0)+.5,1,false);
+ assert.equal(calls.some(x=>x[0]==='fillRect'),false);
 });

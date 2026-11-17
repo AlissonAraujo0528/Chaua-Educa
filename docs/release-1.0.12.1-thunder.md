@@ -1,19 +1,27 @@
-# Chauá Educa — correção v1.0.12.1 (trovões)
+# Chauá Educa — v1.0.12.1 · trovões reais (revisão de áudio)
 
-Branch: `preparacao-para-a-versao-2.0`. Esta correção não é um merge para a main.
+Branch: `preparacao-para-a-versao-2.0`. Sem merge automático para `main`.
 
-## Correções
-- Relâmpagos e áudio agora usam um único calendário determinístico de descargas, com intervalos variáveis (aproximadamente 3,35–4,65 segundos) e variação discreta de tom/intensidade.
-- O buffer procedural de 2,8 s é pré-gerado em blocos de 2.048 amostras de 24 kHz após a primeira interação sonora; a geração total deixa de bloquear um quadro de voo.
-- No caso raro em que o primeiro relâmpago ocorre antes da conclusão da pré-geração, o ruído grave ambiental permanece disponível sem processar o buffer inteiro no RAF.
-- Reiniciar, continuar de checkpoint ou iniciar treinamento reinicia a identidade do último trovão. O buffer pronto é reutilizado.
-- O clima visual selecionado no menu não causa trovões sem relâmpagos: sons de descargas só ocorrem durante o voo e a aproximação final.
-- Pausa, pergunta, silêncio, perda de foco e encerramento interrompem os estrondos em reprodução com atenuação curta.
-- O desenho do raio mantém sua forma fixa dentro de cada descarga em vez de variar os segmentos a cada quadro.
+## Fonte e licença
+- **BigSoundBank Thunder #3 (ID 3114)**: https://bigsoundbank.com/thunder-3-s3114.html
+- **BigSoundBank Thunder #5 (ID 3116)**: https://bigsoundbank.com/thunder-5-s3116.html
+- Licença indicada na fonte: CC0. Arquivos originais fornecidos pelo usuário.
+- Dois uploads de Thunder #5 eram idênticos (mesmo SHA-256); apenas uma cópia foi utilizada.
 
-## Garantias e validação
-- Sem novas imagens ou sons baixados; mantém o áudio procedural e a escolha de clima apenas visual.
-- Testes adicionados: `tests/thunder-1121.test.mjs`, executado por `npm test`.
-- Teste auditivo em navegadores e medição de FPS em dispositivos reais ainda são necessários para homologação.
+## Processamento
+`Chaua-Educa-main/sounds/thunder-real.mp3` é um pacote mono MP3 de 24 kHz / 24 kbps, cerca de 16,8 KB. Foi editado a partir de dois trechos reais:
+- **Próximo:** 0–2,50 s de áudio, vindo de Thunder #3 (original cortado em 1,20–3,70 s).
+- **Distante:** 2,62–5,47 s, vindo de Thunder #5 (original cortado em 1,05–3,90 s).
+- Há 0,12 s de silêncio entre trechos. Ambas as gravações receberam fades curtos de entrada/saída e ajuste moderado de ganho.
+- MP3 decodificado uma vez após a interação do usuário e reutilizado em memória. O carregamento é assíncrono e não está no RAF.
 
-Nota de versão: `1.0.12.1` é o identificador de correção do jogo; o campo `version` do pacote npm permanece `1.0.11`, pois npm exige SemVer de três componentes.
+## Comportamento
+- O controlador `lightning.mjs` continua sendo a fonte única dos momentos de descarga visual e sonora.
+- Trovão próximo toca com atraso de 0,12 s; distante, 0,40 s. Três padrões determinísticos usam essas duas gravações para alternar as descargas.
+- O processamento antigo de estalos elétricos, onda de choque e rugido procedural foi removido.
+- Pausar, abrir quiz, silenciar ou perder foco interrompe a fonte atual com fade breve; reiniciar libera o mesmo índice para uma nova tentativa.
+- Caso o arquivo falhe ao carregar, o evento permanece silencioso, sem recorrer ao antigo chiado sintetizado.
+- O arquivo está pré-carregado como recurso do Pages e consta da auditoria offline de release.
+
+## Validação
+`npm test` inclui `tests/thunder-1121.test.mjs`. O áudio deve ser conferido com fones e alto-falantes reais no navegador antes da homologação definitiva.
