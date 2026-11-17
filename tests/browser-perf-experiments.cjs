@@ -10,7 +10,7 @@ const root=base.endsWith('/')?base:base+'/';
   for(const enabled of [false,true]){
    const page=await browser.newPage({viewport:{width:1366,height:768},deviceScaleFactor:1,acceptDownloads:true});
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(root+'?perf-test=1&snakeWarmup='+(enabled?'1':'0'),{waitUntil:'networkidle'});
+   await page.goto(root+'?perf-test=1&perf-level=deep&snakeWarmup='+(enabled?'1':'0'),{waitUntil:'networkidle'});
    await page.locator('#start-training:not([disabled])').waitFor();
    const original=page.locator('#result-bird canvas');
    assert.equal(await original.count(),1,'result bird canvas exists before any flight');

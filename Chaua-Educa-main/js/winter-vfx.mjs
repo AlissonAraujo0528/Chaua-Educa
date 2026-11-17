@@ -1,3 +1,5 @@
+import {PERF_AB_VARIANT} from './perf-ab.mjs';
+
 // Winter VFX are procedural and use the original character/tree art intact.
 // No generated anatomy, no texture allocation per frame, no sprite replacement.
 const clamp01=v=>Math.min(1,Math.max(0,Number.isFinite(v)?v:0));
@@ -7,7 +9,7 @@ const wrap=(v,span)=>((v%span)+span)%span;
 // are sparse and do not compete with fruits, HUD, warning labels or predators.
 export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0,foreground=false,motion=null){
  const amount=clamp01(intensity);
- if(amount<=.012||reduced||w<=0||h<=0)return;
+ if(amount<=.012||reduced||w<=0||h<=0||PERF_AB_VARIANT==='snow-flakes-off')return;
  const layers=foreground?[{depth:1,count:low?6:18}]:
   [{depth:.32,count:low?16:48},{depth:.68,count:low?16:56}];
  c.save();c.beginPath();c.rect(0,0,w,h);c.clip();
@@ -54,9 +56,27 @@ export function snowRevealHeight(intensity,column=0){
  const delay=((Math.imul(column+1,73)>>>0)%101)/101*.18;
  return clamp01((progress-delay)/(1-delay));
 }
+// Cache clipping geometry for visually identical snow-masks. The old path
+// allocation was repeated once PER visible trunk and frame.
+const revealPaths=new Map(),REVEAL_PATH_LIMIT=192;
 export function clipSnowReveal(c,x,y,width,height,intensity){
- c.beginPath();
  const columns=32;
+ if(typeof Path2D!=='undefined'&&PERF_AB_VARIANT!=='legacy-snow-clips'){
+  const step=Math.round(clamp01(intensity)*256);
+  const key=[x,y,width,height,step].join(':');
+  let path=revealPaths.get(key);
+  if(!path){
+   path=new Path2D();
+   for(let i=0;i<columns;i++){
+    const reach=snowRevealHeight(intensity,i);
+    if(reach>0)path.rect(x+i*width/columns,y,width/columns,height*reach);
+   }
+   if(revealPaths.size>=REVEAL_PATH_LIMIT)revealPaths.delete(revealPaths.keys().next().value);
+   revealPaths.set(key,path);
+  }
+  c.clip(path);return;
+ }
+ c.beginPath();
  for(let i=0;i<columns;i++){
   const reach=snowRevealHeight(intensity,i);
   if(reach>0)c.rect(x+i*width/columns,y,width/columns,height*reach);

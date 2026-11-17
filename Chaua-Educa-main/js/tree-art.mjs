@@ -3,6 +3,8 @@ import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
 import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
+import {PERF_AB_VARIANT} from './perf-ab.mjs';
+import {activeProbe} from './perf-hooks.mjs';
 
 
 // Repeat complete bark bands at the same scale as the authored cap.
@@ -96,7 +98,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Reveal solid authored snow progressively over the exposed surface.
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
- if(snow>0&&!fullSnow){
+ if(snow>0&&!fullSnow&&PERF_AB_VARIANT!=='snow-mask-off'){
   const overlay=snowOverlay(kind,snow);
   if(overlay){
    if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
@@ -150,7 +152,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
     c.restore();}
 
   // Snow variant transition
-  if (snow > 0 && breakAge === undefined) {
+  if (snow > 0 && breakAge === undefined && PERF_AB_VARIANT!=='snow-mask-off') {
    const snowImage = images.get('tree-variants-snow');
    if (snowImage) {
     c.save();
@@ -311,6 +313,7 @@ export function prepareTreeWeather(context){
  }
 }
 function snowOverlay(kind,amount){
+ if(PERF_AB_VARIANT==='snow-mask-off')return null;
  amount=Math.round(Math.min(1,Math.max(0,amount))*256)/256;
  const image=images.get(`trees-${kind}-overlay-04`);
  if(!image)return null;
@@ -324,6 +327,7 @@ function snowOverlay(kind,amount){
  // One shared surface per orientation, rebuilt only when coverage changes.
  // The final overlay retains authored opacity, shading and antialiased edges.
  if(buffer.amount!==amount||buffer.image!==image){
+  const probe=activeProbe,started=probe?probe.begin('render.snowMaskRebuild'):0;
   const c=buffer.c;c.clearRect(0,0,1024,1024);
   c.save();c.globalAlpha=1;c.globalCompositeOperation='source-over';
   for(const f of FOREST_ART[kind]){
@@ -335,6 +339,7 @@ function snowOverlay(kind,amount){
    c.restore();
   }
   c.restore();buffer.amount=amount;buffer.image=image;
+  if(probe)probe.end('render.snowMaskRebuild',started,{kind,amount,maskPixels:1024*1024});
  }
  return buffer.canvas;
 }

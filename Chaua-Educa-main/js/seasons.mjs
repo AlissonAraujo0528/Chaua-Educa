@@ -2,6 +2,7 @@ import {getWeatherMode,journeyRain,journeyStorm} from './weather.mjs';
 import {seasonFromFlight} from './climate-timeline.mjs';
 import {drawSnowfall} from './winter-vfx.mjs';
 import {activeProbe} from './perf-hooks.mjs';
+import {PERF_AB_VARIANT} from './perf-ab.mjs';
 
 export function journeySeason(game) {
  const wm = getWeatherMode();
@@ -114,7 +115,7 @@ export class SeasonalBackdrop {
   const state=this.prepare(atlas,w,h,dpr,game),margin=26;
   if(probe)probe.end('render.seasonalPrepare',prepAt);
   const blitAt=probe?probe.begin('render.seasonalBlit'):0;
-  const drift=reduced?0:Math.sin(time*.035)*24;
+  const drift=reduced||PERF_AB_VARIANT==='static-season-bg'?0:Math.sin(time*.035)*24;
   c.save();c.setTransform(1,0,0,1,0,0);
   c.globalAlpha=1;
   c.drawImage(this.frames.get(state.mix===1?state.to:state.from),Math.round((drift-margin)*dpr),0);
