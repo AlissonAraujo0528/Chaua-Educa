@@ -14,6 +14,8 @@ const THUNDER_CLIPS = Object.freeze([
     Object.freeze({offset: .04, duration: 2.45, delay: .54, gain: .53}) // long: ~2.38–2.53 s
 ]);
 
+const SHORT_VOLUME_TYPES = new Set(['countdown','snake-warning','hawk-warning','feather-end','pepper-end']);
+
 // Local wind ambience plus two CC0 real thunder recordings. No synthesized thunder crackle.
 export class ForestAudio {
     constructor(contextFactory=()=>new (window.AudioContext||window.webkitAudioContext)(), fetchThunder=url=>fetch(url)) {
@@ -88,7 +90,12 @@ export class ForestAudio {
                 if(now-this.lastFlap<.15)return;
                 this.lastFlap=now;this.tone(210,now,.09,.15,'triangle',70);this.tone(140,now+.02,.07,.12,'sine',50);return;
             }
-            notes[type].forEach((f,i)=>this.tone(f,now+i*.075,.18,['countdown','snake-warning','hawk-warning','feather-end','pepper-end'].includes(type) ? .08 : .18,type==='shield-break'?'triangle':'sine'));
+            const seq = notes[type];
+            const vol = SHORT_VOLUME_TYPES.has(type) ? .08 : .18;
+            const wave = type === 'shield-break' ? 'triangle' : 'sine';
+            for (let i = 0; i < seq.length; i++) {
+                this.tone(seq[i], now + i * .075, .18, vol, wave);
+            }
         } catch { /* Audio failure never blocks the game. */ }
     }
     // Real MP3 samples are fetched from this Pages deployment once and decoded

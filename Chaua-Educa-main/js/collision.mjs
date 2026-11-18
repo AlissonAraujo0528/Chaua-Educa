@@ -75,11 +75,27 @@ export function intersects(a,b){
  }
  return true;
 }
+function polyOverlapsPoly(a,b){
+ let aMinX=Infinity,aMaxX=-Infinity,aMinY=Infinity,aMaxY=-Infinity;
+ for(let i=0;i<a.length;i++){
+  const v=a[i];
+  if(v.x<aMinX)aMinX=v.x;if(v.x>aMaxX)aMaxX=v.x;
+  if(v.y<aMinY)aMinY=v.y;if(v.y>aMaxY)aMaxY=v.y;
+ }
+ let bMinX=Infinity,bMaxX=-Infinity,bMinY=Infinity,bMaxY=-Infinity;
+ for(let i=0;i<b.length;i++){
+  const v=b[i];
+  if(v.x<bMinX)bMinX=v.x;if(v.x>bMaxX)bMaxX=v.x;
+  if(v.y<bMinY)bMinY=v.y;if(v.y>bMaxY)bMaxY=v.y;
+ }
+ return aMaxX>bMinX&&aMinX<bMaxX&&aMaxY>bMinY&&aMinY<bMaxY;
+}
 export function shapesIntersect(a,b){
  for(let i=0;i<a.length;i++){
   const p=a[i];
   for(let j=0;j<b.length;j++){
-   if(intersects(p,b[j]))return true;
+   const q=b[j];
+   if(polyOverlapsPoly(p,q)&&intersects(p,q))return true;
   }
  }
  return false;

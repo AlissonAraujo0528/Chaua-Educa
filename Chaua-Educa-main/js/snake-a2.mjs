@@ -1,3 +1,22 @@
+const WARNING_ATTACK_FRAMES = Object.freeze([2, 3, 4]);
+const WARNING_DEF_FRAMES = Object.freeze([1, 0, 0]);
+const IDLE_CYCLE = Object.freeze([0, 1, 2, 1]);
+const DELTA_X_CANDIDATES = Object.freeze([0,-16,16,-32,32,-48,48,-64,64,-80,80,-96,96,-112,112,-128,128,-144,144]);
+const FALLBACK_DX = Object.freeze([-160,160,-180,180,-200,200]);
+
+function snakesClear(snakes, cx, cy) {
+ for (let i = 0; i < snakes.length; i++) {
+  if (!snakeA2FruitHasClearance(snakes[i], cx, cy)) return false;
+ }
+ return true;
+}
+function previousClear(previous, cx, cy) {
+ for (let i = 0; i < previous.length; i++) {
+  const p = previous[i];
+  if (Math.abs(p.x - cx) < 56 && Math.abs(p.y - cy) < 50) return false;
+ }
+ return true;
+}
 import {loadImage} from './image-loader.mjs';
 import {SNAKE_ATTACK_ART} from './snake-attack-art.mjs';
 import {snakeAttack} from './attack-patterns.mjs';
@@ -157,8 +176,8 @@ export function placeA2Fruit(snakes,x,y,minimumY,maximumY,previous=[]){
  const fits=(cx,cy)=>{
   candidates++;
   return cy>=minimumY&&cy<=maximumY&&
-   snakes.every(wood=>snakeA2FruitHasClearance(wood,cx,cy))&&
-   !previous.some(p=>Math.abs(p.x-cx)<56&&Math.abs(p.y-cy)<50);
+   snakesClear(snakes,cx,cy)&&
+   previousClear(previous,cx,cy);
  };
  if(fits(x,y)){
   if(probe)probe.event('snake:fruitPlacement',{candidates,originalPositionAccepted:true});
@@ -167,7 +186,8 @@ export function placeA2Fruit(snakes,x,y,minimumY,maximumY,previous=[]){
  let best=null,score=Infinity;
  // Prefer a tiny vertical shift within the existing corridor. A horizontal
  // adjustment is a fallback, so the difficulty and fruit routes are retained.
- for(const deltaX of [0,-16,16,-32,32,-48,48,-64,64,-80,80,-96,96,-112,112,-128,128,-144,144]){
+ for(let dIdx=0;dIdx<DELTA_X_CANDIDATES.length;dIdx++){
+  const deltaX=DELTA_X_CANDIDATES[dIdx];
   for(let yy=minimumY;yy<maximumY+4;yy+=4){
    const cy=Math.min(yy,maximumY),cx=x+deltaX;
    const cost=Math.abs(deltaX)*1.4+Math.abs(cy-y);
@@ -175,7 +195,8 @@ export function placeA2Fruit(snakes,x,y,minimumY,maximumY,previous=[]){
    score=cost;best={x:cx,y:cy};
   }
  }
- if(!best)for(const dx of [-160,160,-180,180,-200,200]){
+ if(!best)for(let dIdx=0;dIdx<FALLBACK_DX.length;dIdx++){
+  const dx=FALLBACK_DX[dIdx];
   const cx=x+dx,cy=Math.max(minimumY,Math.min(y,maximumY));
   if(fits(cx,cy)){best={x:cx,y:cy};break;}
  }
@@ -226,7 +247,7 @@ export function snakeA2Pose(s={},reduced=false){
    return {key,frame:f,state:'recover'};
   }
   case 'spent':case 'leaving':return {key:'idle',frame:0,state:s.phase};
-  default:return {key:'idle',frame:[0,1,2,1][Math.floor(validTime(s.age)*2.3)%4],state:'watching'};
+  default:return {key:'idle',frame:IDLE_CYCLE[Math.floor(validTime(s.age)*2.3)%4],state:'watching'};
  }
 }
 export function preloadSnakeA2(){
@@ -325,19 +346,26 @@ export function snakeA2SpriteRect(wood,reduced=false){
 
 // Upper silhouette supplies the head/mouth location for weather effects.
 // The collision remains the complete mask, not this illustrative bounding box.
+const HEAD_BOUNDS_CACHE = Object.create(null);
 export function snakeA2HeadRect(wood,reduced=false){
  if(!wood?.snake||wood.snake.retreat)return null;
  const place=snakePlacement(wood),pose=snakeA2Pose(wood.snake,reduced);place.factor*=snakeA2ArtScale(pose);
- const mask=collisionMasks[pose.key][pose.frame],flip=snakeA2NeedsMirror(pose);
- let minX=MASK_SIDE,maxX=-1,minY=MASK_SIDE,maxY=-1;
- for(let row=0;row<(pose.key==='sweep'?22:14);row++)for(let col=0;col<MASK_SIDE;col++){
-  if(!mask[row*MASK_SIDE+col])continue;
-  const displayCol=flip?MASK_SIDE-1-col:col;
-  minX=Math.min(minX,displayCol);maxX=Math.max(maxX,displayCol);
-  minY=Math.min(minY,row);maxY=Math.max(maxY,row);
+ const flip=snakeA2NeedsMirror(pose);
+ const cacheKey=`${pose.key}:${pose.frame}:${flip?1:0}`;
+ let bounds=HEAD_BOUNDS_CACHE[cacheKey];
+ if(bounds===undefined){
+  const mask=collisionMasks[pose.key][pose.frame];
+  let minX=MASK_SIDE,maxX=-1,minY=MASK_SIDE,maxY=-1;
+  for(let row=0;row<(pose.key==='sweep'?22:14);row++)for(let col=0;col<MASK_SIDE;col++){
+   if(!mask[row*MASK_SIDE+col])continue;
+   const displayCol=flip?MASK_SIDE-1-col:col;
+   minX=Math.min(minX,displayCol);maxX=Math.max(maxX,displayCol);
+   minY=Math.min(minY,row);maxY=Math.max(maxY,row);
+  }
+  bounds=HEAD_BOUNDS_CACHE[cacheKey]=maxX<0?null:{minX,maxX,minY,maxY};
  }
- if(maxX<0)return null;
- return {x:place.x+(minX*MASK_CELL-SNAKE_A2_GRID.anchorX)*place.factor,
-  y:place.y+(minY*MASK_CELL-SNAKE_A2_GRID.anchorY)*place.factor,
-  w:(maxX-minX+1)*MASK_CELL*place.factor,h:(maxY-minY+1)*MASK_CELL*place.factor};
+ if(!bounds)return null;
+ return {x:place.x+(bounds.minX*MASK_CELL-SNAKE_A2_GRID.anchorX)*place.factor,
+  y:place.y+(bounds.minY*MASK_CELL-SNAKE_A2_GRID.anchorY)*place.factor,
+  w:(bounds.maxX-bounds.minX+1)*MASK_CELL*place.factor,h:(bounds.maxY-bounds.minY+1)*MASK_CELL*place.factor};
 }

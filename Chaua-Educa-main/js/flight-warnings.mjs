@@ -3,10 +3,21 @@ import {warningPosition,snakeWarningPosition} from './viewport.mjs';
 import {snakeA2SpriteRect} from './snake-a2.mjs';
 import {predictedHawkY} from './animals.mjs';
 
+const ACTIVE_SNAKE_PHASES = new Set(['warning','windup','striking']);
+
+function hasActiveThreat(entities, playerX) {
+ for (let i = 0; i < entities.length; i++) {
+  const e = entities[i];
+  if (e.kind === 'hawk' && !e.harmless && e.x > playerX + 100) return true;
+  if (e.kind === 'wood' && e.snake && ACTIVE_SNAKE_PHASES.has(e.snake.phase)) return true;
+ }
+ return false;
+}
+
 // Presentation only: protected regions do not alter collision or encounters.
 export function flightWarnings(game,view,reduced=false,shakeX=0,shakeY=0){
+ if(!hasActiveThreat(game.entities, game.x))return {boxes:[],protectedRegions:[]};
  const notices=[],protectedRegions=[];
- if(!game.entities.some(e=>e.kind==='hawk'&&!e.harmless&&e.x>game.x+100||e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase)))return {boxes:notices,protectedRegions};
  const project=rect=>({x:view.x+(rect.x-view.worldLeft)*view.scale+shakeX,
   y:view.y+(rect.y-(view.worldTop||0))*view.scale+shakeY,w:rect.w*view.scale,h:rect.h*view.scale});
  const protect=rect=>{
@@ -16,10 +27,11 @@ export function flightWarnings(game,view,reduced=false,shakeX=0,shakeY=0){
  };
  // Bounds enclose the rotated 154px flight cell, including wing extremes.
  protect({x:game.x-116,y:game.y-116,w:232,h:232});
- for(const e of game.entities){
+ for(let i=0;i<game.entities.length;i++){
+  const e=game.entities[i];
   if(e.kind==='wood'&&e.snake){
    protect(snakeA2SpriteRect(e,reduced));
-   if(['warning','windup','striking'].includes(e.snake.phase))
+   if(ACTIVE_SNAKE_PHASES.has(e.snake.phase))
     notices.push({...snakeWarningPosition(view,e),w:160,h:26,type:'snake',entity:e});
   }else if(e.kind==='hawk'&&!e.harmless&&e.x>game.x+100){
    // Protect the visible bird, including authored wing/dive poses.

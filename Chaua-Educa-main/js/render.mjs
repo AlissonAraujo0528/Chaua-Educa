@@ -30,6 +30,9 @@ import {AnimalWeather} from './animal-weather.mjs';
 import { WIDTH, HEIGHT } from './engine.mjs';
 
 const TAU = Math.PI * 2;
+const ROUTE_LINE_DASH = Object.freeze([4, 8]);
+const HAWK_LINE_DASH = Object.freeze([6, 8]);
+const SHIELD_EMPTY_DASH = Object.freeze([5, 7]);
 const BACKGROUND_PALETTE=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
 const TINT_PALETTE=['#bdcf8c','#e4c16b','#507b63','#92bf74'];
 
@@ -583,6 +586,10 @@ function drawRefugeHearts(c, x, y, size, t) {
 }
 
 // Pre-rendered radial glows and static vector sprites for zero-cost drawImage in gameplay loop.
+const PEPPER_AURA_STOPS = Object.freeze([[8, 0, '#ff523366'], [8, 0.5, '#ff883344'], [8, 1, '#ff330000']]);
+const FEATHER_AURA_STOPS = Object.freeze([[16, 0, 'rgba(255, 235, 140, 0.45)'], [16, 0.65, 'rgba(255, 205, 60, 0.28)'], [16, 1, 'rgba(255, 216, 80, 0)']]);
+const SHIELD_AURA_STOPS = Object.freeze([[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]);
+const compareFruitX = (a, b) => a.x - b.x;
 const pickupCaches = new Map();
 function getPickupCache(key, radius, stops) {
     let surface = pickupCaches.get(key);
@@ -637,14 +644,10 @@ function getPepperSprite() {
     return surface;
 }
 
-export function drawBird(c, {
-    x, y, scale = 1, angle = 0, wing = 0, perched = false, time = 0, surprise = false,
-    reduced = false, reaction = 0, flapImpulse = 0, vy = 0,
-    defeated = false, impactProgress = 0, turbo = false, stamina = 1, won = false, landing = null,
-    shieldHitAge = null, snow = 0, rain = 0, low = false, cold = snow, weather = null
-}) {
+export function drawBird(c, props) {
     if(!images.has('chaua-atlas'))return;
-    return animatedBird(c,{x,y,scale,angle,wing,perched,time,surprise,reduced,reaction,flapImpulse,vy,defeated,impactProgress,turbo,stamina,won,landing,shieldHitAge,snow,rain,low,cold,weather});
+    if(props.cold===undefined)props.cold=props.snow??0;
+    return animatedBird(c, props);
 }
 
 // Shared attachment geometry keeps the authored perch positioned harmoniously.
@@ -1238,18 +1241,24 @@ export class Renderer {
         // the logical game viewport. Derive wood limits from the live camera,
         // including shake and a 64px guard for transformed/leaning bark.
         this.animalWeather.begin(c,{time:sceneTime,seed:game.seed,speed:game.speed,wind,snow,snowfall:winter,wet,rain,reduced,low:this.decoration==='low'});
-        const renderBounds={
-            top:view.worldTop-(view.y+Math.abs(shakeY)+64)/s,
-            bottom:view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s,
-            winter, wind, rain
-        };
+        const renderBounds=this._renderBoundsScratch??(this._renderBoundsScratch={top:0,bottom:0,winter:0,wind:0,rain:0});
+        renderBounds.top=view.worldTop-(view.y+Math.abs(shakeY)+64)/s;
+        renderBounds.bottom=view.worldTop+(this.h-view.y+Math.abs(shakeY)+64)/s;
+        renderBounds.winter=winter;
+        renderBounds.wind=wind;
+        renderBounds.rain=rain;
         const treesAt=probe&&probe.deep?probe.begin('render.trees'):0;
-        for (const e of game.entities) {
+        for (let i = 0; i < game.entities.length; i++) {
+            const e = game.entities[i];
             if (e.kind === 'wood' && (this.drawOffscreenEntitiesForTest === true ||
                 !Number.isFinite(e.x) || (e.x >= view.worldLeft - 320 &&
                 e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced, renderBounds);
         }
-        this.treeDrips.draw(c,game,sceneTime,game.surfaceWeather?.drip??0,wind,this.decoration==='low',reduced,{left:view.worldLeft,right:view.worldLeft+view.worldWidth,bottom:renderBounds.bottom});
+        const dripsBounds=this._treeDripsBoundsScratch??(this._treeDripsBoundsScratch={left:0,right:0,bottom:0});
+        dripsBounds.left=view.worldLeft;
+        dripsBounds.right=view.worldLeft+view.worldWidth;
+        dripsBounds.bottom=renderBounds.bottom;
+        this.treeDrips.draw(c,game,sceneTime,game.surfaceWeather?.drip??0,wind,this.decoration==='low',reduced,dripsBounds);
         if(probe&&probe.deep)probe.end('render.trees',treesAt);
         c.restore();
         c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
@@ -1260,7 +1269,7 @@ export class Renderer {
             const remaining = Math.min(1, game.pepper / 2);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const turboRadius = (46 + 14 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 12) * 0.08);
-            const auraSurface = getPickupCache('chaua-pepper-aura', 60, [[8, 0, '#ff523366'], [8, 0.5, '#ff883344'], [8, 1, '#ff330000']]);
+            const auraSurface = getPickupCache('chaua-pepper-aura', 60, PEPPER_AURA_STOPS);
             if (auraSurface) c.drawImage(auraSurface, game.x - turboRadius, game.y - turboRadius, turboRadius * 2, turboRadius * 2);
             else {
                 const aura = c.createRadialGradient(game.x, game.y, 8, game.x, game.y, turboRadius);
@@ -1292,7 +1301,7 @@ export class Renderer {
             const remaining = Math.min(1, game.feather / 3);
             c.globalAlpha = 0.5 + 0.5 * remaining;
             const radius = (66 + 18 * remaining) * (reduced ? 1 : 1 + Math.sin(game.elapsed * 3) * 0.06);
-            const auraSurface = getPickupCache('chaua-feather-aura', 84, [[16, 0, 'rgba(255, 235, 140, 0.45)'], [16, 0.65, 'rgba(255, 205, 60, 0.28)'], [16, 1, 'rgba(255, 216, 80, 0)']]);
+            const auraSurface = getPickupCache('chaua-feather-aura', 84, FEATHER_AURA_STOPS);
             if (auraSurface) c.drawImage(auraSurface, game.x - radius, game.y - radius, radius * 2, radius * 2);
             else {
                 const aura = c.createRadialGradient(game.x, game.y, 16, game.x, game.y, radius);
@@ -1320,33 +1329,41 @@ export class Renderer {
             this._routesLists.push(list);
         });
         this._routesMap.clear();
-        for (const e of game.entities) if (e.kind === 'fruit' && e.route !== undefined && !e.collected) {
-            let list = this._routesMap.get(e.route);
-            if (!list) {
-                list = this._routesLists.pop() || [];
-                this._routesMap.set(e.route, list);
+        for (let i = 0; i < game.entities.length; i++) {
+            const e = game.entities[i];
+            if (e.kind === 'fruit' && e.route !== undefined && !e.collected) {
+                let list = this._routesMap.get(e.route);
+                if (!list) {
+                    list = this._routesLists.pop() || [];
+                    this._routesMap.set(e.route, list);
+                }
+                list.push(e);
             }
-            list.push(e);
         }
         this._routesMap.forEach(fruit => {
             if (fruit.length > 1) {
-                fruit.sort((a,b) => a.x - b.x);
+                if (fruit.length === 2) {
+                    if (fruit[0].x > fruit[1].x) { const tmp = fruit[0]; fruit[0] = fruit[1]; fruit[1] = tmp; }
+                } else {
+                    fruit.sort(compareFruitX);
+                }
                 c.save(); c.strokeStyle = fruit[0].optional ? '#f4d77caa' : '#e9f3cf99';
-                c.lineWidth = 2; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
+                c.lineWidth = 2; c.setLineDash(ROUTE_LINE_DASH); c.beginPath(); c.moveTo(fruit[0].x, fruit[0].y);
                 for (let i = 1; i < fruit.length; i++) c.lineTo(fruit[i].x, fruit[i].y);
                 c.stroke(); c.restore();
             }
         });
         const visibleLeft=view.worldLeft,visibleRight=view.worldLeft+view.worldWidth;
-        for (const e of game.entities) {
+        for (let i = 0; i < game.entities.length; i++) {
+            const e = game.entities[i];
             const margin=e.kind==='wood'?320:e.kind==='hawk'?180:100;
             const drawSprite=this.drawOffscreenEntitiesForTest===true||
                 !Number.isFinite(e.x)||(e.x>=visibleLeft-margin&&e.x<=visibleRight+margin);
             if (e.kind === 'wood') continue;
             if (e.kind === 'hawk') {
                 if (e.warning > 0 || (!e.harmless && e.x>game.x+180)) {
-                    c.save(); c.strokeStyle = '#684b3caa'; c.lineWidth = 2; c.setLineDash([6, 8]);
-                    c.strokeStyle=e.targetLocked?'#a85b34aa':'#755a45aa';c.lineWidth=2;
+                    c.save(); c.lineWidth = 2; c.setLineDash(HAWK_LINE_DASH);
+                    c.strokeStyle=e.targetLocked?'#a85b34aa':'#755a45aa';
                     c.beginPath();
                     if(e.attackKind){for(let i=0;i<=20;i++){const xx=e.startX+(e.targetX-e.startX)*i/20,yy=predictedHawkY(e,xx);if(i===0)c.moveTo(xx,yy);else c.lineTo(xx,yy);}}
                     else {c.moveTo(e.targetX,e.targetY);c.lineTo(e.startX,e.startY);}
@@ -1361,7 +1378,7 @@ export class Renderer {
             c.save();
             c.globalAlpha = game.shield ? 0.95 : 0.45;
             const auraRadius = r + 10;
-            const auraSurface = getPickupCache('chaua-shield-aura', auraRadius, [[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]);
+            const auraSurface = getPickupCache('chaua-shield-aura', auraRadius, SHIELD_AURA_STOPS);
             if (auraSurface) c.drawImage(auraSurface, game.x - auraRadius, game.y - auraRadius, auraRadius * 2, auraRadius * 2);
             else {
                 const aura = c.createRadialGradient(game.x, game.y, 38, game.x, game.y, auraRadius);
@@ -1393,7 +1410,7 @@ export class Renderer {
                     c.restore();
                 }
             } else {
-                c.setLineDash([5, 7]); c.strokeStyle = '#d0e9ff'; c.lineWidth = 2;
+                c.setLineDash(SHIELD_EMPTY_DASH); c.strokeStyle = '#d0e9ff'; c.lineWidth = 2;
                 c.beginPath(); c.arc(game.x, game.y, 48, 0, TAU); c.stroke(); c.setLineDash([]);
             }
             c.restore();
@@ -1414,16 +1431,17 @@ export class Renderer {
             : (game.state === 'ended' && !game.won ? 1 : 0);
         const contact=woodContactPosition(game,impactProg,reduced);
         const birdAt=probe&&probe.deep?probe.begin('render.bird'):0;
-        drawBird(c, {
-            x: contact.x, y: contact.y, scale: 1.04, perched: game.state === 'ended' && game.won,
-            cold: winter, angle: game.angle, wing: reduced ? .2 : game.wing, time: (game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime,
-            landing: game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null,
-            reaction: game.collectPulse, flapImpulse: game.flapImpulse || 0, vy: game.vy || 0, reduced,
-            shieldHitAge:game.hit&&game.invincible>0?game.hit.age:null,
-            defeated: isDefeated, impactProgress: impactProg, turbo: (game.pepper || 0) > 0,
-            stamina: game.stamina !== undefined ? game.stamina : 1, won: game.state === 'ended' && game.won,
-            snow, rain, low:this.decoration==='low',weather:this.animalWeather
-        });
+        const bProps=this._drawBirdScratch??(this._drawBirdScratch={});
+        bProps.x=contact.x;bProps.y=contact.y;bProps.scale=1.04;bProps.perched=game.state==='ended'&&game.won;
+        bProps.cold=winter;bProps.angle=game.angle;bProps.wing=reduced?.2:game.wing;
+        bProps.time=(game.state==='impact'||game.state==='ended'&&game.won)?visualTime:sceneTime;
+        bProps.landing=game.arrival&&!game.won?Math.min(1,game.arrival.age/1.6):null;
+        bProps.reaction=game.collectPulse;bProps.flapImpulse=game.flapImpulse||0;bProps.vy=game.vy||0;bProps.reduced=reduced;
+        bProps.shieldHitAge=game.hit&&game.invincible>0?game.hit.age:null;
+        bProps.defeated=isDefeated;bProps.impactProgress=impactProg;bProps.turbo=(game.pepper||0)>0;
+        bProps.stamina=game.stamina!==undefined?game.stamina:1;bProps.won=game.state==='ended'&&game.won;
+        bProps.snow=snow;bProps.rain=rain;bProps.low=this.decoration==='low';bProps.weather=this.animalWeather;
+        drawBird(c, bProps);
         if(probe&&probe.deep)probe.end('render.bird',birdAt);
         const particlesAt=probe&&probe.deep?probe.begin('render.particles'):0;
         if (!reduced) {
@@ -1473,11 +1491,14 @@ export class Renderer {
         c.globalAlpha = 1;
         if(game.popups.length) {
             c.font='800 18px Nunito';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#254a35';
-            for(const p of game.popups) {
-                c.save();c.globalAlpha=Math.min(1,p.life*3);
+            for(let i=0;i<game.popups.length;i++) {
+                const p = game.popups[i];
+                c.globalAlpha=Math.min(1,p.life*3);
                 c.strokeText(p.text,p.x,p.y);
-                c.fillStyle=p.gold?'#ffe392':'#f1ffd4';c.fillText(p.text,p.x,p.y);c.restore();
+                c.fillStyle=p.gold?'#ffe392':'#f1ffd4';
+                c.fillText(p.text,p.x,p.y);
             }
+            c.globalAlpha=1;
         }
         c.restore();
         if(rain>0&&!reduced){
@@ -1522,9 +1543,10 @@ export class Renderer {
         const rain = game.surfaceWeather?.wet ?? (renderBounds?.rain ?? journeyRain(game, game.tutorial));
         const snow = surfaceSnow(game);
         const winter = renderBounds?.winter ?? winterAmount(game);
-        for (const side of ['top', 'bottom']) {
-            const upper = side === 'top';
-            const y = e[side];
+        for (let sIdx = 0; sIdx < 2; sIdx++) {
+            const upper = sIdx === 0;
+            const side = upper ? 'top' : 'bottom';
+            const y = upper ? e.top : e.bottom;
             const visibleReach=renderBounds?Math.max(0,upper?y-renderBounds.top:renderBounds.bottom-y):1000;
             const broken = e.broken && e.brokenSide === side;
             if (broken && (reduced || !e.breakFx)) continue;
@@ -1630,7 +1652,8 @@ export class Renderer {
     }
 
     pickup(e, time, reduced, snow = 0, rain = 0) {
-        const c=this.c,{float,pulse,angle:pickupAngle}=pickupPose(e,time,reduced);
+        this._pickupPoseScratch ??= {float: 0, pulse: 1, angle: 0, frame: 0};
+        const c=this.c,{float,pulse,angle:pickupAngle}=pickupPose(e,time,reduced,this._pickupPoseScratch);
         c.save(); c.translate(e.x, e.y);
         c.scale(pulse, pulse);
         if (e.kind === 'fruit') {

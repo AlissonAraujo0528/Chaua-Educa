@@ -235,10 +235,14 @@ export function drawLightningIllumination(context,width,height,time,storm,reduce
 const rainWrap=(value,span)=>((value%span)+span)%span;
 const rainClamp=x=>Math.min(1,Math.max(0,Number.isFinite(x)?x:0));
 const rainScratch=[];
+const RAIN_BANDS_FG_LOW = Object.freeze([{depth:1,count:10}]);
+const RAIN_BANDS_FG_NORM = Object.freeze([{depth:1,count:38}]);
+const RAIN_BANDS_BG_LOW = Object.freeze([{depth:.40,count:18},{depth:.73,count:28}]);
+const RAIN_BANDS_BG_NORM = Object.freeze([{depth:.40,count:68},{depth:.73,count:104}]);
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250,motion=null){
  if(w<=0||h<=0)return;
- const bands=foreground?[{depth:1,count:low?10:38}]:
-  [{depth:.40,count:low?18:68},{depth:.73,count:low?28:104}];
+ const bands=foreground?(low?RAIN_BANDS_FG_LOW:RAIN_BANDS_FG_NORM):
+  (low?RAIN_BANDS_BG_LOW:RAIN_BANDS_BG_NORM);
  // Similar density on laptop and portrait viewports, without letting a huge
  // canvas spawn an unbounded number of raindrops.
  const areaScale=Math.max(.65,Math.min(1.45,Math.sqrt(w*h/(960*640))));

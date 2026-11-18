@@ -69,7 +69,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if (!image) return;
 
  const f = FOREST_ART[kind][((variant % 4) + 4) % 4], s = width / (f.core[1] - f.core[0]);
- const [sx, sy] = f.rect, [cx, cy, cw, ch] = f.content;
+ const sx = f.rect[0], sy = f.rect[1], cx = f.content[0], cy = f.content[1], cw = f.content[2], ch = f.content[3];
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
  const coreLeft = x + (f.core[0] - f.anchor[0]) * s;
  const barkImage=images.get(`trees-${kind}`);
@@ -120,12 +120,13 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
 const TREE_CELL = 256;
 const TREE_CAP_Y = 8;
 const TREE_CORE_WIDTH = 128;
-const TREE_VARIANTS = ['rot', 'hollow', 'moss', 'vine'];
+const TREE_VARIANTS = Object.freeze(['rot', 'hollow', 'moss', 'vine']);
+const TREE_VARIANT_INDEX = Object.freeze({rot: 0, hollow: 1, moss: 2, vine: 3});
 const TREE_SPLICES = [181, 180, 180, 182];
 
 export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0, visibleReach = 1000) {
  const image = images.get('tree-variants');
- const index = TREE_VARIANTS.indexOf(kind);
+ const index = TREE_VARIANT_INDEX[kind] ?? -1;
  if (!image || index < 0) return;
  const sx = (index % 2) * TREE_CELL;
  const sy = Math.floor(index / 2) * TREE_CELL;

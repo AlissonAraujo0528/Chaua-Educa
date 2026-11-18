@@ -47,6 +47,28 @@ export class FlightClock {
     }
 }
 
+const FRUIT_PALETTES = Object.freeze([
+    Object.freeze(['#e0536c', '#f58ea1', '#85bb57', '#ffe894']),
+    Object.freeze(['#d4a366', '#a16e38', '#ffe596', '#7bb850']),
+    Object.freeze(['#ffb03a', '#ff7824', '#ffdc69', '#66bb46']),
+    Object.freeze(['#ff7b2b', '#ffa245', '#332219', '#ffe27d']),
+    Object.freeze(['#6ea644', '#99cf64', '#557d38', '#ffd875']),
+    Object.freeze(['#ffdf40', '#ffe875', '#c8ae32', '#6fb846']),
+    Object.freeze(['#ffcc22', '#ffe666', '#7ec850', '#ffffff'])
+]);
+const SEED_BURST_COLORS = Object.freeze(['#c87a32', '#9e4a22', '#522b13', '#d99438', '#b85e28', '#8a4218']);
+const LEAF_BURST_COLORS = Object.freeze(['#6da855', '#4c8a45', '#9abf68', '#386334']);
+const WOOD_BURST_COLORS = Object.freeze(['#3e2723', '#8d6e63', '#a1887f', '#4e342e', '#9aba67']);
+
+function hasApproachingDanger(entities, px) {
+    for (let i = 0; i < entities.length; i++) {
+        const e = entities[i];
+        if ((e.kind === 'wood' && e.x + 85 > px - 36) ||
+            (e.kind === 'hawk' && !e.harmless && e.x + 30 > px - 36)) return true;
+    }
+    return false;
+}
+
 // Only flight time advances physics, spawns, powers and warnings.
 export class Game {
     constructor({ random, seed = Math.floor(Math.random()*4294967296), onEvent = () => {} } = {}) {
@@ -485,9 +507,7 @@ export class Game {
     maybeOpenQuiz() {
         if (this.state !== 'playing' || !this.quizDue || this.refuge) return false;
         // Drain existing encounters before the pause; nothing dangerous remains ahead.
-        const danger = this.entities.some(e =>
-            (e.kind === 'wood' && e.x + 85 > this.x - 36) ||
-            (e.kind === 'hawk' && !e.harmless && e.x + 30 > this.x - 36));
+        const danger = hasApproachingDanger(this.entities, this.x);
         if (danger || this.y < 120 || this.y > HEIGHT - 120 || Math.abs(this.vy) > 160) return false;
         if (!this.questionPool.length) this.questionPool = QUESTIONS.map((_,i)=>i);
         const review = this.questionPool.find(i=>this.reviewIds.includes(QUESTIONS[i].id));
@@ -525,16 +545,7 @@ export class Game {
 
     fruitBurst(x, y, variety, multiplier = 1) {
         const probe=activeProbe,burstAt=probe?probe.begin('vfx.fruitBurst'):0;
-        const PALETTES = [
-            ['#e0536c', '#f58ea1', '#85bb57', '#ffe894'],
-            ['#d4a366', '#a16e38', '#ffe596', '#7bb850'],
-            ['#ffb03a', '#ff7824', '#ffdc69', '#66bb46'],
-            ['#ff7b2b', '#ffa245', '#332219', '#ffe27d'],
-            ['#6ea644', '#99cf64', '#557d38', '#ffd875'],
-            ['#ffdf40', '#ffe875', '#c8ae32', '#6fb846'],
-            ['#ffcc22', '#ffe666', '#7ec850', '#ffffff']
-        ];
-        const colors = PALETTES[(variety ?? 0) % PALETTES.length];
+        const colors = FRUIT_PALETTES[(variety ?? 0) % FRUIT_PALETTES.length];
         const count = 12;
         for (let i = 0; i < count; i++) {
             const a = i * Math.PI * 2 / count;
@@ -550,7 +561,7 @@ export class Game {
             });
         }
         // Dispersao de sementes pelo chaua apos comer a fruta
-        const seedColors = ['#c87a32', '#9e4a22', '#522b13', '#d99438', '#b85e28', '#8a4218'];
+        const seedColors = SEED_BURST_COLORS;
         const seedCount = 5;
         for (let s = 0; s < seedCount; s++) {
             const seedAngle = (s * 0.45 - 0.9) + (Math.random() - 0.5) * 0.35;
@@ -591,7 +602,7 @@ export class Game {
     }
 
     leafBurst(x, y, count = 10) {
-        const colors = ['#6da855', '#4c8a45', '#9abf68', '#386334'];
+        const colors = LEAF_BURST_COLORS;
         for (let i = 0; i < count; i++) {
             const a = (i * 1.8) + (i % 2 ? 0.3 : -0.3);
             const speed = 40 + (i * 23) % 70;
@@ -624,7 +635,7 @@ export class Game {
     }
 
     woodBurst(x,y) {
-        const colors=['#3e2723','#8d6e63','#a1887f','#4e342e','#9aba67'];
+        const colors=WOOD_BURST_COLORS;
         for(let i=0;i<18;i++) {
             const a=i*2.39996;
             this.particle({x,y,vx:Math.cos(a)*(105+i*6),vy:Math.sin(a)*120-75,
@@ -697,8 +708,16 @@ export class Game {
         const soloHawk = !this.chapterEntry && this.elapsed > profile.hawkAt && n % (challenge?.hawkEvery??3) === 1;
         // Reserve the first encounters: finish the preceding wood before a
         // solo hawk, and let that hawk leave before presenting another trunk.
-        const waitingForSolo = this.entities.some(e => e.kind === 'hawk' && e.solo && !e.harmless && e.x > this.x - 100);
-        if (waitingForSolo || (soloHawk && this.entities.some(e => e.kind === 'wood' && e.x + 85 > this.x - 40))) {
+        let waitingForSolo = false;
+        let woodAhead = false;
+        const px = this.x;
+        for (let i = 0; i < this.entities.length; i++) {
+            const e = this.entities[i];
+            if (!waitingForSolo && e.kind === 'hawk' && e.solo && !e.harmless && e.x > px - 100) waitingForSolo = true;
+            if (!woodAhead && e.kind === 'wood' && e.x + 85 > px - 40) woodAhead = true;
+            if (waitingForSolo && woodAhead) break;
+        }
+        if (waitingForSolo || (soloHawk && woodAhead)) {
             this.sequence--; this.nextSpawn = .4; return;
         }
         if (!this.chapterEntry && n > 0 && n % (challenge?.quietEvery??6) === (challenge?.quietEvery??6)-1) {
@@ -774,11 +793,18 @@ export class Game {
             this.entities.push(wood);
         }
         const fruits=hawkAlone?[{x:15,y:center}]:plan.fruits;
-        const nearbySnakes = this.entities.filter(entity => entity.kind === 'wood' && entity.snake);
+        this._nearbySnakesBuffer ??= [];
+        const nearbySnakes = this._nearbySnakesBuffer;
+        nearbySnakes.length = 0;
+        for (let i = 0; i < this.entities.length; i++) {
+            const ent = this.entities[i];
+            if (ent.kind === 'wood' && ent.snake) nearbySnakes.push(ent);
+        }
         const placedFruits=[];
         const corridorTop = (hasSnake?center-85:center-gap/2) + 55;
         const corridorBottom = (hasSnake?center-85:center-gap/2) + encounterGap - (hasSnake ? 218 : 55);
-        for(const [index,point] of fruits.entries()) {
+        for(let fIdx=0; fIdx<fruits.length; fIdx++) {
+            const point = fruits[fIdx];
             let fy = point.y, fx=x+point.x;
             if (hasSnake) {
                 // Center the entire fruit route directly in the clear flight corridor above the snake
@@ -786,14 +812,22 @@ export class Game {
                 fy = corridorCenter + (point.y - center) * 0.35;
                 fy = Math.max(corridorTop, Math.min(fy, corridorBottom));
             }
-            for (const s of nearbySnakes) {
+            for (let sIdx = 0; sIdx < nearbySnakes.length; sIdx++) {
+                const s = nearbySnakes[sIdx];
                 if (Math.abs(fx - (s.x + 29)) < 110) {
                     const safeLimit = Math.min(corridorBottom, s.bottom - 218);
                     if (fy > safeLimit) fy = safeLimit;
                     fy = Math.max(corridorTop, fy);
                 }
             }
-            if (nearbySnakes.some(wood => !snakeA2FruitHasClearance(wood,fx,fy))) {
+            let lacksClearance = false;
+            for (let sIdx = 0; sIdx < nearbySnakes.length; sIdx++) {
+                if (!snakeA2FruitHasClearance(nearbySnakes[sIdx], fx, fy)) {
+                    lacksClearance = true;
+                    break;
+                }
+            }
+            if (lacksClearance) {
                 const probe=activeProbe,placeAt=probe?probe.begin('snake.placeFruit'):0;
                 const placed = placeA2Fruit(nearbySnakes,fx,fy,corridorTop,corridorBottom,placedFruits);
                 if(probe)probe.end('snake.placeFruit',placeAt,{nearbySnakes:nearbySnakes.length});
@@ -816,13 +850,23 @@ export class Game {
 
     advanceJourney(dt) {
         if(this.distance<journeyLength(this.mode))return;
-        const danger=this.entities.some(e=>(e.kind==='wood'&&e.x+85>this.x-36)||(e.kind==='hawk'&&!e.harmless&&e.x+30>this.x-36));
+        const danger=hasApproachingDanger(this.entities, this.x);
         if(danger || (this.quizDue&&!this.refuge))return;
         if(!this.refuge){this.refuge={x:Math.max(this.width,this.viewWidth||this.width)+220,y:320};this.onEvent({type:'refuge'});}
         this.refuge.x=Math.max(330,this.refuge.x-this.speed*dt);
         if(this.refuge.x<=330 && Math.abs(this.y-this.refuge.y)<=60) {
             this.state='arrival';this.arrival={age:0,offset:0,fromY:this.y};this.cancelInput();this.snapshot();
         }
+    }
+
+    _getPlayerBody(pose) {
+        const px = this.x, py = this.y, pa = this.angle;
+        if (!this._cachedPlayerBody || this._cachedPX !== px || this._cachedPY !== py || this._cachedPA !== pa) {
+            this._cachedPX = px; this._cachedPY = py; this._cachedPA = pa;
+            pose.x = px; pose.y = py; pose.angle = pa;
+            this._cachedPlayerBody = playerShapes(px, py, pa, pose, this._playerShapesBuffer);
+        }
+        return this._cachedPlayerBody;
     }
 
     tick(dt) {
@@ -922,17 +966,8 @@ export class Game {
         }
 
         // Lazy evaluation of player collision polygons, automatically invalidated if recover() repositions the bird.
-        let cachedPlayerBody=boundaryBody;
-        let cachedX=boundaryX,cachedY=boundaryY,cachedAngle=boundaryAngle;
-        const getPlayerBody = () => {
-            const px = this.x, py = this.y, pa = this.angle;
-            if (!cachedPlayerBody || cachedX !== px || cachedY !== py || cachedAngle !== pa) {
-                cachedX = px; cachedY = py; cachedAngle = pa;
-                pose.x=px;pose.y=py;pose.angle=pa;
-                cachedPlayerBody = playerShapes(px,py,pa,pose,this._playerShapesBuffer);
-            }
-            return cachedPlayerBody;
-        };
+        this._cachedPX = boundaryX; this._cachedPY = boundaryY; this._cachedPA = boundaryAngle;
+        this._cachedPlayerBody = boundaryBody;
 
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
@@ -940,14 +975,14 @@ export class Game {
             const px = this.x;
             if (e.kind === 'hawk') {
                 advanceHawk(e,dt,speed,px,this.y);
-                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x-px)<180 && Math.abs(e.y-this.y)<140 && shapesIntersect(getPlayerBody(),hawkShapes(e,this.sceneTime,this.reducedMotion,this._hawkShapesBuffer))) this.collide(e, true);
+                if (e.phase !== 'warning' && !e.harmless && Math.abs(e.x-px)<180 && Math.abs(e.y-this.y)<140 && shapesIntersect(this._getPlayerBody(pose),hawkShapes(e,this.sceneTime,this.reducedMotion,this._hawkShapesBuffer))) this.collide(e, true);
                 continue;
             }
             e.x -= speed * dt;
             if (e.kind === 'wood') {
                 advanceSnake(e,dt,px,speed);
                 if (e.snake && !e.snake.retreat && Math.abs(e.x-px)<230) {
-                    const player=getPlayerBody();
+                    const player=this._getPlayerBody(pose);
                     const hit=snakeA2HitsPlayer(e,player,this.reducedMotion);
                     if(hit)this.collide(e.snake,true,e);
                 }
@@ -959,7 +994,7 @@ export class Game {
                             this.leafBurst(this.x, this.y > (e.top + e.bottom)/2 ? e.bottom : e.top, 3);
                         }
                     }
-                    const pBody = getPlayerBody();
+                    const pBody = this._getPlayerBody(pose);
                     const rects = this.woodRects(e);
                     let woodHit = null;
                     for (let ri = 0; ri < rects.length; ri++) {
@@ -972,7 +1007,7 @@ export class Game {
                 }
                 if (this.state !== 'playing') break;
                 if (!e.scored && e.x + 85 < px - 20) { e.scored = true; if (!e.broken && !e.contacted) this.addScore(1); }
-            } else if (!e.collected && Math.abs(e.x-px)<100 && Math.abs(e.y-this.y)<90 && pickupHitsPlayer(e,getPlayerBody(),this.elapsed,this.reducedMotion)) this.collect(e);
+            } else if (!e.collected && Math.abs(e.x-px)<100 && Math.abs(e.y-this.y)<90 && pickupHitsPlayer(e,this._getPlayerBody(pose),this.elapsed,this.reducedMotion)) this.collect(e);
         }
         const minBound = (this.viewLeft !== undefined ? this.viewLeft : 0) - 260;
         const maxBound = Math.max(this.width, this.viewWidth || this.width) + 800;

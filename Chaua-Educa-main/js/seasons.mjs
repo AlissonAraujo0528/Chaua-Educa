@@ -49,22 +49,29 @@ export class SeasonalBackdrop {
    this.release();this.key=key;this.atlas=atlas;
   }
   const needed1=state.to,needed2=state.mix===1?-1:state.from;
-  const ahead={elapsed:(game.elapsed||0)+this.prewarmSeconds,mode:game.mode,
-   seed:game.seed,tutorial:game.tutorial};
-  const needed3=(this.prewarmEnabled && state.mix===1)?journeySeason(ahead).to:-1;
-  const needed=[needed1];
-  if(needed2>=0&&needed2!==needed1)needed.push(needed2);
-  if(needed3>=0&&needed3!==needed1&&needed3!==needed2)needed.push(needed3);
-  for(const [id,surface] of this.frames)if(!needed.includes(id)){
-   surface.width=0;surface.height=0;this.frames.delete(id);
-  }
-  if(this.pending&&!needed.includes(this.pending.id)){
+  if(!this._ahead)this._ahead={elapsed:0,mode:'aventura',seed:0,tutorial:null};
+  this._ahead.elapsed=(game.elapsed||0)+this.prewarmSeconds;
+  this._ahead.mode=game.mode;
+  this._ahead.seed=game.seed;
+  this._ahead.tutorial=game.tutorial;
+  const needed3=(this.prewarmEnabled && state.mix===1)?journeySeason(this._ahead).to:-1;
+  if(!this._needed)this._needed=[0,0,0];
+  let neededCount=1;
+  this._needed[0]=needed1;
+  if(needed2>=0&&needed2!==needed1)this._needed[neededCount++]=needed2;
+  if(needed3>=0&&needed3!==needed1&&needed3!==needed2)this._needed[neededCount++]=needed3;
+  const isNeeded=id=>id===needed1||(needed2>=0&&id===needed2)||(needed3>=0&&id===needed3);
+  this.frames.forEach((surface,id)=>{
+   if(!isNeeded(id)){surface.width=0;surface.height=0;this.frames.delete(id);}
+  });
+  if(this.pending&&!isNeeded(this.pending.id)){
    this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
   }
   // Shared per-frame budget covers all speculative surfaces, not each one
   // independently; visible surfaces take priority regardless of budget.
   const budgetStart=this.now();
-  for(const id of needed){
+  for(let ni=0;ni<neededCount;ni++){
+   const id=this._needed[ni];
    if(this.frames.has(id))continue;
    if(this.pending&&this.pending.id!==id){
     this.pending.surface.width=0;this.pending.surface.height=0;this.pending=null;
@@ -132,11 +139,12 @@ export class SeasonalBackdrop {
 export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,motion=null){
  if(reduced)return;
  const state=journeySeason(game);
- const weights=[0,0,0,0];weights[state.from]+=1-state.mix;weights[state.to]+=state.mix;
+ const wFrom=1-state.mix,wTo=state.mix;
+ const weight3=(state.from===3?wFrom:0)+(state.to===3?wTo:0);
  const driftOffset=game.distance||0;
  // Snow shares the exact winter weight used by terrain, animals and lighting.
  // The original atlas contains only petals and leaves, not snow textures.
- drawSnowfall(c,w,h,time,weights[3],reduced,low,wind,false,motion);
+ drawSnowfall(c,w,h,time,weight3,reduced,low,wind,false,motion);
  if(!atlas)return;
  const cell=(atlas.naturalWidth||atlas.width)/2;
  // Rain and storm are independent weather modes, not seasons. Suppress
@@ -146,8 +154,8 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  const r=Math.max(0,Math.min(1,(rain-.5)/.35));
  const t=Math.max(0,Math.min(1,(storm-.3)/.5));
  const suppression=Math.max(r*r*(3-2*r),t*t*(3-2*t));
- const w0=weights[0]*(1-suppression);
- const w2=weights[2]*(1-suppression*.85);
+ const w0=((state.from===0?wFrom:0)+(state.to===0?wTo:0))*(1-suppression);
+ const w2=((state.from===2?wFrom:0)+(state.to===2?wTo:0))*(1-suppression*.85);
  if(w0>0){
   const count=low?1:3,layerAlpha=Math.min(0.92,w0*.85);
   for(let i=0;i<count;i++){

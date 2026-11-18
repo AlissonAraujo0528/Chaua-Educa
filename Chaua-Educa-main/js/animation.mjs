@@ -7,7 +7,15 @@ export function sequence(frames,progress,loop=false){
 }
 // Use complete authored flight poses: crossfading distant wing positions creates
 // translucent duplicate feathers rather than an intermediate drawing.
-function flightFrame(frames,progress){const clip=sequence(frames,progress,true);const frame=clip.blend<.5?clip.frame:clip.next;return {frame,next:frame,blend:0};}
+function flightFrame(frames,progress){
+ const position=((progress%1+1)%1)*frames.length;
+ const i=Math.min(frames.length-1,Math.floor(position));
+ const blend=ease(position-i);
+ const frame=blend<.5?frames[i]:frames[(i+1)%frames.length];
+ return {frame,next:frame,blend:0};
+}
+const CHAUA_REDUCED_FLIGHT=Object.freeze({frame:3,next:3,blend:0});
+const HAWK_WARNING_FRAME=Object.freeze({frame:8,next:8,blend:0});
 export const CLIPS=Object.freeze({
  chaua:{flight:[0,1,2,3,4,5,6,7],landing:[8,9,10,11,12],idle:[12,13],recoil:[14,15]},
  hawk:{flight:[0,1,2,3,4,5,6,7],glide:[8,9],dive:[10,11],recoil:[12,13,14,15]},
@@ -15,7 +23,7 @@ export const CLIPS=Object.freeze({
 export function birdAnimation({wing=0,time=0,perched=false,landing=null,defeated=false,impactProgress=0,reduced=false}={}){
  const glidePose=reduced?.42:.42+(time>0?Math.sin(time*2.4)*0.025:0);
  const flapProgress=(.42+(1-wing))%1;
- const flight=reduced?{frame:3,next:3,blend:0}:flightFrame(CLIPS.chaua.flight,wing>0?flapProgress:glidePose);
+ const flight=reduced?CHAUA_REDUCED_FLIGHT:flightFrame(CLIPS.chaua.flight,wing>0?flapProgress:glidePose);
  if(landing!==null){
   if(!reduced&&landing<.15)return {frame:flight.frame,next:8,blend:ease(landing/.15)};
   return sequence(CLIPS.chaua.landing,reduced?1:(landing-.15)/.85);
@@ -27,7 +35,7 @@ export function birdAnimation({wing=0,time=0,perched=false,landing=null,defeated
 }
 export function hawkAnimation(e,time=0,reduced=false){
  if(e.retreat||e.dazed)return sequence(CLIPS.hawk.recoil,reduced?1:(e.retreatTime||0)/.7);
- if(reduced||e.warning>0)return {frame:8,next:8,blend:0};
+ if(reduced||e.warning>0)return HAWK_WARNING_FRAME;
  if(e.phase==='leaving')return flightFrame(CLIPS.hawk.glide,time*.7);
  if(e.dive)return flightFrame(CLIPS.hawk.dive,(Math.sin(time*4)+1)/2);
  const cycle=(time*1.6+(e.id||0)*.37)%2.6;
