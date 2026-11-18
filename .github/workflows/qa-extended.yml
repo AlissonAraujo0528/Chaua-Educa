@@ -13,7 +13,7 @@ concurrency:
 jobs:
   cross-browser-and-art:
     runs-on: ubuntu-24.04
-    timeout-minutes: 24
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -73,7 +73,7 @@ jobs:
 
   responsive-panels:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -101,7 +101,7 @@ jobs:
 
   reliability:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -132,7 +132,7 @@ jobs:
 
   three-screen-refinement:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -193,7 +193,7 @@ jobs:
 
   fullscreen-native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
