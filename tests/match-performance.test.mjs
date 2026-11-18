@@ -60,3 +60,28 @@ test('oldest results are pruned, with bounded stutter details',()=>{
  assert.ok(r.latest().stutters.length<=100);
  assert.equal(r.latest().summary.frames,200);
 });
+
+test('CPU callback spikes are captured independently from RAF stutter thresholds, with bounded stage timings',()=>{
+ const {game,quality,renderer}=make();const r=new MatchPerformance({storage:storage()});
+ r.start(game,quality,renderer);game.state='playing';game.elapsed=1.1;
+ const sections={physicsMs:2,uiMs:3,audioMs:1,visualMs:4,drawMs:23,otherMs:2};
+ r.frame(100,game,quality,renderer,35,true,sections);
+ game.elapsed=1.15;r.frame(116.7,game,quality,renderer,3,true,null);
+ const report=r.finish('ended',game,quality,renderer);
+ assert.equal(report.summary.framesOver33Ms,0,'the spike may not appear in RAF intervals');
+ assert.equal(report.longCallbacks.total,1);
+ assert.equal(report.longCallbacks.slowest.length,1);
+ assert.equal(report.longCallbacks.slowest[0].cpuMs,35);
+ assert.deepEqual(report.longCallbacks.slowest[0].breakdownMs,sections);
+ assert.equal(report.longCallbacks.slowest[0].entities.snakes,0);
+});
+test('retains only 50 largest callback entries without altering matched frame summaries',()=>{
+ const {game,quality,renderer}=make();const r=new MatchPerformance({storage:storage()});
+ r.start(game,quality,renderer);game.state='playing';
+ for(let i=1;i<=80;i++){game.elapsed=i/60;r.frame(i*16.7,game,quality,renderer,20+i/10,true);}
+ const report=r.finish('ended',game,quality,renderer);
+ assert.equal(report.longCallbacks.total,80);
+ assert.equal(report.longCallbacks.slowest.length,50);
+ assert.ok(Math.min(...report.longCallbacks.slowest.map(x=>x.cpuMs))>=23.1);
+ assert.equal(report.summary.frames,79);
+});

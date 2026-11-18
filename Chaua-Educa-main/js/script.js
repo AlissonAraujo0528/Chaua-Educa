@@ -52,6 +52,13 @@ const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 // Detailed forensic capture and automatic match summaries are exclusive.
 const diagnosticLink=new URLSearchParams(location.search).get('perf-test')==='1';
 const matchPerformance=new MatchPerformance({enabled:!diagnosticLink&&DB.readObject(MATCH_PERF_SETTING,true)!==false});
+// Repeat the encounter seed for controlled A/B testing, without changing the
+// regular random gameplay. Only unsigned decimal numbers are accepted.
+const seedQuery=new URLSearchParams(location.search).get('test-seed');
+const fixedTestSeed=seedQuery!==null&&/^\d{1,10}$/.test(seedQuery)&&
+    Number(seedQuery)<=0xffffffff?Number(seedQuery):null;
+// Reused on every RAF: create no new timing objects on normal frames.
+const cpuSections={physicsMs:0,uiMs:0,audioMs:0,visualMs:0,drawMs:0,otherMs:0};
 function applyVisualQuality() {
     if(quality.mode==='auto')renderer.setAutomaticQuality(quality.level);
     else renderer.setQuality(quality.level);
@@ -240,7 +247,7 @@ function start(training = false, checkpoint = null) {
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
     flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
-    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player));
+    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player),fixedTestSeed===null?undefined:fixedTestSeed);
     matchPerformance.start(game,quality,renderer,training);
     forestAudio.beginFlight();
     if(betaRuntime?.active)betaRuntime.attempt();
@@ -684,6 +691,7 @@ function frame(time) {
     // This elapsed JS wall time is diagnostic, not a GPU timing measurement.
     const betaStateBefore=game.state;
     const frameWorkStart=performance.now();
+    const measureSections=matchPerformance.current!==null&&game.state==='playing';
     const probe=activeProbe;
     if(probe)probe.beginFrame(time,game.stage);
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
@@ -692,15 +700,19 @@ function frame(time) {
     const clockAt=probe?probe.begin('engine.advance'):0;
     clock.advance(delta);
     if(probe)probe.end('engine.advance',clockAt);
+    const afterPhysics=measureSections?performance.now():0;
     if(game.state!==previousState || time-lastHudTime>=80){
         const hudAt=probe?probe.begin('ui.sync'):0;
         syncUI();lastHudTime=time;
         if(probe)probe.end('ui.sync',hudAt);
     }
+    const afterUI=measureSections?performance.now():0;
     const sceneTime = game.state === 'menu' ? time / 1000 : (game.sceneTime ?? game.elapsed);
     forestAudio.update(game.state,!audioInterrupted&&!document.hidden&&document.hasFocus(),sceneTime,game.stage,
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
+    const afterAudio=measureSections?performance.now():0;
+    let afterVisual=afterAudio;
     if(document.hidden){
         if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
         matchPerformance.frame(time,game,quality,renderer,0,false);
@@ -719,16 +731,26 @@ function frame(time) {
         const visualAt=probe?probe.begin('engine.visual'):0;
         const frameView=game.visual(clock.accumulator / (1 / 120));
         if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
+        if(measureSections)afterVisual=performance.now();
         const drawAt=probe?probe.begin('render.game'):0;
         renderer.game(frameView, reducedMotion.matches, time / 1000);
         if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
+    const afterDraw=measureSections?performance.now():0;
     if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
     const activeFlight=document.hasFocus()&&game.state==='playing';
     const frameWorkMs=performance.now()-frameWorkStart;
+    if(measureSections){
+        cpuSections.physicsMs=afterPhysics-frameWorkStart;
+        cpuSections.uiMs=afterUI-afterPhysics;
+        cpuSections.audioMs=afterAudio-afterUI;
+        cpuSections.visualMs=afterVisual-afterAudio;
+        cpuSections.drawMs=afterDraw-afterVisual;
+        cpuSections.otherMs=Math.max(0,frameWorkMs-(afterDraw-frameWorkStart));
+    }
     if(quality.sample(delta,activeFlight,frameWorkMs))applyVisualQuality();
-    matchPerformance.frame(time,game,quality,renderer,frameWorkMs,activeFlight);
+    matchPerformance.frame(time,game,quality,renderer,frameWorkMs,activeFlight,measureSections?cpuSections:null);
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

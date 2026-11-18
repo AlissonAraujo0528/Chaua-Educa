@@ -9,6 +9,7 @@ import {GAME_VERSION} from './version.mjs';
 export const MATCH_PERF_KEY='chaua-performance-matches-v1';
 export const MATCH_PERF_SETTING='chaua-performance-auto-enabled';
 const MAX_REPORTS=10,MAX_FRAMES=45000,MAX_STUTTERS=100,MAX_EVENTS=80,MAX_SNAPSHOTS=160;
+const MAX_LONG_CALLBACKS=50,LONG_CALLBACK_MS=18;
 const round=(n,d=2)=>Number(Number(n).toFixed(d));
 const empty=()=>Object.create(null);
 function storageOrNull(){
@@ -71,6 +72,7 @@ export class MatchPerformance {
    seed:game.seed,mode:game.mode,training:!!training,
    samples:[],byStage:empty(),byWindow:empty(),byProfile:empty(),
    stutters:[],events:[],snapshots:[],profileChanges:[],previous:0,
+   longCallbacks:[],longCallbackTotal:0,
    previousCpuMs:null,stutterTotal:0,over50:0,over100:0,
    lastSnapshot:0,lastProfile:''
   };
@@ -101,7 +103,7 @@ export class MatchPerformance {
    canvas:[renderer.canvas.width,renderer.canvas.height]
   });
  }
- frame(timestamp,game,quality,renderer,callbackMs,eligible){
+ frame(timestamp,game,quality,renderer,callbackMs,eligible,cpuSections=null){
   const c=this.current;
   if(!c)return;
   if(game.state==='ended'||game.state==='trained'){
@@ -126,6 +128,37 @@ export class MatchPerformance {
    c.lastResolution=resolution;c.lastDecoration=decoration;
   }
   const profile=c.lastProfile;
+  // Record the largest CPU stalls even when their RAF gap occurs *after*
+  // this callback. The normal path performs no allocation or entity scan.
+  if(callbackMs>=LONG_CALLBACK_MS){
+   c.longCallbackTotal++;
+   let position=c.longCallbacks.length;
+   if(position>=MAX_LONG_CALLBACKS){
+    let smallest=0;
+    for(let i=1;i<position;i++)if(c.longCallbacks[i].cpuMs<c.longCallbacks[smallest].cpuMs)smallest=i;
+    if(callbackMs<=c.longCallbacks[smallest].cpuMs)position=-1;
+    else position=smallest;
+   }
+   if(position>=0){
+    let wood=0,snakes=0,fruit=0,hawks=0,activeSnakeWarnings=0;
+    for(const e of game.entities||[]){
+     if(e.kind==='wood'){wood++;if(e.snake){snakes++;if(['warning','windup','striking'].includes(e.snake.phase))activeSnakeWarnings++;}}
+     else if(e.kind==='hawk')hawks++;
+     else if(e.kind==='fruit')fruit++;
+    }
+    const breakdownMs=cpuSections?{
+     physicsMs:round(cpuSections.physicsMs),uiMs:round(cpuSections.uiMs),
+     audioMs:round(cpuSections.audioMs),visualMs:round(cpuSections.visualMs),
+     drawMs:round(cpuSections.drawMs),otherMs:round(cpuSections.otherMs)
+    }:null;
+    c.longCallbacks[position]={
+     gameSeconds:round(game.elapsed||0),stage:game.stage,cpuMs:round(callbackMs),
+     breakdownMs,weather:getWeatherMode(),profile,
+     textWarningsShown:renderer.showTextWarnings!==false,
+     entities:{wood,snakes,fruit,hawks,activeSnakeWarnings,particles:game.particles?.length??0}
+    };
+   }
+  }
   if(c.previous>0&&timestamp>c.previous&&c.samples.length<MAX_FRAMES){
    const dt=timestamp-c.previous,stage=game.stage,windowKey=Math.floor((game.elapsed||0)/10)*10;
    c.samples.push(dt);
@@ -200,7 +233,10 @@ export class MatchPerformance {
    byStage:byBucket(c.byStage),byTenSecondWindow:byBucket(c.byWindow),
    byProfile:byBucket(c.byProfile),
    profileChanges:c.profileChanges,climateTimeline:c.snapshots,
-   stutters:c.stutters.sort((a,b)=>a.frame-b.frame),events:c.events
+   stutters:c.stutters.sort((a,b)=>a.frame-b.frame),
+   longCallbacks:{thresholdMs:LONG_CALLBACK_MS,total:c.longCallbackTotal,
+    slowest:c.longCallbacks.sort((a,b)=>a.gameSeconds-b.gameSeconds)},
+   events:c.events
   };
   this.lastReport=report;
   this.records.push(report);
