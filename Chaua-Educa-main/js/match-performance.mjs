@@ -95,6 +95,7 @@ export class MatchPerformance {
    cold:round(game.surfaceWeather?.cold??0,3),
    snow:round(game.surfaceWeather?.snow??0,3),
    quality:quality.mode+'/'+quality.level,
+   textWarningsShown:renderer.showTextWarnings!==false,
    resolution:renderer.resolution,
    decoration:renderer.decoration,
    canvas:[renderer.canvas.width,renderer.canvas.height]
@@ -163,7 +164,8 @@ export class MatchPerformance {
       currentCallbackCpuMs:round(callbackMs),
       pendingSeasonSurface:renderer.seasonalBackdrop?.pending?.id??null,
       entities:{wood,hawk,snake,fruit,particles:game.particles?.length??0},
-      visibleWarnings:{snakes:snakeWarnings,hawks:hawkWarnings}
+      visibleWarnings:{snakes:snakeWarnings,hawks:hawkWarnings},
+      textWarningsShown:renderer.showTextWarnings!==false
      };
     }
    }
@@ -180,14 +182,15 @@ export class MatchPerformance {
   this.current=null;
   const report={
    schemaVersion:1,source:'Chaua Educa / desempenho automatico por partida',
-   provenance:{gameVersion:GAME_VERSION,build:typeof document==='undefined'?null:document.querySelector('meta[name="chaua-build"]')?.content||null,host:typeof location!=='undefined'?location.host:null,
+   provenance:{gameVersion:GAME_VERSION,testBranch:'teste-v2-performance-sem-avisos-texto',build:typeof document==='undefined'?null:document.querySelector('meta[name="chaua-build"]')?.content||null,host:typeof location!=='undefined'?location.host:null,
     path:typeof location!=='undefined'?location.pathname:null},
    id:c.id,startedAt:c.start,collectedAt:new Date().toISOString(),
    device:viewportInfo(renderer),
    match:{seed:c.seed,mode:c.mode,training:c.training,score:game.score,
     won:!!game.won,flightSeconds:round(game.elapsed||0),stage:game.stage},
    endReason:reason,settings:{qualityMode:quality.mode,qualityLevel:quality.level,
-    resolution:renderer.resolution,decoration:renderer.decoration},
+    resolution:renderer.resolution,decoration:renderer.decoration,
+    textWarningsShownAtEnd:renderer.showTextWarnings!==false},
    measurement:{eligibleOnly:'visible-focused-playing',deepInstrumentation:false,
     sampleLimit:MAX_FRAMES,capped:c.samples.length===MAX_FRAMES,
     limitations:['RAF intervals include browser scheduling and are not exclusively CPU or GPU work.',

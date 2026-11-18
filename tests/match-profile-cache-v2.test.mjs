@@ -24,6 +24,8 @@ test('quality-profile caching preserves per-profile and per-time-window statisti
  assert.equal(Object.keys(report.byProfile).length,2);
  assert.equal(Object.keys(report.byTenSecondWindow).length,2);
  assert.equal(report.summary.frames,54);
+ assert.equal(report.settings.textWarningsShownAtEnd,true,'legacy render defaults to warning text unless branch setting disables it');
+ assert.equal(report.climateTimeline[0].textWarningsShown,true);
  assert.ok(report.byStage['0'].frames>0);
  assert.ok(report.byStage['1'].frames>0);
 });

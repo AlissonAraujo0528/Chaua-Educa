@@ -54,14 +54,10 @@ export function placeWarnings(items,view,protectedRegions=[]){
   const right=Math.max(left,view.x+view.w-box.w-4),bottom=Math.max(top,view.y+view.h-box.h-4);
   box.x=Math.max(left,Math.min(right,item.x));box.y=Math.max(top,Math.min(bottom,item.y));
   const blockers=[...protectedRegions,...result];
-  // Zero overlap AND zero displacement is a global optimum: there cannot
-  // be a better position. Three separate snake notices should therefore not
-  // run the costly X×Y candidate search on every animation frame.
-  let initialOverlap=0;
-  for(const blocker of blockers)initialOverlap+=area(box,blocker);
-  if(initialOverlap===0){result.push(box);continue;}
-  // Only crowded placements need the full original candidate search.
-  // Preserve ordering, deduplication and tie-breaks for exact visual parity.
+  // The first candidate is the original position. If it already has zero
+  // overlap, no candidate can improve on (overlap=0, distance=0).
+  // Early-exit the existing search instead of doing a redundant prepass,
+  // which regressed CPU times for three tightly overlapping notices.
   const xs=[box.x,left,right],ys=[box.y,top,bottom];
   for(const b of blockers){
    xs.push(b.x-box.w-gap,b.x+b.w+gap);
@@ -69,13 +65,14 @@ export function placeWarnings(items,view,protectedRegions=[]){
   }
   let best={x:box.x,y:box.y,overlap:Infinity,distance:Infinity};
   const candidate={x:0,y:0,w:box.w,h:box.h};
-  for(const x of new Set(xs))for(const y of new Set(ys)){
+  search:for(const x of new Set(xs))for(const y of new Set(ys)){
    if(x<left||x>right||y<top||y>bottom)continue;
    candidate.x=x;candidate.y=y;
    let overlap=0;
    for(const b of blockers)overlap+=area(candidate,b);
    const distance=(x-box.x)**2+(y-box.y)**2;
    if(overlap<best.overlap||overlap===best.overlap&&distance<best.distance)best={x,y,overlap,distance};
+   if(best.overlap===0&&best.distance===0)break search;
   }
   result.push({...box,x:best.x,y:best.y});
  }

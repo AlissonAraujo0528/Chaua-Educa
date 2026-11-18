@@ -80,6 +80,7 @@ jobs:
           npm run test:perf-probe
           node scripts/benchmark-warning-bursts.mjs
           node tests/browser-match-performance.cjs
+          node tests/browser-text-warning-toggle.cjs
           npm run test:perf-forensics
           npm run test:perf-experiments
           npm run test:snake-continuity

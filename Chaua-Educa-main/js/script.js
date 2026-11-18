@@ -43,6 +43,10 @@ app.classList.toggle('mobile-device', mobileDevice);
 document.documentElement.classList.toggle('mobile-device', mobileDevice);
 if(mobileDevice) $('.home-links').append($('#open-credits'));
 const renderer = new Renderer($('#forest'));
+// This test build starts without text placards. Toggle them in Settings to
+// compare matched flights, while preserving warning sounds and screen-reader cues.
+const TEXT_WARNING_SETTING='chaua-attack-warning-text';
+renderer.showTextWarnings=DB.readObject(TEXT_WARNING_SETTING,false)===true;
 renderer.homeMobileLayout=mobileDevice;
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 // Detailed forensic capture and automatic match summaries are exclusive.
@@ -825,6 +829,7 @@ function showSettings(fromPause=false){
     if($('#weather-mode')) $('#weather-mode').value=getWeatherMode();
     $('#controls-side').value=app.dataset.controlsSide;
     $('#warning-sounds').checked=warningSounds;
+    $('#show-text-warnings').checked=renderer.showTextWarnings;
     $('#settings-sound').checked=soundOn;
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
@@ -887,6 +892,10 @@ if(new URLSearchParams(location.search).get('perf-test')==='1'){
 
 $('#controls-side').addEventListener('change',event=>{app.dataset.controlsSide=event.target.value;saveSetting('chaua-controls-side',event.target.value);});
 $('#warning-sounds').addEventListener('change',event=>{warningSounds=event.target.checked;saveSetting('chaua-warning-sounds',warningSounds);});
+$('#show-text-warnings').addEventListener('change',event=>{
+    renderer.showTextWarnings=event.target.checked;
+    saveSetting(TEXT_WARNING_SETTING,renderer.showTextWarnings);
+});
 $('#settings-sound').addEventListener('change',event=>{soundOn=event.target.checked;DB.writeObject('chaua-sound',soundOn); forestAudio.setEnabled(soundOn);updateSoundButton();if(soundOn)sound('correct');});
 
 // Beta is opened deliberately; ordinary play never imports or starts a collector.

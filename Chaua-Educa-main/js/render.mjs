@@ -692,6 +692,9 @@ export class Renderer {
         this.resolution = 'high';
         this.decoration = 'high';
         this.automaticProfile = false;
+        // Direct Renderer users keep legacy visual alerts. The consolidated
+        // gameplay branch overrides this from a persisted A/B setting.
+        this.showTextWarnings = true;
         // A/B experiment only: ?snakeWarmup=1. The baseline stays unchanged.
         this.snakeWarmupEnabled = typeof location !== 'undefined' &&
             new URLSearchParams(location.search).get('snakeWarmup') === '1';
@@ -1540,6 +1543,10 @@ export class Renderer {
         // The original sky flash runs behind birds/trees. This second pass
         // illuminates the complete scene without whitening warning labels.
         drawLightningIllumination(c,this.w,this.h,sceneTime,storm,reduced);
+        // A/B performance mode: omit the *entire* visual warning pipeline
+        // when textual attack placards are off. Audio, accessible DOM cues,
+        // physical threats and attack animations are independent.
+        if(this.showTextWarnings){
         // Natural viewport flight boundary
         const warningLayoutAt=probe?probe.begin('render.warningLayout'):0;
         const {boxes}=flightWarnings(game,view,reduced,shakeX,shakeY);
@@ -1556,6 +1563,7 @@ export class Renderer {
             }
         }
         if(probe)probe.end('render.warningPaint',warningPaintAt,{count:boxes.length});
+        }
         if (game.state === 'ended' && game.won) {
             for (let i = 0; i < (this.decoration==='low'?12:32); i++) {
                 const t = reduced ? 0 : visualTime * 25;
