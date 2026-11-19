@@ -116,3 +116,13 @@ test('direct snow clipping counts independently from legacy atlas rebuilds',asyn
   assert.equal(result.longCallbacks.slowest[0].snowDirectClips,5);
  }finally{snowMaskMetrics.directClips-=5;}
 });
+
+test('ordinary match reports identify which snow rendering algorithm ran',async()=>{
+ const {SNOW_RENDER_MODE}=await import('../Chaua-Educa-main/js/tree-art.mjs');
+ const {game,quality,renderer}=make(),r=new MatchPerformance({storage:storage()});
+ r.start(game,quality,renderer);
+ r.frame(100,game,quality,renderer,2,true);
+ const report=r.finish('ended',game,quality,renderer);
+ assert.equal(report.snowMask.renderer,SNOW_RENDER_MODE);
+ assert.ok(['direct','legacy'].includes(report.snowMask.renderer));
+});

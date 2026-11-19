@@ -5,7 +5,7 @@ import {summarizeFrames} from './frame-summary.mjs';
 import {journeySeason} from './seasons.mjs';
 import {getWeatherMode} from './weather.mjs';
 import {GAME_VERSION} from './version.mjs';
-import {snowMaskMetrics} from './tree-art.mjs';
+import {snowMaskMetrics,SNOW_RENDER_MODE} from './tree-art.mjs';
 
 export const MATCH_PERF_KEY='chaua-performance-matches-v1';
 export const MATCH_PERF_SETTING='chaua-performance-auto-enabled';
@@ -251,7 +251,8 @@ export class MatchPerformance {
    stutters:c.stutters.sort((a,b)=>a.frame-b.frame),
    longCallbacks:{thresholdMs:LONG_CALLBACK_MS,total:c.longCallbackTotal,
     slowest:c.longCallbacks.sort((a,b)=>a.gameSeconds-b.gameSeconds)},
-   snowMask:{rebuildsDuringFlight:c.snowMaskRebuilds,
+   snowMask:{renderer:SNOW_RENDER_MODE,
+    rebuildsDuringFlight:c.snowMaskRebuilds,
     directClipsDuringFlight:c.snowDirectClips},
    events:c.events
   };

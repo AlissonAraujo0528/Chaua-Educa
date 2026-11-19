@@ -25,3 +25,12 @@ URL do experimento profundo para comparar motor antigo sem alterar branch:
 O modo profundo não produz o mesmo histórico automático de partidas, portanto é para experimentos isolados. O histórico comum agora registra `snowMask.rebuildsDuringFlight` e `snowMask.directClipsDuringFlight` além de anotações nos quadros lentos. Esperado no caminho normal: 0 rebuilds e quantidade positiva de recortes diretos. É possível que o custo de clipping por árvore seja maior em algumas GPUs; somente testes de dispositivo real confirmarão ganho final.
 
 Critério: testes Node, 8 árvores reais, 7 níveis de neve, cenas de alta qualidade, resposta a resize/mobilidade e depois partida longa no mesmo Android. Se houver regressão, ativar o experimento legado para diagnóstico e reverter o mecanismo, sem mexer nos dados visuais originais.
+
+## Comparação no Android com o coletor normal de partidas
+
+O modo de diagnóstico profundo `?perf-test=1` desliga o coletor automático; para realizar uma comparação legítima do FPS por partida **sem esse modo profundo**, foram adicionados parâmetros independentes:
+
+- Mecanismo novo (padrão): `?clima=winter&test-seed=3333272785`
+- Mecanismo antigo: `?clima=winter&test-seed=3333272785&snow-render=legacy`
+
+Ambas as URLs mantêm o mesmo coletor automático; `snowMask.renderer` identifica a versão usada (`direct` ou `legacy`). Não é replay determinístico porque o controle do Chauá pode variar; jogar condições semelhantes e comparar no mesmo celular.

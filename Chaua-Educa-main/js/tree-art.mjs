@@ -102,7 +102,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // those atlas updates; the 32-column snow edge and 1/256 steps stay intact.
  // ?perf-test=1&perf-ab=legacy-snow-rebuild retains the original A/B path.
  if(snow>0&&!fullSnow&&PERF_AB_VARIANT!=='snow-mask-off'){
-  if(PERF_AB_VARIANT==='legacy-snow-rebuild'){
+  if(SNOW_RENDER_MODE==='legacy'){
    const overlay=snowOverlay(kind,snow);
    if(overlay){
     if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
@@ -319,6 +319,12 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
  drawLivingTrunk(c, {x: rootX, y: top, width, length: 900, variant: 3, time, snow, rain});
 }
 
+// Use either renderer with normal automatic match reports. Only an explicit
+// test URL opts into legacy: ?snow-render=legacy&test-seed=...&clima=winter.
+const compareParams=typeof location!=='undefined'?new URLSearchParams(location.search):null;
+export const SNOW_RENDER_MODE=
+ (PERF_AB_VARIANT==='legacy-snow-rebuild'||compareParams?.get('snow-render')==='legacy')
+ ?'legacy':'direct';
 const snowMixBuffers=new Map();
 // Monotonic instrumentation only, without extra Canvas work. The normal
 // per-match recorder observes changes to identify expensive snow rebuilds.
@@ -326,7 +332,7 @@ export const snowMaskMetrics={rebuilds:0,directClips:0};
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
   // Direct clipping does not need a full 1024x1024 snow-mask surface.
-  if(PERF_AB_VARIANT==='legacy-snow-rebuild')snowOverlay(kind,0);
+  if(SNOW_RENDER_MODE==='legacy')snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);
