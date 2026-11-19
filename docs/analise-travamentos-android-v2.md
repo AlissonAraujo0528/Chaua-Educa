@@ -15,3 +15,9 @@ Os relatórios locais enviados em 18/11/2026 mostram 3 partidas novas longas, FP
 - O relato com 0 cobras e 42 ms de JavaScript refuta a hipótese de que *toda* a queda venha das mensagens. Apenas dados de spans distinguem as rotinas.
 - Esta alteração não promete ganhos de FPS e não reduz qualidade de imagem. Não tocar nos sprites até haver evidência de qual render path é o gargalo. Não atribuir a regressão visual a uma causa sem medição.
 - Testar no mesmo dispositivo, mesmo clima e configurações. Observar `longCallbacks.slowest[].breakdownMs` e `stutters[].visibleWarnings` para decidir o alvo da correção seguinte.
+
+## Preparação dos recursos gráficos antes do voo
+
+A primeira queda de ~42 ms em uma partida de inverno ocorreu aos 10,37 segundos, sem cobra no cenário. Esse período coincide com o surgimento inicial de neve no histórico, mas **não prova** que a primeira exibição de frutas congeladas causou o travamento. O código já preparava o atlas congelado fora do voo, porém o primeiro blit no Canvas principal podia continuar adiado até a fase jogável. Em clima Inverno, este experimento realiza esse primeiro blit, em 8×8 pixels, durante a contagem inicial e antes do fundo opaco cobrir a área. Além disso, habilita por padrão o pré-aquecimento de cada spritesheet de cobra (uma por quadro da contagem), já implementado anteriormente mas opt-in. 
+
+Parâmetros de controle: `?snakeWarmup=0` desativa o pré-aquecimento das cobras; `?winterFoodWarmup=0` desativa o das frutas congeladas; `?test-seed=1724079006` fixa a semente. Testar as opções com o mesmo clima/qualidade/seed. A preparação pode transferir custo para a contagem, não eliminar trabalho total, e é possível que o navegador não antecipe toda a transferência de textura; **não há promessa de ganho de FPS sem novo A/B**. Ambos os recursos preservam sprites e colisões.

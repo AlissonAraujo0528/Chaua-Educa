@@ -695,10 +695,15 @@ export class Renderer {
         // Direct Renderer users keep legacy visual alerts. The consolidated
         // gameplay branch overrides this from a persisted A/B setting.
         this.showTextWarnings = true;
-        // A/B experiment only: ?snakeWarmup=1. The baseline stays unchanged.
-        this.snakeWarmupEnabled = typeof location !== 'undefined' &&
-            new URLSearchParams(location.search).get('snakeWarmup') === '1';
-        this.snakeWarmupIndex = 0;
+        // Experimental V2: move potential first-use sprite upload work out
+        // of active gameplay and into the existing countdown. Never change
+        // a single authored sprite frame, hitbox or animation state.
+        // Both warmups can be disabled for controlled A/B on the same phone.
+        const warmupParams=typeof location!=='undefined'?new URLSearchParams(location.search):null;
+        this.snakeWarmupEnabled=warmupParams?.get('snakeWarmup')!=='0';
+        this.snakeWarmupIndex=0;
+        this.frozenFoodWarmupEnabled=warmupParams?.get('winterFoodWarmup')!=='0';
+        this.frozenFoodWarmupDone=false;
         this.canvas = canvas;
         this.c = canvas.getContext('2d');
         this.treeDrips = new TreeDrips();
@@ -1209,6 +1214,17 @@ export class Renderer {
                 this.snakeWarmupIndex++;
                 if(warmProbe)warmProbe.event('snake-warmup',{sheet,gameSeconds:game.elapsed});
             }
+        }
+        if(game.state==='countdown'&&this.frozenFoodWarmupEnabled&&!this.frozenFoodWarmupDone&&
+            winterAmount(game)>0&&images.get('runtime-foods-0')){
+            // The frozen atlas is already built during asset loading, but its
+            // first draw onto the visible Canvas may still create a GPU upload.
+            // Touch one frame during countdown before the opaque forest covers
+            // these 8x8 pixels; avoid a possible hitch as snow first appears.
+            const p=activeProbe,at=p?p.begin('food.frozenWarmupMs'):0;
+            drawFood(this.c,0,4,4,8,0,true,0,1,0);
+            this.frozenFoodWarmupDone=true;
+            if(p){p.end('food.frozenWarmupMs',at);p.event('food-frozen-warmup',{gameSeconds:game.elapsed});}
         }
         if(game.state==='countdown'){
             // The active season backdrop replaces the opaque original forest.
