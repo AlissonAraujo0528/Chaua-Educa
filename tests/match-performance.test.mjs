@@ -85,3 +85,19 @@ test('retains only 50 largest callback entries without altering matched frame su
  assert.ok(Math.min(...report.longCallbacks.slowest.map(x=>x.cpuMs))>=23.1);
  assert.equal(report.summary.frames,79);
 });
+
+// The winter-mix mask is 1024x1024 per orientation. Report how often it was
+// actually rebuilt near a CPU spike, rather than inferring it from snowfall.
+test('mask-rebuild counters are correlated with long callback records',async()=>{
+ const {snowMaskMetrics}=await import('../Chaua-Educa-main/js/tree-art.mjs');
+ const {game,quality,renderer}=make(),r=new MatchPerformance({storage:storage()});
+ r.start(game,quality,renderer);game.state='playing';
+ r.frame(100,game,quality,renderer,1,true);
+ snowMaskMetrics.rebuilds+=2;
+ try{
+  r.frame(116.7,game,quality,renderer,22,true,{physicsMs:1,uiMs:0,audioMs:0,visualMs:0,drawMs:21,otherMs:0});
+  const result=r.finish('ended',game,quality,renderer);
+  assert.equal(result.snowMask.rebuildsDuringFlight,2);
+  assert.equal(result.longCallbacks.slowest[0].snowMaskRebuilds,2);
+ }finally{snowMaskMetrics.rebuilds-=2;}
+});

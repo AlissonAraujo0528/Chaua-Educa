@@ -297,6 +297,9 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 }
 
 const snowMixBuffers=new Map();
+// Monotonic instrumentation only, without extra Canvas work. The normal
+// per-match recorder observes changes to identify expensive snow rebuilds.
+export const snowMaskMetrics={rebuilds:0};
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
   snowOverlay(kind,0);
@@ -340,6 +343,7 @@ function snowOverlay(kind,amount){
    c.restore();
   }
   c.restore();buffer.amount=amount;buffer.image=image;
+  snowMaskMetrics.rebuilds++;
   if(probe)probe.end('render.snowMaskRebuild',started,{kind,amount,maskPixels:1024*1024});
  }
  return buffer.canvas;

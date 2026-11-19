@@ -5,6 +5,7 @@ import {summarizeFrames} from './frame-summary.mjs';
 import {journeySeason} from './seasons.mjs';
 import {getWeatherMode} from './weather.mjs';
 import {GAME_VERSION} from './version.mjs';
+import {snowMaskMetrics} from './tree-art.mjs';
 
 export const MATCH_PERF_KEY='chaua-performance-matches-v1';
 export const MATCH_PERF_SETTING='chaua-performance-auto-enabled';
@@ -73,6 +74,7 @@ export class MatchPerformance {
    samples:[],byStage:empty(),byWindow:empty(),byProfile:empty(),
    stutters:[],events:[],snapshots:[],profileChanges:[],previous:0,
    longCallbacks:[],longCallbackTotal:0,
+   snowMaskPrevious:snowMaskMetrics.rebuilds,snowMaskRebuilds:0,
    previousCpuMs:null,stutterTotal:0,over50:0,over100:0,
    lastSnapshot:0,lastProfile:''
   };
@@ -112,7 +114,7 @@ export class MatchPerformance {
   if(game.state==='menu'){
    this.finish('returned-to-menu',game,quality,renderer);return;
   }
-  if(!eligible){c.previous=0;c.previousCpuMs=null;return;}
+  if(!eligible){c.previous=0;c.previousCpuMs=null;c.snowMaskPrevious=snowMaskMetrics.rebuilds;return;}
   // Quality is stable for nearly every frame. Avoid constructing a new
   // four-part profile string at 60+ Hz; still record every real profile change.
   const mode=quality.mode,level=quality.level,resolution=renderer.resolution,
@@ -128,6 +130,9 @@ export class MatchPerformance {
    c.lastResolution=resolution;c.lastDecoration=decoration;
   }
   const profile=c.lastProfile;
+  const snowMaskRebuilds=Math.max(0,snowMaskMetrics.rebuilds-c.snowMaskPrevious);
+  c.snowMaskPrevious=snowMaskMetrics.rebuilds;
+  c.snowMaskRebuilds+=snowMaskRebuilds;
   // Record the largest CPU stalls even when their RAF gap occurs *after*
   // this callback. The normal path performs no allocation or entity scan.
   if(callbackMs>=LONG_CALLBACK_MS){
@@ -153,7 +158,7 @@ export class MatchPerformance {
     }:null;
     c.longCallbacks[position]={
      gameSeconds:round(game.elapsed||0),stage:game.stage,cpuMs:round(callbackMs),
-     breakdownMs,weather:getWeatherMode(),profile,
+     breakdownMs,weather:getWeatherMode(),profile,snowMaskRebuilds,
      textWarningsShown:renderer.showTextWarnings!==false,
      entities:{wood,snakes,fruit,hawks,activeSnakeWarnings,particles:game.particles?.length??0}
     };
@@ -196,6 +201,7 @@ export class MatchPerformance {
       previousCallbackCpuMs:c.previousCpuMs===null?null:round(c.previousCpuMs),
       currentCallbackCpuMs:round(callbackMs),
       pendingSeasonSurface:renderer.seasonalBackdrop?.pending?.id??null,
+      snowMaskRebuilds,
       entities:{wood,hawk,snake,fruit,particles:game.particles?.length??0},
       visibleWarnings:{snakes:snakeWarnings,hawks:hawkWarnings},
       textWarningsShown:renderer.showTextWarnings!==false
@@ -236,6 +242,7 @@ export class MatchPerformance {
    stutters:c.stutters.sort((a,b)=>a.frame-b.frame),
    longCallbacks:{thresholdMs:LONG_CALLBACK_MS,total:c.longCallbackTotal,
     slowest:c.longCallbacks.sort((a,b)=>a.gameSeconds-b.gameSeconds)},
+   snowMask:{rebuildsDuringFlight:c.snowMaskRebuilds},
    events:c.events
   };
   this.lastReport=report;
