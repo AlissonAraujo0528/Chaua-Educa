@@ -115,8 +115,11 @@ test('upper-tree snow grows only on the exposed cap, directly from authored artw
  images.set('trees-upper',original);
  images.set('trees-upper-overlay-04',stage4);
  const oldCanvas=globalThis.OffscreenCanvas;
- let offscreenAllocations=0;
- globalThis.OffscreenCanvas=class{constructor(){offscreenAllocations++;}getContext(){return mock().c;}};
+ const offscreenSizes=[];
+ globalThis.OffscreenCanvas=class{
+  constructor(width,height){offscreenSizes.push([width,height]);}
+  getContext(){return mock().c;}
+ };
  t.after(()=>{globalThis.OffscreenCanvas=oldCanvas});
  const upper=mock();
  drawLivingTrunk(upper.c,{x:200,y:200,upper:true,width:TREE_WIDTH,length:900,snow:.375});
@@ -124,7 +127,8 @@ test('upper-tree snow grows only on the exposed cap, directly from authored artw
  assert.equal(capDraws.length,1,'reveal the original snow overlay directly, not through a rebuilt atlas');
  assert.ok(upper.calls.some(x=>x.type==='rect'),'the original progressive 32-column clipping mask remains');
  assert.ok(upper.calls.some(x=>x.type==='clip'),'snow art must be clipped to the exposed cap');
- assert.equal(offscreenAllocations,0,'rendering the snow may not allocate an intermediate 1024px canvas');
+ assert.ok(offscreenSizes.every(([width,height])=>width!==1024||height!==1024),
+  'snow must not allocate a 1024x1024 overlay atlas; ordinary bark tile caching remains allowed');
  const authoredSourceY=capDraws[0].args[2];
  assert.ok(authoredSourceY>=49,'the upper overlay must begin at the cap splice, not at the ceiling-bound trunk');
  assert.ok(upper.calls.some(x=>x.type==='image'&&x.args[0]===original),'base tree sprite preserved');
