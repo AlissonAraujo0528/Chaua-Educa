@@ -82,6 +82,7 @@ jobs:
           node tests/browser-match-performance.cjs
           node tests/browser-text-warning-toggle.cjs
           node tests/browser-runtime-warmup-a-b.cjs
+          node tests/browser-snow-direct-clip-a-b.cjs
           npm run test:perf-forensics
           npm run test:perf-experiments
           npm run test:snake-continuity

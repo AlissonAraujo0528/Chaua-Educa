@@ -95,14 +95,37 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if(rain>0){c.save();c.globalAlpha=rain*.42;
   drawPackedSection(c,'wet',`${kind}-${((variant%4)+4)%4}`,cx,upper?splice:cy,cw,(upper?f.endY:splice)-(upper?splice:cy),px,upper?join:py,cw*s,((upper?f.endY:splice)-(upper?splice:cy))*s);c.restore();}
 
- // Reveal solid authored snow progressively over the exposed surface.
- // Only the visible branch/cap is coated; a suspended tree must never gain
- // snow along the trunk section attached to the ceiling.
+ // Progressive snow uses the original authored overlay as an immutable
+ // texture. Clip it directly in the destination's source-coordinate space.
+ // The old route cleared and rebuilt TWO 1024x1024 canvases 343 times in a
+ // single 219-second Android flight. Direct clipping completely removes
+ // those atlas updates; the 32-column snow edge and 1/256 steps stay intact.
+ // ?perf-test=1&perf-ab=legacy-snow-rebuild retains the original A/B path.
  if(snow>0&&!fullSnow&&PERF_AB_VARIANT!=='snow-mask-off'){
-  const overlay=snowOverlay(kind,snow);
-  if(overlay){
-   if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
-   else c.drawImage(overlay,sx+cx,sy,cw,splice,px,y-f.anchor[1]*s,cw*s,splice*s);
+  if(PERF_AB_VARIANT==='legacy-snow-rebuild'){
+   const overlay=snowOverlay(kind,snow);
+   if(overlay){
+    if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
+    else c.drawImage(overlay,sx+cx,sy,cw,splice,px,y-f.anchor[1]*s,cw*s,splice*s);
+   }
+  }else{
+   const original=images.get(`trees-${kind}-overlay-04`);
+   if(original){
+    const sourceX=sx+cx,sourceY=sy+(upper?splice:0);
+    const sourceHeight=upper?snowyTipEnd-splice:splice;
+    const destY=upper?join:y-f.anchor[1]*s;
+    const top=upper?f.spliceY:0;
+    const bottom=upper?Math.min(512,f.endY+30):f.spliceY;
+    const reveal=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
+    c.save();
+    c.translate(px-sourceX*s,destY-sourceY*s);
+    c.scale(s,s);
+    clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
+    c.drawImage(original,sourceX,sourceY,cw,sourceHeight,
+     sourceX,sourceY,cw,sourceHeight);
+    c.restore();
+    snowMaskMetrics.directClips++;
+   }
   }
  }
 
@@ -299,10 +322,11 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 const snowMixBuffers=new Map();
 // Monotonic instrumentation only, without extra Canvas work. The normal
 // per-match recorder observes changes to identify expensive snow rebuilds.
-export const snowMaskMetrics={rebuilds:0};
+export const snowMaskMetrics={rebuilds:0,directClips:0};
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
-  snowOverlay(kind,0);
+  // Direct clipping does not need a full 1024x1024 snow-mask surface.
+  if(PERF_AB_VARIANT==='legacy-snow-rebuild')snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);

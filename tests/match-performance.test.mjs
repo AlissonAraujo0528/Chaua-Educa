@@ -101,3 +101,18 @@ test('mask-rebuild counters are correlated with long callback records',async()=>
   assert.equal(result.longCallbacks.slowest[0].snowMaskRebuilds,2);
  }finally{snowMaskMetrics.rebuilds-=2;}
 });
+
+test('direct snow clipping counts independently from legacy atlas rebuilds',async()=>{
+ const {snowMaskMetrics}=await import('../Chaua-Educa-main/js/tree-art.mjs');
+ const {game,quality,renderer}=make(),r=new MatchPerformance({storage:storage()});
+ r.start(game,quality,renderer);game.state='playing';
+ r.frame(100,game,quality,renderer,1,true);
+ snowMaskMetrics.directClips+=5;
+ try{
+  r.frame(116.7,game,quality,renderer,23,true,{physicsMs:1,uiMs:0,audioMs:0,visualMs:0,drawMs:22,otherMs:0});
+  const result=r.finish('ended',game,quality,renderer);
+  assert.equal(result.snowMask.directClipsDuringFlight,5);
+  assert.equal(result.snowMask.rebuildsDuringFlight,0);
+  assert.equal(result.longCallbacks.slowest[0].snowDirectClips,5);
+ }finally{snowMaskMetrics.directClips-=5;}
+});
