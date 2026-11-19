@@ -264,6 +264,7 @@ function home() {
     if(matchPerformance.finish('returned-to-menu',game,quality,renderer))refreshPerformanceControls();
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
     game.reset(); flightCues.reset(); previousState = ''; clock.reset(); lastTime = 0;
+    forestAudio.update('menu',!audioInterrupted&&!document.hidden&&document.hasFocus(),0,0,0,0,0);
     releaseFlightLandscape(app, document, screen);
     $('#hud').hidden = true; $('#countdown').hidden = true; $('#home').hidden = false;
     app.classList.remove('in-flight','training'); document.documentElement.classList.remove('in-flight'); updateTrainingButton();updateChapterButtons();
@@ -394,6 +395,10 @@ $('.brand').addEventListener('click', event => { event.preventDefault(); home();
 document.querySelectorAll('.back-home').forEach(button => button.addEventListener('click', home));
 function pauseFlight(message='Seu voo e seus poderes estão pausados.') {
     clearInputs(); game.pause(); clock.reset(); lastTime=0;
+    // Immediate stop, rather than waiting for the next animation callback.
+    if(game.state==='paused')
+        forestAudio.update('paused',!audioInterrupted&&!document.hidden&&document.hasFocus(),
+            game.sceneTime??game.elapsed,game.stage,0,0,0);
     if(game.state==='paused')$('#pause-message').textContent=message;
     syncUI();
 }
