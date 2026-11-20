@@ -55,7 +55,7 @@ export function exportMatchReports(reports,filename='chaua-desempenho-partidas.j
 export class MatchPerformance {
  constructor({storage=storageOrNull(),enabled=true,maxReports=MAX_REPORTS}={}){
   this.storage=storage;this.enabled=enabled!==false;
-  this.forensicEnabled=MATCH_FORENSICS;this.forensic=null;
+  this.forensicEnabled=MATCH_FORENSICS;this.forensic=null;this.forensicBackdrop=null;
   this.maxReports=Math.min(MAX_REPORTS,Math.max(1,Math.floor(maxReports)));
   this.current=null;this.records=[];this.lastReport=null;this.savedToDevice=false;
   try{
@@ -68,7 +68,16 @@ export class MatchPerformance {
  }
  setEnabled(enabled){
   this.enabled=enabled!==false;
-  if(!this.enabled)this.current=null; // Opting out discards unfinished data.
+  if(!this.enabled){
+   this.current=null; // Opting out discards unfinished data.
+   this.forensic?.stopBrowserObservers();
+   if(this.forensic)setActiveProbe(null);
+   if(this.forensicBackdrop){
+    this.forensicBackdrop.onTelemetry=null;
+    this.forensicBackdrop.prewarmEnabled=true;
+   }
+   this.forensic=null;this.forensicBackdrop=null;
+  }
   try{this.storage?.setItem(MATCH_PERF_SETTING,JSON.stringify(this.enabled));}catch{}
  }
  start(game,quality,renderer,training=false){
@@ -78,6 +87,7 @@ export class MatchPerformance {
   // No extra RAF, forced Canvas readback or upload timing claims.
   const forensic=this.forensicEnabled?new ForensicRecorder():null;
   this.forensic=forensic;
+  this.forensicBackdrop=forensic?renderer.seasonalBackdrop||null:null;
   if(forensic){
    forensic.deep=true;
    forensic.startBrowserObservers();
@@ -289,7 +299,7 @@ export class MatchPerformance {
     renderer.seasonalBackdrop.prewarmEnabled=true;
    }
   }
-  this.forensic=null;
+  this.forensic=null;this.forensicBackdrop=null;
   this.current=null;
   const report={
    schemaVersion:1,source:'Chaua Educa / desempenho automatico por partida',
