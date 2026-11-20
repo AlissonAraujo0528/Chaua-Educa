@@ -78,7 +78,12 @@ function drawSnowDirect(c,kind,f,sx,sy,cx,cw,splice,snowyTipEnd,s,px,destY,snow)
 // Caps, knots, branches and foliage retain the authored proportions.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
- const fullSnow = snow >= 1 - 1e-6;
+ // Snap the final 1/256 increment to the fully authored winter artwork:
+ // the approved full-snow source is pixel-perfect, while a 75%-resolution
+ // atlas can differ by one antialiased edge pixel at 255/256. This also
+ // prevents a one-frame perceived reduction in coverage as snow finishes.
+ const fullSnow = snow >= 1 - 1e-6 ||
+   (SNOW_RENDER_MODE==='sprites'&&snow>=255/256);
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
  const image = snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
