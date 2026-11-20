@@ -13,7 +13,7 @@ import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,prepareSnowSprites,SNOW_RENDER_MODE} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
-import {warmupSnowSpriteTexture} from './snow-sprites.mjs';
+import {warmupSnowSpriteTexture,SNOW_GPU_PAGES} from './snow-sprites.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
@@ -1214,7 +1214,7 @@ export class Renderer {
         // GPU texture uploads for the four authored snow pages happen under
         // the countdown backdrop, never on the first visible icy obstacle.
         if(game.state==='countdown'&&SNOW_RENDER_MODE==='sprites'&&
-           this.snowSpriteWarmupIndex<4){
+           this.snowSpriteWarmupIndex<SNOW_GPU_PAGES){
             if(warmupSnowSpriteTexture(this.c,this.snowSpriteWarmupIndex))
                 this.snowSpriteWarmupIndex++;
         }
