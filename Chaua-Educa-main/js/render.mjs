@@ -11,8 +11,9 @@ import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mj
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
-import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,prepareSnowSprites} from './tree-art.mjs';
+import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,prepareSnowSprites,SNOW_RENDER_MODE} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
+import {warmupSnowSpriteTexture} from './snow-sprites.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation} from './animation.mjs';
 import {hawkAngle} from './collision.mjs';
@@ -702,6 +703,9 @@ export class Renderer {
         const warmupParams=typeof location!=='undefined'?new URLSearchParams(location.search):null;
         this.snakeWarmupEnabled=warmupParams?.get('snakeWarmup')!=='0';
         this.snakeWarmupIndex=0;
+        this.snowSpriteWarmupIndex=0;
+        this.collectRenderTimings=false;
+        this._renderCpuParts={backgroundMs:0,treesMs:0,entitiesMs:0,birdMs:0,particlesMs:0,foregroundMs:0};
         this.frozenFoodWarmupEnabled=warmupParams?.get('winterFoodWarmup')!=='0';
         this.frozenFoodWarmupDone=false;
         this.canvas = canvas;
@@ -734,7 +738,7 @@ export class Renderer {
             prepareTreeWeather(this.c);
             // Build the authored 16-stage snow atlas while the loading screen
             // is still visible. No atlas work is done during active flight.
-            prepareSnowSprites();
+            if(SNOW_RENDER_MODE==='sprites')prepareSnowSprites();
             // All cold-weather food artwork and visual caches are prepared
             // before flight, not during the first pickup or winter transition.
             prewarmFoodArt();
@@ -1057,6 +1061,7 @@ export class Renderer {
         // short-lived visual state explicitly while retaining loaded art/caches.
         this.treeDrips=new TreeDrips();this.animalWeather=new AnimalWeather();this.weatherMotion=new WeatherMotion();
         this.cameraTime=undefined;this.cameraTop=undefined;
+        this.snowSpriteWarmupIndex=0;
     }
 
     background(time, offset = 0, stage = 0, home = false, reduced = false, stageMix = 1, rain = 0, storm = 0, fog = 0, wind = 0, seasonDistance = null, rainSpeed = 250, weatherMotion = null) {
@@ -1206,6 +1211,13 @@ export class Renderer {
 
     game(game, reduced, visualTime = 0) {
         this.base(false);
+        // GPU texture uploads for the four authored snow pages happen under
+        // the countdown backdrop, never on the first visible icy obstacle.
+        if(game.state==='countdown'&&SNOW_RENDER_MODE==='sprites'&&
+           this.snowSpriteWarmupIndex<4){
+            if(warmupSnowSpriteTexture(this.c,this.snowSpriteWarmupIndex))
+                this.snowSpriteWarmupIndex++;
+        }
         if(game.state==='countdown' && this.snakeWarmupEnabled && this.snakeWarmupIndex<SNAKE_SHEET_KEYS.length){
             // One sheet per countdown frame; the opaque backdrop immediately
             // covers this tiny translucent draw inside the visible main canvas.
@@ -1258,10 +1270,13 @@ export class Renderer {
         const winter = winterAmount(game);
         const weatherMotion=this.weatherMotion.advance(sceneTime,{wind,storm,speed:game.speed||250,seed:`${game.seed}:${game.tutorial?'training':'flight'}`});
         const probe=activeProbe;
+        const frameParts=this.collectRenderTimings?this._renderCpuParts:null;
+        let partAt=frameParts?performance.now():0;
         const backgroundAt=probe?probe.begin('render.background'):0;
         this.background(sceneTime, game.distance, game.stage, false, reduced, reduced?1:Math.min(1,game.stageAge/4),
             rain, storm, fog, wind, game.tutorial?null:game, game.speed||250,weatherMotion);
         if(probe)probe.end('render.background',backgroundAt);
+        if(frameParts){const now=performance.now();frameParts.backgroundMs=now-partAt;partAt=now;}
         const baseView = this.getViewport();
         // Follow the player only on screens that cannot fit the full world at
         // the improved sprite scale. The camera does not touch gameplay math.
@@ -1310,6 +1325,7 @@ export class Renderer {
         this.treeDrips.draw(c,game,sceneTime,game.surfaceWeather?.drip??0,wind,this.decoration==='low',reduced,dripsBounds);
         if(probe&&probe.deep)probe.end('render.trees',treesAt);
         c.restore();
+        if(frameParts){const now=performance.now();frameParts.treesMs=now-partAt;partAt=now;}
         c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY); c.scale(s, s);
         c.beginPath(); c.rect(view.worldLeft - 120, view.worldTop - 600, Math.max(WIDTH, view.worldWidth) + 240, view.worldHeight + 1200); c.clip();
@@ -1479,6 +1495,7 @@ export class Renderer {
                 ACTION_TIMINGS.parrotRecoil))
             : (game.state === 'ended' && !game.won ? 1 : 0);
         const contact=woodContactPosition(game,impactProg,reduced);
+        if(frameParts){const now=performance.now();frameParts.entitiesMs=now-partAt;partAt=now;}
         const birdAt=probe&&probe.deep?probe.begin('render.bird'):0;
         const bProps=this._drawBirdScratch??(this._drawBirdScratch={});
         bProps.x=contact.x;bProps.y=contact.y;bProps.scale=1.04;bProps.perched=game.state==='ended'&&game.won;
@@ -1492,6 +1509,7 @@ export class Renderer {
         bProps.snow=snow;bProps.rain=rain;bProps.low=this.decoration==='low';bProps.weather=this.animalWeather;
         drawBird(c, bProps);
         if(probe&&probe.deep)probe.end('render.bird',birdAt);
+        if(frameParts){const now=performance.now();frameParts.birdMs=now-partAt;partAt=now;}
         const particlesAt=probe&&probe.deep?probe.begin('render.particles'):0;
         if (!reduced) {
             const pList = game.particles;
@@ -1537,6 +1555,7 @@ export class Renderer {
         }
         this.animalWeather.draw(c);
         if(probe&&probe.deep)probe.end('render.particles',particlesAt,{count:game.particles.length});
+        if(frameParts){const now=performance.now();frameParts.particlesMs=now-partAt;partAt=now;}
         c.globalAlpha = 1;
         if(game.popups.length) {
             c.font='800 18px Nunito';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#254a35';
@@ -1590,6 +1609,7 @@ export class Renderer {
                 leaf(c, x, y, 5 + i % 4, i + (reduced ? 0 : visualTime * .3), i % 3 ? '#b8cc6d' : '#f4c967', i % 3 ? '#79a05b' : '#d49c47');
             }
         }
+        if(frameParts)frameParts.foregroundMs=performance.now()-partAt;
     }
 
     obstacle(e, game, reduced=false, renderBounds=null) {

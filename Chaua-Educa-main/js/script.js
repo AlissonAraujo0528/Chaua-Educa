@@ -737,6 +737,7 @@ function frame(time) {
         const frameView=game.visual(clock.accumulator / (1 / 120));
         if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
         if(measureSections)afterVisual=performance.now();
+        renderer.collectRenderTimings=measureSections;
         const drawAt=probe?probe.begin('render.game'):0;
         renderer.game(frameView, reducedMotion.matches, time / 1000);
         if(probe)probe.end('render.game',drawAt);

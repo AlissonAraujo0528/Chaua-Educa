@@ -126,3 +126,16 @@ test('ordinary match reports identify which snow rendering algorithm ran',async(
  assert.equal(report.snowMask.renderer,SNOW_RENDER_MODE);
  assert.ok(['direct','legacy','sprites'].includes(report.snowMask.renderer));
 });
+
+test('slow callback export includes named renderer passes when available',()=>{
+ const {game,quality,renderer}=make(),r=new MatchPerformance({storage:storage()});
+ renderer._renderCpuParts={backgroundMs:5,treesMs:9,entitiesMs:21,
+  birdMs:3,particlesMs:1,foregroundMs:2};
+ r.start(game,quality,renderer);game.state='playing';
+ r.frame(100,game,quality,renderer,41,true,{
+  physicsMs:0,uiMs:0,audioMs:0,visualMs:0,drawMs:41,otherMs:0});
+ const report=r.finish('ended',game,quality,renderer);
+ const row=report.longCallbacks.slowest[0];
+ assert.equal(row.renderPartsMs.entitiesMs,21);
+ assert.equal(row.renderPartsMs.backgroundMs,5);
+});

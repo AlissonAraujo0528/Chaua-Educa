@@ -172,7 +172,14 @@ export class MatchPerformance {
     }:null;
     c.longCallbacks[position]={
      gameSeconds:round(game.elapsed||0),stage:game.stage,cpuMs:round(callbackMs),
-     breakdownMs,weather:getWeatherMode(),profile,snowMaskRebuilds,snowDirectClips,snowSpriteDraws,
+     breakdownMs,renderPartsMs:renderer._renderCpuParts&&cpuSections?{
+      backgroundMs:round(renderer._renderCpuParts.backgroundMs),
+      treesMs:round(renderer._renderCpuParts.treesMs),
+      entitiesMs:round(renderer._renderCpuParts.entitiesMs),
+      birdMs:round(renderer._renderCpuParts.birdMs),
+      particlesMs:round(renderer._renderCpuParts.particlesMs),
+      foregroundMs:round(renderer._renderCpuParts.foregroundMs)
+     }:null,weather:getWeatherMode(),profile,snowMaskRebuilds,snowDirectClips,snowSpriteDraws,
      textWarningsShown:renderer.showTextWarnings!==false,
      entities:{wood,snakes,fruit,hawks,activeSnakeWarnings,particles:game.particles?.length??0}
     };

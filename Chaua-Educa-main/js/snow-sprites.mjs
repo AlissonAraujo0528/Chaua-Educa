@@ -93,3 +93,14 @@ export function drawSnowSprites(c,kind,variant,snow,dx,dy,dw,dh){
  }
  return true;
 }
+
+// Used during countdown, before the opaque seasonal background covers these
+// tiny draws. This primes texture upload without affecting the game image.
+export function warmupSnowSpriteTexture(c,index){
+ const ordered=[...atlases.get('lower')?.pages||[],...atlases.get('upper')?.pages||[]];
+ const source=ordered[index];if(!source)return false;
+ c.save();c.setTransform(1,0,0,1,0,0);
+ c.drawImage(source,0,0,1,1,0,0,1,1);
+ c.restore();
+ return true;
+}
