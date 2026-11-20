@@ -1734,11 +1734,11 @@ export class Renderer {
         let observedArt;
         if(action){
             const activeFrame=(action.blend??0)<.5?action.frame:(action.next??action.frame);
-            observedArt=`action:${action.sheet}:${activeFrame}`;
+            observedArt=hawkProbe?`action:${action.sheet}:${activeFrame}`:null;
             // Required art missing? Throw explicitly; never switch to v6 mid-flight.
             drawActionSheet(c,action.sheet,activeFrame,-HAWK_ART.size/2,-HAWK_ART.size/2,HAWK_ART.size,HAWK_ART.size);
         }else{
-            observedArt=`v6:${clip.frame}:${clip.next}`;
+            observedArt=hawkProbe?`v6:${clip.frame}:${clip.next}`:null;
             // Deliberate original v6 poses: inclined dive, warning, unshielded retreat.
             atlasAnimation(c,'hawk',clip,HAWK_ART.atlasScale,180);
         }
