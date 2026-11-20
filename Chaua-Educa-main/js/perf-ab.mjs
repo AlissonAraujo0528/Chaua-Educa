@@ -10,4 +10,6 @@ export function resolvePerfVariant(search='') {
  const requested=params.get('perf-ab')||PERF_AB_BRANCH_DEFAULT;
  return PERF_AB_OPTIONS.includes(requested)?requested:PERF_AB_BRANCH_DEFAULT;
 }
-export const PERF_AB_VARIANT=resolvePerfVariant(typeof location==='undefined'?'':location.search);
+// Node tests without a browser still exercise the approved baseline drawing.
+// Only the actual browser branch defaults to the experimental snowless arm.
+export const PERF_AB_VARIANT=typeof location==='undefined'?'baseline':resolvePerfVariant(location.search);
