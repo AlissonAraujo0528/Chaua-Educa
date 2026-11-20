@@ -3,6 +3,7 @@ import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
 import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
+import {prepareSnowSprites,drawSnowSprites,snowSpriteMetrics} from './snow-sprites.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 
@@ -60,6 +61,20 @@ function variantBark(image,index){
   Math.floor(index/2)*TREE_CELL+TREE_SPLICES[index]-96,TREE_CORE_WIDTH,96,true);
 }
 
+// Only used as an opt-in A/B control or a safe fallback if atlas preloading
+// did not finish. No masks are rebuilt here.
+function drawSnowDirect(c,kind,f,sx,sy,cx,cw,splice,snowyTipEnd,s,px,destY,snow){
+ const original=images.get(`trees-${kind}-overlay-04`);if(!original)return;
+ const upper=kind==='upper',sourceX=sx+cx,sourceY=sy+(upper?splice:0);
+ const sourceHeight=upper?snowyTipEnd-splice:splice;
+ const top=upper?f.spliceY:0;
+ const bottom=upper?Math.min(512,f.endY+30):f.spliceY;
+ const reveal=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
+ c.save();c.translate(px-sourceX*s,destY-sourceY*s);c.scale(s,s);
+ clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
+ c.drawImage(original,sourceX,sourceY,cw,sourceHeight,sourceX,sourceY,cw,sourceHeight);
+ c.restore();snowMaskMetrics.directClips++;
+}
 // Caps, knots, branches and foliage retain the authored proportions.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
@@ -102,30 +117,23 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // those atlas updates; the 32-column snow edge and 1/256 steps stay intact.
  // ?perf-test=1&perf-ab=legacy-snow-rebuild retains the original A/B path.
  if(snow>0&&!fullSnow&&PERF_AB_VARIANT!=='snow-mask-off'){
-  if(SNOW_RENDER_MODE==='legacy'){
+  if(SNOW_RENDER_MODE==='sprites'){
+   const sourceY=sy+(upper?splice:0);
+   const sourceHeight=upper?snowyTipEnd-splice:splice;
+   const destY=upper?join:y-f.anchor[1]*s;
+   if(!drawSnowSprites(c,kind,((variant%4)+4)%4,snow,px,destY,cw*s,sourceHeight*s)){
+    // Never drop a warning, cap or snow layer if an atlas has not loaded.
+    drawSnowDirect(c,kind,f,sx,sy,cx,cw,splice,snowyTipEnd,s,px,destY,snow);
+   }
+  }else if(SNOW_RENDER_MODE==='legacy'){
    const overlay=snowOverlay(kind,snow);
    if(overlay){
     if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
     else c.drawImage(overlay,sx+cx,sy,cw,splice,px,y-f.anchor[1]*s,cw*s,splice*s);
    }
   }else{
-   const original=images.get(`trees-${kind}-overlay-04`);
-   if(original){
-    const sourceX=sx+cx,sourceY=sy+(upper?splice:0);
-    const sourceHeight=upper?snowyTipEnd-splice:splice;
-    const destY=upper?join:y-f.anchor[1]*s;
-    const top=upper?f.spliceY:0;
-    const bottom=upper?Math.min(512,f.endY+30):f.spliceY;
-    const reveal=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
-    c.save();
-    c.translate(px-sourceX*s,destY-sourceY*s);
-    c.scale(s,s);
-    clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
-    c.drawImage(original,sourceX,sourceY,cw,sourceHeight,
-     sourceX,sourceY,cw,sourceHeight);
-    c.restore();
-    snowMaskMetrics.directClips++;
-   }
+   const destY=upper?join:y-f.anchor[1]*s;
+   drawSnowDirect(c,kind,f,sx,sy,cx,cw,splice,snowyTipEnd,s,px,destY,snow);
   }
  }
 
@@ -324,11 +332,12 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 const compareParams=typeof location!=='undefined'?new URLSearchParams(location.search):null;
 export const SNOW_RENDER_MODE=
  (PERF_AB_VARIANT==='legacy-snow-rebuild'||compareParams?.get('snow-render')==='legacy')
- ?'legacy':'direct';
+ ?'legacy':compareParams?.get('snow-render')==='direct'?'direct':'sprites';
 const snowMixBuffers=new Map();
 // Monotonic instrumentation only, without extra Canvas work. The normal
 // per-match recorder observes changes to identify expensive snow rebuilds.
-export const snowMaskMetrics={rebuilds:0,directClips:0};
+export const snowMaskMetrics={rebuilds:0,directClips:0,snowSpriteMetrics};
+export {prepareSnowSprites};
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
   // Direct clipping does not need a full 1024x1024 snow-mask surface.

@@ -76,6 +76,7 @@ export class MatchPerformance {
    longCallbacks:[],longCallbackTotal:0,
    snowMaskPrevious:snowMaskMetrics.rebuilds,snowMaskRebuilds:0,
    snowClipsPrevious:snowMaskMetrics.directClips,snowDirectClips:0,
+   snowSpritePrevious:snowMaskMetrics.snowSpriteMetrics.draws,snowSpriteDraws:0,
    previousCpuMs:null,stutterTotal:0,over50:0,over100:0,
    lastSnapshot:0,lastProfile:''
   };
@@ -119,6 +120,7 @@ export class MatchPerformance {
    c.previous=0;c.previousCpuMs=null;
    c.snowMaskPrevious=snowMaskMetrics.rebuilds;
    c.snowClipsPrevious=snowMaskMetrics.directClips;
+   c.snowSpritePrevious=snowMaskMetrics.snowSpriteMetrics.draws;
    return;
   }
   // Quality is stable for nearly every frame. Avoid constructing a new
@@ -142,6 +144,9 @@ export class MatchPerformance {
   c.snowClipsPrevious=snowMaskMetrics.directClips;
   c.snowMaskRebuilds+=snowMaskRebuilds;
   c.snowDirectClips+=snowDirectClips;
+  const snowSpriteDraws=Math.max(0,snowMaskMetrics.snowSpriteMetrics.draws-c.snowSpritePrevious);
+  c.snowSpritePrevious=snowMaskMetrics.snowSpriteMetrics.draws;
+  c.snowSpriteDraws+=snowSpriteDraws;
   // Record the largest CPU stalls even when their RAF gap occurs *after*
   // this callback. The normal path performs no allocation or entity scan.
   if(callbackMs>=LONG_CALLBACK_MS){
@@ -167,7 +172,7 @@ export class MatchPerformance {
     }:null;
     c.longCallbacks[position]={
      gameSeconds:round(game.elapsed||0),stage:game.stage,cpuMs:round(callbackMs),
-     breakdownMs,weather:getWeatherMode(),profile,snowMaskRebuilds,snowDirectClips,
+     breakdownMs,weather:getWeatherMode(),profile,snowMaskRebuilds,snowDirectClips,snowSpriteDraws,
      textWarningsShown:renderer.showTextWarnings!==false,
      entities:{wood,snakes,fruit,hawks,activeSnakeWarnings,particles:game.particles?.length??0}
     };
@@ -210,7 +215,7 @@ export class MatchPerformance {
       previousCallbackCpuMs:c.previousCpuMs===null?null:round(c.previousCpuMs),
       currentCallbackCpuMs:round(callbackMs),
       pendingSeasonSurface:renderer.seasonalBackdrop?.pending?.id??null,
-      snowMaskRebuilds,snowDirectClips,
+      snowMaskRebuilds,snowDirectClips,snowSpriteDraws,
       entities:{wood,hawk,snake,fruit,particles:game.particles?.length??0},
       visibleWarnings:{snakes:snakeWarnings,hawks:hawkWarnings},
       textWarningsShown:renderer.showTextWarnings!==false
@@ -253,7 +258,10 @@ export class MatchPerformance {
     slowest:c.longCallbacks.sort((a,b)=>a.gameSeconds-b.gameSeconds)},
    snowMask:{renderer:SNOW_RENDER_MODE,
     rebuildsDuringFlight:c.snowMaskRebuilds,
-    directClipsDuringFlight:c.snowDirectClips},
+    directClipsDuringFlight:c.snowDirectClips,
+    spriteDrawsDuringFlight:c.snowSpriteDraws,
+    spriteBuildMs:snowMaskMetrics.snowSpriteMetrics.buildMs,
+    spriteEstimatedBytes:snowMaskMetrics.snowSpriteMetrics.estimatedBytes},
    events:c.events
   };
   this.lastReport=report;

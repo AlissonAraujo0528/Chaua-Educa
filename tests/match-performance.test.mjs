@@ -124,5 +124,5 @@ test('ordinary match reports identify which snow rendering algorithm ran',async(
  r.frame(100,game,quality,renderer,2,true);
  const report=r.finish('ended',game,quality,renderer);
  assert.equal(report.snowMask.renderer,SNOW_RENDER_MODE);
- assert.ok(['direct','legacy'].includes(report.snowMask.renderer));
+ assert.ok(['direct','legacy','sprites'].includes(report.snowMask.renderer));
 });

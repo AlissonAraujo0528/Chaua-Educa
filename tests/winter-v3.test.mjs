@@ -108,7 +108,7 @@ test('four existing transparent snow overlays crossfade progressively at every b
  }
 });
 
-test('upper-tree snow grows only on the exposed cap, directly from authored artwork, without a 1024px mask rebuild',t=>{
+test('upper-tree snow remains on the authored exposed cap, with a safe direct fallback when sprites are not loaded',t=>{
  const old=new Map(images);
  t.after(()=>{images.clear();for(const [k,v] of old)images.set(k,v)});
  const original={id:'original'},stage4={id:'stage4'};

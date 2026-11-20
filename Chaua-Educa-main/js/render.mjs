@@ -11,7 +11,7 @@ import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mj
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
-import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather} from './tree-art.mjs';
+import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,prepareSnowSprites} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation} from './animation.mjs';
@@ -732,6 +732,9 @@ export class Renderer {
     initializeAssets() {
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
             prepareTreeWeather(this.c);
+            // Build the authored 16-stage snow atlas while the loading screen
+            // is still visible. No atlas work is done during active flight.
+            prepareSnowSprites();
             // All cold-weather food artwork and visual caches are prepared
             // before flight, not during the first pickup or winter transition.
             prewarmFoodArt();
