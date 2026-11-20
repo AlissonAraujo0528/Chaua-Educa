@@ -18,7 +18,7 @@ const STUTTER_THRESHOLD_MS=28;
 const forensicParams=typeof location==='undefined'?null:new URLSearchParams(location.search);
 // Dedicated forensics branch: automatically include the causal trace in the regular match JSON.
 // ?match-forensics=0 is an explicit opt-out for overhead comparison.
-const MATCH_FORENSICS=forensicParams?.get('match-forensics')!=='0';
+const MATCH_FORENSICS=typeof location!=='undefined'&&forensicParams?.get('match-forensics')!=='0';
 const SEASON_PREWARM_DISABLED=MATCH_FORENSICS&&forensicParams?.get('season-prewarm')==='off';
 const round=(n,d=2)=>Number(Number(n).toFixed(d));
 const empty=()=>Object.create(null);
