@@ -180,7 +180,11 @@ function drawDelta(c,a,variant,stage,fraction,dx,dy,dw,dh){
 export function drawSnowSprites(c,kind,variant,snow,dx,dy,dw,dh){
  const atlas=atlases.get(kind);
  if(!atlas||atlas.image!==images.get('trees-'+kind+'-overlay-04'))return false;
- const v=Math.min(SNOW_FRAMES,Math.max(0,snow*SNOW_FRAMES));
+ // Match the established 1/256 coverage quantization used by
+ // clipSnowReveal. Very small floating-point differences either side of
+ // a sprite boundary must not cause a discontinuous Canvas image switch.
+ const coverage=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
+ const v=coverage*SNOW_FRAMES;
  const lower=Math.floor(v),fraction=v-lower;
  if(lower>0)drawStage(c,atlas,variant,lower,dx,dy,dw,dh);
  if(fraction>.00001&&lower<SNOW_FRAMES)
