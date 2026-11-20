@@ -83,13 +83,21 @@ export function drawSnowSprites(c,kind,variant,snow,dx,dy,dw,dh){
  if(!atlas||atlas.image!==images.get('trees-'+kind+'-overlay-04'))return false;
  const v=Math.min(SNOW_FRAMES,Math.max(0,snow*SNOW_FRAMES));
  const lower=Math.floor(v),fraction=v-lower;
- if(lower>0)drawStage(c,atlas,variant,lower,dx,dy,dw,dh);
- // The accumulated, already-opaque snow remains solid. Only the *new*
- // increment fades in; fading out the whole old snow made it look translucent.
- if(fraction>.001&&lower<SNOW_FRAMES){
+ // Complementary interpolation makes atlas transitions mathematically
+ // continuous: at stage boundaries the previous layer has exactly zero
+ // weight, so there is no 1-frame double-compositing discontinuity.
+ // Frame alpha is unchanged at each exact authored stage.
+ if(fraction>.00001&&lower<SNOW_FRAMES){
+  if(lower>0){
+   c.save();c.globalAlpha*=1-fraction;
+   drawStage(c,atlas,variant,lower,dx,dy,dw,dh);
+   c.restore();
+  }
   c.save();c.globalAlpha*=fraction;
   drawStage(c,atlas,variant,lower+1,dx,dy,dw,dh);
   c.restore();
+ }else if(lower>0){
+  drawStage(c,atlas,variant,lower,dx,dy,dw,dh);
  }
  return true;
 }
