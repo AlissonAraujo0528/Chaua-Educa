@@ -40,7 +40,11 @@ function frameRect(a,variant,step){
 }
 function readStage(a,variant,step){
  const rect=frameRect(a,variant,step);
- return rect.canvas.getContext('2d').getImageData(rect.x,rect.y,rect.w,rect.h);
+ const ctx=rect.canvas.getContext('2d');
+ if(typeof ctx?.getImageData!=='function')return null;
+ const pixels=ctx.getImageData(rect.x,rect.y,rect.w,rect.h);
+ return pixels?.data&&Number.isFinite(pixels.width)&&
+  Number.isFinite(pixels.height)?pixels:null;
 }
 function createDelta(ctx,low,hi){
  const w=hi.width,h=hi.height,data=ctx.createImageData(w,h);
@@ -68,13 +72,17 @@ function createDelta(ctx,low,hi){
 function prepareDeltas(a){
  const work=newCanvas(a.strideX*4,a.strideY);
  const workCtx=work?.getContext('2d',{willReadFrequently:true});
- if(!workCtx)return false;
+ // Some non-browser render unit tests provide a drawing-only Canvas fake.
+ // Their fallback renderer must remain supported without pretending that
+ // stubbed getImageData/createImageData can decode sprite pixels.
+ if(!workCtx||typeof workCtx.createImageData!=='function')return false;
  const pending=[];let sumHeight=0;
  for(let step=1;step<=SNOW_FRAMES;step++){
   let rowHeight=0;const variants=[];
   for(let variant=0;variant<4;variant++){
    const low=step===1?null:readStage(a,variant,step-1);
    const hi=readStage(a,variant,step);
+   if(!hi||(step>1&&!low))return false;
    const delta=createDelta(workCtx,low,hi);
    rowHeight=Math.max(rowHeight,delta.maxY>=delta.minY?delta.maxY-delta.minY+1:0);
    variants.push(delta);
