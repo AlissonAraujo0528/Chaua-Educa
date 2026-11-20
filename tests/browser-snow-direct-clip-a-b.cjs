@@ -17,6 +17,9 @@ const browserOptions={executablePath:process.env.CHROMIUM_PATH||undefined,args:[
    await page.route(/\/js\/script\.js(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:''}));
    const url=new URL(TEST_URL);
    url.searchParams.set('perf-test','1');url.searchParams.set('perf-ab',variant);
+   // Baseline now tests cached snow sprites; compare the direct implementation
+   // explicitly against the pre-existing 1024px rebuild reference.
+   if(variant==='baseline')url.searchParams.set('snow-render','direct');
    await page.goto(url.toString(),{waitUntil:'networkidle'});
    const out=await page.evaluate(async snow=>{
     const [{Renderer},{drawLivingTrunk,snowMaskMetrics}]=await Promise.all([
