@@ -5,6 +5,7 @@ import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage,precomposedAssetKey} from './precomposed-winter.mjs';
 
 
 // Repeat complete bark bands at the same scale as the authored cap.
@@ -63,9 +64,12 @@ function variantBark(image,index){
 // Caps, knots, branches and foliage retain the authored proportions.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
+ // Test C: draw a single complete authored tree state, not tree plus overlay.
+ const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(snow):0;
+ const preparedImage=precomposedLevel>0?images.get(precomposedAssetKey(kind,precomposedLevel)):null;
  const fullSnow = snow >= 1 - 1e-6;
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
- const image = snowImg4 || images.get(`trees-${kind}`);
+ const image = (PRECOMPOSED_SNOW_ACTIVE?preparedImage:null) || snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
  const f = FOREST_ART[kind][((variant % 4) + 4) % 4], s = width / (f.core[1] - f.core[0]);
@@ -98,7 +102,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Reveal solid authored snow progressively over the exposed surface.
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
- if(snow>0&&!fullSnow&&PERF_AB_VARIANT!=='snow-mask-off'){
+ if(snow>0&&!fullSnow&&!PRECOMPOSED_SNOW_ACTIVE&&PERF_AB_VARIANT!=='snow-mask-off'){
   const overlay=snowOverlay(kind,snow);
   if(overlay){
    if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
@@ -126,6 +130,11 @@ const TREE_SPLICES = [181, 180, 180, 182];
 
 export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain = 0, time = 0, visibleReach = 1000) {
  const image = images.get('tree-variants');
+ // Special upper trunks remain free of ceiling-attached snow.
+ // Broken variants retain the original fracture sequence.
+ const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
+ const preparedVariant=precomposedLevel>0?images.get(precomposedAssetKey('special',precomposedLevel)):null;
+ const intactImage=preparedVariant||image;
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
  if (!image || index < 0) return;
  const sx = (index % 2) * TREE_CELL;
@@ -153,7 +162,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
     c.restore();}
 
   // Snow variant transition
-  if (snow > 0 && breakAge === undefined && PERF_AB_VARIANT!=='snow-mask-off') {
+  if (snow > 0 && breakAge === undefined && !PRECOMPOSED_SNOW_ACTIVE && PERF_AB_VARIANT!=='snow-mask-off') {
    const snowImage = images.get('tree-variants-snow');
    if (snowImage) {
     c.save();
@@ -229,7 +238,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    c.lineTo(r - (i < 2 ? 4 : 0), join * .65); c.lineTo(r, join);
    c.lineTo(l, join); c.lineTo(l - (i > 0 ? 4 : 0), join * .65);
    c.lineTo(l + (i > 0 ? 6 : 0), join * .3); c.closePath(); c.clip();
-   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
+   c.drawImage(intactImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
     left, 0, TREE_CELL * scale, join);
    c.restore();
   }
@@ -299,12 +308,21 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 const snowMixBuffers=new Map();
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
-  snowOverlay(kind,0);
+  if(!PRECOMPOSED_SNOW_ACTIVE)snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);
    if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
   });
+ }
+ // Warm each prepared sheet before gameplay: avoid texture upload during flight.
+ if(PRECOMPOSED_SNOW_ACTIVE&&context){
+  context.save();
+  for(const kind of ['lower','upper','special'])for(let stage=1;stage<=15;stage++){
+   const img=images.get(precomposedAssetKey(kind,stage));
+   if(img)context.drawImage(img,100,100,20,20,0,0,1,1);
+  }
+  context.restore();
  }
  const image=images.get('tree-variants');
  if(image)wetVariantCap(image);
