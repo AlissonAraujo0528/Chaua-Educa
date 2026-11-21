@@ -44,6 +44,10 @@ if(mobileDevice) $('.home-links').append($('#open-credits'));
 const renderer = new Renderer($('#forest'));
 renderer.homeMobileLayout=mobileDevice;
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
+// Deterministic seed for controlled winter A/B/C tests; normal gameplay is random.
+const seedQuery=new URLSearchParams(location.search).get('test-seed');
+const fixedTestSeed=seedQuery!==null&&/^\d{1,10}$/.test(seedQuery)&&
+ Number(seedQuery)<=0xffffffff?Number(seedQuery):null;
 function applyVisualQuality() {
     if(quality.mode==='auto')renderer.setAutomaticQuality(quality.level);
     else renderer.setQuality(quality.level);
@@ -231,7 +235,7 @@ function start(training = false, checkpoint = null) {
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
     flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
-    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player));
+    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player),fixedTestSeed===null?undefined:fixedTestSeed);
     forestAudio.beginFlight();
     if(betaRuntime?.active)betaRuntime.attempt();
     renderer.resetFlightPresentation();
