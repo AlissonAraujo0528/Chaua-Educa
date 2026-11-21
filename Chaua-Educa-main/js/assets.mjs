@@ -1,5 +1,6 @@
 import {loadImage} from './image-loader.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,precomposedAssetKey} from './precomposed-winter.mjs';
 // One cache for gameplay, menus and results. All files are local.
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
@@ -9,6 +10,18 @@ export const ASSET_PATHS = Object.fromEntries([
  // full-size frames from BOOT, while keeping their on-disk originals intact.
  ...['lower','upper'].map(k=>[`trees-${k}-snow-04`,`../assets/Seasons/Winter/trees-${k}-snow-04.webp`]),
  ...['lower','upper'].flatMap(k=>[1,2,3,4].map(s=>[`trees-${k}-overlay-0${s}`,`../assets/Seasons/Winter/trees-${k}-overlay-0${s}.webp`])),
+ // Test C: add 43 source-aligned stage files only when explicitly requested.
+ // Stage zero and full-snow living trees reuse already approved assets.
+ ...(PRECOMPOSED_SNOW_ACTIVE?[
+  ...['lower','upper'].flatMap(kind=>Array.from({length:14},(_,i)=>i+1).map(stage=>[
+   precomposedAssetKey(kind,stage),
+   '../assets/Seasons/Winter/Precomposed/trees-'+kind+'-snow-'+String(stage).padStart(2,'0')+'.webp'
+  ])),
+  ...Array.from({length:15},(_,i)=>i+1).map(stage=>[
+   precomposedAssetKey('special',stage),
+   '../assets/Seasons/Winter/Precomposed/tree-variants-snow-'+String(stage).padStart(2,'0')+'.webp'
+  ])
+ ]:[]),
  ...Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((page,i)=>[`runtime-${family}-${i}`,page.path])),
  ...['forest'].map(k=>[k,`../assets/v3/${k}.webp`]),
  ...['feather','shield'].map(k=>[k,`../assets/v4/${k}.webp`]),
