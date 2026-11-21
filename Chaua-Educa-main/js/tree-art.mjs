@@ -65,9 +65,10 @@ function variantBark(image,index){
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
  // Test C: draw a single complete authored tree state, not tree plus overlay.
- const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(snow):0;
+ const treeSnow=PERF_AB_VARIANT==='snow-mask-off'?0:snow;
+ const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(treeSnow):0;
  const preparedImage=precomposedLevel>0?images.get(precomposedAssetKey(kind,precomposedLevel)):null;
- const fullSnow = snow >= 1 - 1e-6;
+ const fullSnow = treeSnow >= 1 - 1e-6;
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
  const image = (PRECOMPOSED_SNOW_ACTIVE?preparedImage:null) || snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
@@ -80,7 +81,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  const bark=livingBark(barkImage,kind,((variant%4)+4)%4,f);
  const splice = upper ? f.spliceY : f.spliceY - 1;
  // Snow icicles may extend past original alpha bounds. Visual clip only.
- const snowyTipEnd=upper&&snow>0?Math.max(f.endY,Math.min(512,f.endY+30)):f.endY;
+ const snowyTipEnd=upper&&treeSnow>0?Math.max(f.endY,Math.min(512,f.endY+30)):f.endY;
  const join = y + (splice - f.anchor[1]) * s;
  if (upper) {
   const start = y - length;
@@ -90,7 +91,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
   const end = y + length;
   fillBark(c,bark,coreLeft,join,width,s,end-join,false);
   // Preserve the snow dome above the bare wood's y=20 content bound.
-  const capTop=snow>0?0:cy;
+  const capTop=treeSnow>0?0:cy;
   c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
    px,y+(capTop-f.anchor[1])*s,cw*s,(splice-capTop)*s);
  }
@@ -238,7 +239,11 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    c.lineTo(r - (i < 2 ? 4 : 0), join * .65); c.lineTo(r, join);
    c.lineTo(l, join); c.lineTo(l - (i > 0 ? 4 : 0), join * .65);
    c.lineTo(l + (i > 0 ? 6 : 0), join * .3); c.closePath(); c.clip();
-   c.drawImage(intactImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
+   if(preparedVariant){
+    // Include the original snowy lip above the 8px bare cap anchor.
+    c.drawImage(intactImage,sx,sy,TREE_CELL,splice,
+     left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
+   }else c.drawImage(intactImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
     left, 0, TREE_CELL * scale, join);
    c.restore();
   }
