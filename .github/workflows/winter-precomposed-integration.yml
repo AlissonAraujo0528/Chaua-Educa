@@ -11,6 +11,8 @@ on:
       - Chaua-Educa-main/js/precomposed-winter.mjs
       - Chaua-Educa-main/index.html
       - Chaua-Educa-main/assets/Seasons/Winter/Precomposed/**
+      - scripts/validate-release.mjs
+      - tests/qa-architecture.test.mjs
       - tests/precomposed-winter.test.mjs
       - tests/browser-precomposed-winter.cjs
       - .github/workflows/winter-precomposed-integration.yml
@@ -36,6 +38,8 @@ jobs:
       - run: npm ci
       - name: Check all game unit tests, including precomposed art fidelity
         run: npm test
+      - name: Audit game release and new opt-in assets
+        run: npm run audit:release
       - name: Install Chromium for real browser art validation
         run: npx playwright install --with-deps chromium
       - name: Verify 43 stage textures and exact single-pass drawing
