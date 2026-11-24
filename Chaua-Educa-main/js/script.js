@@ -67,7 +67,7 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dialogs = [...document.querySelectorAll('dialog')];
 let player = '', selectedMode = 'aventura', previousState = '', board = 'aventura';
 let returnToMissionsResult = false;
-let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0;
+let returnToResult = false, lastTime = 0, toastUntil = 0, pointsUntil = 0, scoreAnim = null;
 let resultAnimation = null, soundOn = true, audioInterrupted = false;
 const flightCues = new FlightCues();
 const controlsSide=DB.readObject('chaua-controls-side','right');
@@ -129,9 +129,10 @@ export const game = new Game({ onEvent(event) {
     if (event.type === 'points') {
         $('#score-bonus').textContent = `+${event.value}`; pointsUntil = game.elapsed + 1;
         if(!reducedMotion.matches) {
-            const score=$('#score');score.getAnimations().forEach(a=>a.cancel());
+            const score=$('#score');
+            scoreAnim?.cancel();
             const t=probe?probe.begin('ui.scoreAnimationSetup'):0;
-            score.animate([{transform:'scale(1)'},{transform:'scale(1.16)',color:'#b48c32'},{transform:'scale(1)'}],{duration:240});
+            scoreAnim=score.animate([{transform:'scale(1)'},{transform:'scale(1.16)'},{transform:'scale(1)'}],{duration:240});
             if(probe)probe.end('ui.scoreAnimationSetup',t);
         }
     }
@@ -670,7 +671,8 @@ function syncUI() {
     hudText('#stage-name',game.tutorial ? (LESSONS[game.tutorial.step]?.title || 'Treino concluído') : STAGES[game.stage]);
     const progress=game.tutorial ? game.tutorial.step/LESSONS.length*100 : Math.min(100,journeyProgress(game)*100);
     hudText('#journey-destination',game.tutorial ? tutorialInstruction(game.tutorial) : game.refuge?'Alinhe o voo com o bando':`Abrigo · ${Math.floor(progress)}%`);
-    if(progress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${progress/100})`;lastHudProgress=progress;}
+    const barProgress=Math.round(progress*10)/10;
+    if(barProgress!==lastHudProgress){hud('#progress-fill').style.transform=`scaleX(${barProgress/100})`;lastHudProgress=barProgress;}
     hudAttribute('#progress-track','aria-valuenow',Math.floor(progress));
     hudAttribute('#progress-track','aria-label',game.tutorial?'Etapas do treino':'Caminho até o abrigo');
     hudValue('#energy',game.stamina);

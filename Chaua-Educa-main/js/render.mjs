@@ -386,22 +386,80 @@ function drawMiniSparkle(c, x, y, r, rot) {
     c.restore();
 }
 
+const TEXT_CACHE_LIMIT = 128;
+const TEXT_CACHE_SCALE = 2;
+const textSprites = new Map();
+let fontCacheHooked = false;
+function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, lineWidth = 0, textBaseline = 'alphabetic') {
+    if (typeof OffscreenCanvas !== 'undefined' && typeof OffscreenCanvasRenderingContext2D !== 'undefined' && typeof document !== 'undefined') {
+        if (!fontCacheHooked && document.fonts?.ready) {
+            fontCacheHooked = true;
+            document.fonts.ready.then(() => textSprites.clear()).catch(() => {});
+        }
+        const key = `${font}|${fillStyle}|${strokeStyle || ''}|${lineWidth}|${textBaseline}|${text}`;
+        let entry = textSprites.get(key);
+        if (!entry) {
+            const probe = document.createElement('canvas').getContext('2d');
+            if (probe && typeof probe.measureText === 'function') {
+                probe.font = font;
+                probe.textAlign = 'center';
+                probe.textBaseline = textBaseline;
+                const m = probe.measureText(text);
+                const pad = Math.ceil(lineWidth) + 4;
+                const leftExt = Math.ceil(Math.max(m.width * 0.5, m.actualBoundingBoxLeft || 0));
+                const rightExt = Math.ceil(Math.max(m.width * 0.5, m.actualBoundingBoxRight || 0));
+                const asc = Math.ceil(m.actualBoundingBoxAscent || 24);
+                const desc = Math.ceil(m.actualBoundingBoxDescent || 10);
+                const w = Math.max(1, leftExt + rightExt + pad * 2);
+                const h = Math.max(1, asc + desc + pad * 2);
+                const anchorX = pad + leftExt;
+                const anchorY = pad + asc;
+                const surface = new OffscreenCanvas(w * TEXT_CACHE_SCALE, h * TEXT_CACHE_SCALE);
+                const oc = surface.getContext('2d');
+                if (oc) {
+                    oc.scale(TEXT_CACHE_SCALE, TEXT_CACHE_SCALE);
+                    oc.font = font;
+                    oc.textAlign = 'center';
+                    oc.textBaseline = textBaseline;
+                    if (strokeStyle && lineWidth > 0) {
+                        oc.lineWidth = lineWidth;
+                        oc.strokeStyle = strokeStyle;
+                        oc.strokeText(text, anchorX, anchorY);
+                    }
+                    oc.fillStyle = fillStyle;
+                    oc.fillText(text, anchorX, anchorY);
+                    if (textSprites.size >= TEXT_CACHE_LIMIT) textSprites.delete(textSprites.keys().next().value);
+                    entry = { surface, w, h, anchorX, anchorY };
+                    textSprites.set(key, entry);
+                }
+            }
+        }
+        if (entry) {
+            c.drawImage(entry.surface, x - entry.anchorX, y - entry.anchorY, entry.w, entry.h);
+            return;
+        }
+    }
+    c.font = font;
+    c.textAlign = 'center';
+    c.textBaseline = textBaseline;
+    if (strokeStyle && lineWidth > 0) {
+        c.lineWidth = lineWidth;
+        c.strokeStyle = strokeStyle;
+        c.strokeText(text, x, y);
+    }
+    c.fillStyle = fillStyle;
+    c.fillText(text, x, y);
+}
+
 function drawFruitSparkles(c, bx, by, reaction, t) {
     c.save();
     const progress = Math.max(0, Math.min(1, 1 - (reaction / 0.26)));
     const floatY = -progress * 34;
     const wobble = Math.sin(progress * 15) * 6;
 
-    c.font = '800 18px Nunito, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillStyle = '#ffe959';
-    c.strokeStyle = '#223d16';
-    c.lineWidth = 2.6;
     const noteX = bx + 10 + wobble;
     const noteY = by - 10 + floatY;
-    c.strokeText('♪', noteX, noteY);
-    c.fillText('♪', noteX, noteY);
+    drawCachedText(c, '♪', noteX, noteY, '800 18px Nunito, sans-serif', '#ffe959', '#223d16', 2.6, 'middle');
 
     const sp1X = bx + 22 + wobble * 0.5;
     const sp1Y = by - 18 + floatY * 0.8;
@@ -1503,13 +1561,10 @@ export class Renderer {
         if(probe&&probe.deep)probe.end('render.particles',particlesAt,{count:game.particles.length});
         c.globalAlpha = 1;
         if(game.popups.length) {
-            c.font='800 18px Nunito';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#254a35';
             for(let i=0;i<game.popups.length;i++) {
                 const p = game.popups[i];
                 c.globalAlpha=Math.min(1,p.life*3);
-                c.strokeText(p.text,p.x,p.y);
-                c.fillStyle=p.gold?'#ffe392':'#f1ffd4';
-                c.fillText(p.text,p.x,p.y);
+                drawCachedText(c, p.text, p.x, p.y, '800 18px Nunito', p.gold?'#ffe392':'#f1ffd4', '#254a35', 3);
             }
             c.globalAlpha=1;
         }
@@ -1532,9 +1587,8 @@ export class Renderer {
             for(const box of boxes){
                 c.save();c.fillStyle='#fff4db';c.strokeStyle='#70513d';c.lineWidth=1.2;
                 c.beginPath();c.roundRect(box.x,box.y,box.w,box.h,8);c.fill();c.stroke();
-                c.fillStyle='#49372c';c.textAlign='center';c.font='800 12px Nunito';
-                if(box.type==='snake')c.fillText(box.entity.snake.phase==='striking'?snakeAttack(box.entity.snake).label:box.entity.snake.phase==='windup'?snakeAttack(box.entity.snake).label+'…':'Cobra à frente',box.x+box.w/2,box.y+18);
-                else {const e=box.entity;c.fillText(e.attackKind?HAWK_ATTACKS[e.attackKind].label.toUpperCase():e.dive?'↙ MERGULHO':e.ascent?'↖ SUBIDA':'← TRAVESSIA',box.x+box.w/2,box.y+15);c.font='700 11px Nunito';c.fillText(e.warning>0?`Gavião · ${Math.max(1,Math.ceil(e.warning))}s`:e.attackKind?'Ataque anunciado':'Em aproximação',box.x+box.w/2,box.y+30);}
+                if(box.type==='snake')drawCachedText(c,box.entity.snake.phase==='striking'?snakeAttack(box.entity.snake).label:box.entity.snake.phase==='windup'?snakeAttack(box.entity.snake).label+'…':'Cobra à frente',box.x+box.w/2,box.y+18,'800 12px Nunito','#49372c');
+                else {const e=box.entity;drawCachedText(c,e.attackKind?HAWK_ATTACKS[e.attackKind].label.toUpperCase():e.dive?'↙ MERGULHO':e.ascent?'↖ SUBIDA':'← TRAVESSIA',box.x+box.w/2,box.y+15,'800 12px Nunito','#49372c');drawCachedText(c,e.warning>0?`Gavião · ${Math.max(1,Math.ceil(e.warning))}s`:e.attackKind?'Ataque anunciado':'Em aproximação',box.x+box.w/2,box.y+30,'700 11px Nunito','#49372c');}
                 c.restore();
             }
         }
@@ -1721,7 +1775,7 @@ export class Renderer {
                 clay(c, 0, -14, 5, 3, '#7ab852', '#3e6c27', 0);
             }
             c.restore();
-            c.fillStyle = '#ffe9b6'; c.font = '900 10px Nunito'; c.textAlign = 'center'; c.fillText('TURBO', 0, 32);
+            drawCachedText(c, 'TURBO', 0, 32, '900 10px Nunito', '#ffe9b6');
         } else {
             const gold = e.kind === 'feather';
             const glowSurface = gold ?
@@ -1747,8 +1801,7 @@ export class Renderer {
                 drawMiniSparkle(c, Math.cos(sa + Math.PI) * 24, Math.sin(sa + Math.PI) * 18 + float, 3, time * 5 + 1);
             }
             if (gold) {
-                c.fillStyle = '#fff4c2'; c.font = '900 12px Nunito'; c.textAlign = 'center';
-                c.fillText('×2', 0, 38);
+                drawCachedText(c, '×2', 0, 38, '900 12px Nunito', '#fff4c2');
             }
         }
         c.restore();

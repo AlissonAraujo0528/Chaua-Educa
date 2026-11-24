@@ -573,6 +573,7 @@ h2 {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  contain: layout style;
 }
 
 .hud button {
@@ -591,6 +592,7 @@ h2 {
   border-radius: 15px;
   padding: 8px 20px;
   box-shadow: var(--shadow);
+  contain: layout style;
 }
 
 .score-pill > span:first-child {
@@ -602,6 +604,7 @@ h2 {
 .score-pill strong {
   font: 700 34px "Baloo 2";
   line-height: 1;
+  will-change: transform;
 }
 
 .score-pill #score-bonus {
@@ -618,6 +621,7 @@ h2 {
   transform: translateX(-50%);
   width: 180px;
   text-align: center;
+  contain: layout style;
 }
 
 .flight-progress > span {
@@ -646,6 +650,7 @@ h2 {
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 0.3s;
+  will-change: transform;
 }
 
 .hud #pause-button {
@@ -662,6 +667,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  contain: layout style;
 }
 
 .power-chip {
