@@ -24,11 +24,20 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  const declaredCommit=params.get('perf-commit');
  const validCommit=value=>typeof value==='string'&&/^[0-9a-f]{40}$/i.test(value);
  let build={gitCommit:validCommit(declaredCommit)?declaredCommit.toLowerCase():null,gitCommitSource:validCommit(declaredCommit)?'url':null};
- void fetch(new URL('../build-info.json',import.meta.url),{cache:'no-store',redirect:'error'}).then(async response=>{
-  if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))return;
-  const info=await response.json();
-  if(validCommit(info.gitCommit))build={gitCommit:info.gitCommit.toLowerCase(),gitCommitSource:'build',dirty:info.dirty===true};
- }).catch(()=>{});
+ const embeddedCommit=document.querySelector('meta[name="chaua-git-commit"]')?.content;
+ if(validCommit(embeddedCommit))build={gitCommit:embeddedCommit.toLowerCase(),gitCommitSource:'build'};
+ else if(!build.gitCommit){
+  // Probe the page that already exists. Static hosts may omit the dev-server header.
+  const page=new URL(location.href);
+  page.search='?chaua-build-info=1';
+  page.hash='';
+  void fetch(page,{method:'HEAD',cache:'no-store',redirect:'error'}).then(response=>{
+   if(!response.ok)return;
+   const commit=response.headers.get('X-Chaua-Git-Commit');
+   if(validCommit(commit))build={gitCommit:commit.toLowerCase(),gitCommitSource:'build',
+    dirty:response.headers.get('X-Chaua-Git-Dirty')==='true'};
+  }).catch(()=>{});
+ }
  const panel=document.createElement('div');
  panel.id='chaua-qa-panel';
  panel.style.cssText='position:fixed;z-index:99999;bottom:8px;left:8px;max-width:calc(100vw - 16px);padding:8px;border-radius:9px;background:#122d24e8;color:#fff;font:12px/1.4 system-ui;box-shadow:0 4px 14px #0006;display:flex;align-items:center;gap:6px;flex-wrap:wrap;';

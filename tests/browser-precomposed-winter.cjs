@@ -61,7 +61,9 @@ const assert=require('node:assert/strict');
   url.searchParams.set('perf-test','1');
   url.searchParams.set('perf-replay','1');
   url.searchParams.set('perf-hz','120');
-  await flight.route('**/build-info.json',route=>route.fulfill({json:{gitCommit:commit}}));
+  await flight.route(url=>url.searchParams.has('chaua-build-info'),route=>route.fulfill({
+   status:200,headers:{'X-Chaua-Git-Commit':commit}
+  }));
   await flight.goto(url.toString(),{waitUntil:'domcontentloaded'});
   await flight.getByRole('button',{name:'Executar voo de referência'}).click();
   await flight.waitForFunction(()=>window.__CHAUA_LAST_LOG__?.replay,{},{timeout:90_000});

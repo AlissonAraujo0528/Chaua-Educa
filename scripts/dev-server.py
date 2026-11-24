@@ -1,5 +1,4 @@
 import http.server
-import json
 import os
 import subprocess
 from urllib.parse import urlsplit
@@ -29,17 +28,12 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
-    def do_GET(self):
-        if urlsplit(self.path).path != '/build-info.json':
-            return super().do_GET()
-        content = json.dumps(build_info()).encode('utf-8')
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Content-Length', str(len(content)))
-        self.end_headers()
-        self.wfile.write(content)
-
     def end_headers(self):
+        if self.command == 'HEAD' and urlsplit(self.path).query == 'chaua-build-info=1':
+            info = build_info()
+            if info['gitCommit']:
+                self.send_header('X-Chaua-Git-Commit', info['gitCommit'])
+                self.send_header('X-Chaua-Git-Dirty', str(info['dirty']).lower())
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         self.send_header('Pragma', 'no-cache')
         self.send_header('Expires', '0')

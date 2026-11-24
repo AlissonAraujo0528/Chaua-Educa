@@ -57,7 +57,7 @@ janelas por tempo de voo. Compare A/B/C no mesmo dispositivo e no mesmo tamanho
 de canvas, com o mesmo perfil gráfico e a mesma instrumentação.
 
 Com `npm start`, o servidor informa o SHA do checkout e se os arquivos publicados
-têm alterações locais. Em hospedagem estática, publique `build-info.json` ao lado
-do HTML com `{"gitCommit":"<SHA completo da publicação>"}` ou acrescente
+têm alterações locais. Em hospedagem estática, inclua no HTML a tag
+`<meta name="chaua-git-commit" content="<SHA completo da publicação>">` ou acrescente
 `&perf-commit=<SHA completo>` ao teste. O relatório distingue o SHA informado
 pela build de um SHA declarado na URL.
