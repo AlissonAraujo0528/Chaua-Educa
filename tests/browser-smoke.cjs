@@ -29,6 +29,7 @@ async function begin(page, name = 'Guardião da mata') {
     try {
         const context = await browser.newContext({ viewport: { width:1440, height:960 } });
         const page = await context.newPage(); await inspect(page);
+        await page.locator('#start-training:not([disabled])').waitFor({timeout:25000});
         // Test actual authored art in BOTH flight and perched states; no fake
         // sheet and no query-param bypass to an obsolete implementation.
         assert.deepEqual(await page.evaluate(async()=>{
