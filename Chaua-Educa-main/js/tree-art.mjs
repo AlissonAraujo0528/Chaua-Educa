@@ -135,7 +135,6 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  // Broken variants retain the original fracture sequence.
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
  const preparedVariant=precomposedLevel>0?images.get(precomposedAssetKey('special',precomposedLevel)):null;
- const intactImage=preparedVariant||image;
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
  if (!image || index < 0) return;
  const sx = (index % 2) * TREE_CELL;
@@ -152,8 +151,12 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   // One cached pattern fill instead of a draw call per repeated band.
   const reach=Math.max(join,Math.min(1000,Number.isFinite(visibleReach)?visibleReach:1000));
   fillBark(c,variantBark(image,index),-TREE_WIDTH/2,join,TREE_WIDTH,scale,reach-join,false);
-  c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
-   left, 0, TREE_CELL * scale, join);
+  if(preparedVariant){
+   // Draw the snow above the original cap without moving the wood anchor.
+   c.drawImage(preparedVariant,sx,sy,TREE_CELL,splice,
+    left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
+  }else c.drawImage(image,sx,sy+TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,
+   left,0,TREE_CELL*scale,join);
 
   // Material highlight remains local to the cap; the WebP silhouette stays intact.
   if(rain>0&&breakAge===undefined)
@@ -239,11 +242,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
    c.lineTo(r - (i < 2 ? 4 : 0), join * .65); c.lineTo(r, join);
    c.lineTo(l, join); c.lineTo(l - (i > 0 ? 4 : 0), join * .65);
    c.lineTo(l + (i > 0 ? 6 : 0), join * .3); c.closePath(); c.clip();
-   if(preparedVariant){
-    // Include the original snowy lip above the 8px bare cap anchor.
-    c.drawImage(intactImage,sx,sy,TREE_CELL,splice,
-     left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
-   }else c.drawImage(intactImage, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
+   c.drawImage(image, sx, sy + TREE_CAP_Y, TREE_CELL, splice - TREE_CAP_Y,
     left, 0, TREE_CELL * scale, join);
    c.restore();
   }

@@ -30,11 +30,15 @@ const assert=require('node:assert/strict');
     results.push({snow,stage:precomposedSnowStage(snow),draws,visible});
    }
    c.clearRect(0,0,1500,800);
-   const saved=c.drawImage.bind(c);let specialDraws=0;
-   c.drawImage=(...args)=>{specialDraws++;return saved(...args);};
+   const saved=c.drawImage.bind(c);const specialSources=[];
+   c.drawImage=(...args)=>{specialSources.push(args);return saved(...args);};
    drawTreeVariant(c,700,120,false,'hollow',undefined,.5,0,0,1000);
    c.drawImage=saved;
-   return {active:PRECOMPOSED_SNOW_ACTIVE,keys:keys.length,
+   const [source,sx,sy,sw,sh,dx,dy,dw,dh]=specialSources[0]??[];
+   const specialDraws=specialSources.length;
+   const snowySpecial=source===images.get('tree-variants-precomposed-08');
+   const anchored=sy===0&&dy<0&&Math.abs(dy+8*dh/sh)<1e-9;
+   return {snowySpecial,anchored,active:PRECOMPOSED_SNOW_ACTIVE,keys:keys.length,
     loaded:keys.filter(k=>images.has(k)).length,
     results,specialDraws};
   });
@@ -45,7 +49,41 @@ const assert=require('node:assert/strict');
   assert.ok(result.results.every(x=>x.draws===1),'one original-compatible draw per living tree');
   assert.ok(result.results.every(x=>x.visible>2000),'all winter stages render visible art');
   assert.equal(result.specialDraws,1,'precomposed special tree has no overlay pass');
+  assert.equal(result.snowySpecial,true,'the intact special tree draws the actual snowy stage');
+  assert.equal(result.anchored,true,'snow extends above the unchanged wood anchor');
   console.log('TEST_C_PRECOMPOSED_PASS '+JSON.stringify(result));
   await page.close();
+
+  // Start the real fixed-step flight from the diagnostic panel and verify the exported result.
+  const flight=await browser.newPage({viewport:{width:1280,height:720},acceptDownloads:true});
+  const flightErrors=[];flight.on('pageerror',e=>flightErrors.push(e.message));
+  const commit='1234567890abcdef1234567890abcdef12345678';
+  url.searchParams.set('perf-test','1');
+  url.searchParams.set('perf-replay','1');
+  url.searchParams.set('perf-hz','120');
+  await flight.route('**/build-info.json',route=>route.fulfill({json:{gitCommit:commit}}));
+  await flight.goto(url.toString(),{waitUntil:'domcontentloaded'});
+  await flight.getByRole('button',{name:'Executar voo de referência'}).click();
+  await flight.waitForFunction(()=>window.__CHAUA_LAST_LOG__?.replay,{},{timeout:90_000});
+  const report=await flight.evaluate(()=>window.__CHAUA_LAST_LOG__);
+  assert.deepEqual(flightErrors,[]);
+  assert.equal(report.replay.completed,true,JSON.stringify(report.replay));
+  assert.equal(report.replay.steps,4949);
+  assert.equal(report.match.score,115);
+  assert.equal(report.experiments.perfAB,'precomposed-snow');
+  assert.equal(report.provenance.gitCommit,commit);
+  assert.equal(report.provenance.gitCommitSource,'build');
+  assert.equal(report.frameBudget.targetHz,120);
+  assert.equal(report.windowTimebase,'flight-seconds');
+  assert.ok(report.byTenSecondWindow['20'].frames>0);
+  assert.ok(report.device.canvas.every(size=>size>0));
+  assert.equal(await flight.locator('dialog[open]').count(),0,'the replay leaves the report controls reachable');
+  const [download]=await Promise.all([
+   flight.waitForEvent('download'),
+   flight.getByRole('button',{name:'Baixar relatório'}).click({timeout:5000})
+  ]);
+  assert.match(download.suggestedFilename(),/^chaua-perf-dispositivo-.*\.json$/);
+  console.log('WINTER_REFERENCE_FLIGHT_PASS '+JSON.stringify(report.replay));
+  await flight.close();
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

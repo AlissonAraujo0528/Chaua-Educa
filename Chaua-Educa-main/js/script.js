@@ -1,3 +1,4 @@
+import {seededRandom} from './encounters.mjs';
 import {FlightCues, nativeKeyboardTarget} from './flight-accessibility.mjs';
 import {OBSERVATION_DETAILS} from './chapter-learning.mjs';
 import {JOURNAL_PHOTOS} from './journal-content.mjs';
@@ -45,7 +46,10 @@ const renderer = new Renderer($('#forest'));
 renderer.homeMobileLayout=mobileDevice;
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 // Deterministic seed for controlled winter A/B/C tests; normal gameplay is random.
-const seedQuery=new URLSearchParams(location.search).get('test-seed');
+const diagnosticParams=new URLSearchParams(location.search);
+const seedQuery=diagnosticParams.get('test-seed');
+let benchmarkFlight=null;
+const beforeBenchmarkTick=game=>benchmarkFlight.replay.beforeTick(game);
 const fixedTestSeed=seedQuery!==null&&/^\d{1,10}$/.test(seedQuery)&&
  Number(seedQuery)<=0xffffffff?Number(seedQuery):null;
 function applyVisualQuality() {
@@ -97,13 +101,15 @@ export const game = new Game({ onEvent(event) {
     if(['tutorial-retry','tutorial-trial'].includes(event.type)){flightInput.clear();$('#screen-reader-status').textContent=tutorialInstruction(game.tutorial);}
     if(event.type==='tutorial-complete') DB.completeTutorial();
     if(game.tutorial)return;
-    if(event.type==='stage'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,chapterCheckpoint(game));
-    if(event.type==='win'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,null);
     flightLearning=advanceFlightLearning(flightLearning,event);
-    DB.discoverEntries(discoveriesFor(event));
-    if(['fruit','correct','incorrect','stage','route-complete','win'].includes(event.type)) DB.advanceMissions(player,event);
-    if (event.type === 'fruit') DB.unlock(event.fruit);
-    if (['correct','incorrect'].includes(event.type)) DB.recordDiscovery(player,event.questionId,event.type==='correct');
+    if(!benchmarkFlight){
+        if(event.type==='stage'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,chapterCheckpoint(game));
+        if(event.type==='win'&&game.mode==='tranquilo')DB.saveChapterCheckpoint(player,null);
+        DB.discoverEntries(discoveriesFor(event));
+        if(['fruit','correct','incorrect','stage','route-complete','win'].includes(event.type)) DB.advanceMissions(player,event);
+        if (event.type === 'fruit') DB.unlock(event.fruit);
+        if (['correct','incorrect'].includes(event.type)) DB.recordDiscovery(player,event.questionId,event.type==='correct');
+    }
     const messages = { shield: 'Escudo de penas · um contato protegido', feather: 'Pena dourada · pontos ×2 por 10s de voo', pepper: 'Pimenta da mata · Voo turbo com velocidade e pontos ×2!', 'shield-break': 'Escudo usado · proteção breve para retomar o voo', quiet: 'Uma clareira. Recupere o fôlego.' };
     if(event.type==='stage')toast(event.message);
     if(event.type==='refuge')toast('O bando espera no centro: alinhe o voo para pousar.');
@@ -139,9 +145,11 @@ function resize() {
         pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');
     }
     lastOrientation=orientation;
-    const view = renderer.getViewport();
-    game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
-    game.viewLeft = Math.floor(view.worldLeft);
+    if(!benchmarkFlight){
+        const view = renderer.getViewport();
+        game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
+        game.viewLeft = Math.floor(view.worldLeft);
+    }
     if(resizeProbe)resizeProbe.end('ui.resize',resizeAt);
 }
 // Canvas mutations belong to the next animation frame, outside observer delivery.
@@ -175,7 +183,7 @@ document.addEventListener('focusout',()=>queueMicrotask(syncMobileViewport));
 syncMobileViewport();
 
 function clearInputs() { flightInput.clear(); }
-function hold(source) { flightInput.press(source); }
+function hold(source) { if(!benchmarkFlight)flightInput.press(source); }
 function release(source) { flightInput.release(source); }
 function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
 function resetPanelScroll(dialog) {
@@ -204,7 +212,7 @@ function settleOpeningViewport() {
 }
 // Start only after the optional browser orientation request. This prevents
 // the normal resize-on-rotation safeguard from pausing the countdown itself.
-async function launchFlight(training = false, checkpoint = null) {
+async function launchFlight(training = false, checkpoint = null, benchmark = null) {
     training = training === true;
     if(openingFlight || !assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     openingFlight = true;
@@ -216,14 +224,18 @@ async function launchFlight(training = false, checkpoint = null) {
         openingFlight = false;
     }
     if(document.hidden)return;
-    start(training,checkpoint);
+    benchmark?.startCapture();
+    start(training,checkpoint,benchmark);
     if(mobile && window.innerHeight > window.innerWidth)
         toast('Para ampliar a visão, ative a rotação automática e vire o celular.');
 }
 
-function start(training = false, checkpoint = null) {
+function start(training = false, checkpoint = null, benchmark = null) {
     training = training === true;
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
+    const leavingBenchmark=benchmarkFlight&&!benchmark;
+    benchmarkFlight=benchmark;
+    game.cosmeticRandom=benchmark?seededRandom(benchmark.fixture.seed ^ 0xa5b35705):null;
     closeDialogs(); clearInputs(); flightCues.reset(); $('#flight-alert').textContent='';
     cancelAnimationFrame(resultAnimation);
     // Reassess the quality profile before the layout-changing in-flight class.
@@ -235,7 +247,20 @@ function start(training = false, checkpoint = null) {
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
     // immediately after changing classes and hiding the home screen.
     flightLearning=createFlightLearning(checkpoint?.stage??0);learningReturnFocus=null;
-    if(training)game.startTutorial();else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}else game.start(selectedMode, DB.reviewTopics(player),fixedTestSeed===null?undefined:fixedTestSeed);
+    if(benchmark){
+        const {mode,seed,worldWidth}=benchmark.fixture;
+        game.viewWidth=worldWidth;game.viewLeft=0;
+        game.start(mode,[],seed);
+    }else{
+        if(leavingBenchmark){
+            const view=renderer.getViewport();
+            game.viewWidth=Math.max(960,Math.ceil(view.worldLeft+view.worldWidth));
+            game.viewLeft=Math.floor(view.worldLeft);
+        }
+        if(training)game.startTutorial();
+        else if(checkpoint){selectedMode='tranquilo';game.resumeChapter(checkpoint,DB.reviewTopics(player));}
+        else game.start(selectedMode,DB.reviewTopics(player),fixedTestSeed===null?undefined:fixedTestSeed);
+    }
     forestAudio.beginFlight();
     if(betaRuntime?.active)betaRuntime.attempt();
     renderer.resetFlightPresentation();
@@ -603,7 +628,7 @@ function syncUI() {
         app.dataset.state = game.state;
         if (!(previousState === 'countdown' && game.state === 'playing')) clearInputs();
         if (game.state === 'paused') { openDialog('#pause-dialog'); $('#resume-button').focus({preventScroll:true}); }
-        if (game.state === 'quiz') {
+        if (game.state === 'quiz' && !benchmarkFlight) {
             const discovery=game.chapterDiscovery;$('#chapter-discovery').hidden=!discovery;$('#chapter-discovery').open=false;
             if(discovery){
                 $('#chapter-discovery-title').textContent=`Neste trecho: ${discovery.title}`;
@@ -618,7 +643,7 @@ function syncUI() {
             $('#answer-true').disabled = false; $('#answer-false').disabled = false;
             openDialog('#quiz-dialog');
         }
-        if (game.state === 'ended') result();
+        if (game.state === 'ended' && !benchmarkFlight) result();
         if (game.state === 'trained') {openDialog('#training-dialog');$('#training-home').focus();}
         previousState = game.state;
     }
@@ -665,9 +690,14 @@ function frame(time) {
     if(probe)probe.beginFrame(time,game.stage);
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
     lastTime = time;
-    game.reducedMotion=reducedMotion.matches;
+    game.reducedMotion=!benchmarkFlight&&reducedMotion.matches;
     const clockAt=probe?probe.begin('engine.advance'):0;
-    clock.advance(delta);
+    if(benchmarkFlight&&game.state==='quiz'){
+        benchmarkFlight.replay.answerQuiz(game);
+        clock.reset();
+    }
+    clock.advance(delta,benchmarkFlight?beforeBenchmarkTick:null);
+    if(benchmarkFlight&&game.state==='ended'&&!benchmarkFlight.replay.finished)benchmarkFlight.replay.finish(game);
     if(probe)probe.end('engine.advance',clockAt);
     if(game.state!==previousState || time-lastHudTime>=80){
         const hudAt=probe?probe.begin('ui.sync'):0;
@@ -689,14 +719,16 @@ function frame(time) {
         renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
         if(probe)probe.end('render.home',homeAt);
     }else{
-        const view = renderer.getViewport();
-        game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
-        game.viewLeft = Math.floor(view.worldLeft);
+        if(!benchmarkFlight){
+            const view = renderer.getViewport();
+            game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
+            game.viewLeft = Math.floor(view.worldLeft);
+        }
         const visualAt=probe?probe.begin('engine.visual'):0;
         const frameView=game.visual(clock.accumulator / (1 / 120));
         if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
         const drawAt=probe?probe.begin('render.game'):0;
-        renderer.game(frameView, reducedMotion.matches, time / 1000);
+        renderer.game(frameView, game.reducedMotion, time / 1000);
         if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
@@ -823,10 +855,18 @@ $('#audio-volume').addEventListener('input',event=>{
 
 // Diagnostic tooling is opt-in and never loaded in normal gameplay.
 // All measurements remain in the device until the player downloads the JSON.
-if(new URLSearchParams(location.search).get('perf-test')==='1'){
-    import('./perf-probe.mjs')
-        .then(({mountPerformanceProbe})=>mountPerformanceProbe({game,quality,renderer}))
-        .catch(error=>console.error('Falha ao iniciar diagnóstico local:',error));
+if(diagnosticParams.get('perf-test')==='1'){
+    const replayModule=diagnosticParams.get('perf-replay')==='1'?import('./perf-replay.mjs'):null;
+    Promise.all([import('./perf-probe.mjs'),replayModule]).then(([{mountPerformanceProbe},reference])=>{
+        const replayLaunch=reference?async startCapture=>{
+            if(getWeatherMode()!=='winter')throw new Error('O voo de referência requer ?clima=winter.');
+            await renderer.ready;
+            await launchFlight(false,null,{
+                fixture:reference.WINTER_REPLAY,replay:new reference.WinterReplay(),startCapture
+            });
+        }:null;
+        mountPerformanceProbe({game,quality,renderer,replayLaunch,getReplay:()=>benchmarkFlight?.replay});
+    }).catch(error=>console.error('Falha ao iniciar diagnóstico local:',error));
 }
 
 $('#controls-side').addEventListener('change',event=>{app.dataset.controlsSide=event.target.value;saveSetting('chaua-controls-side',event.target.value);});

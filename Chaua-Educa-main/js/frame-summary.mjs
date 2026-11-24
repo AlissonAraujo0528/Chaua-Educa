@@ -21,3 +21,20 @@ export function summarizeFrames(samples){
  };
 }
 
+
+// Half a refresh interval separates ordinary jitter from a missed refresh.
+export function frameBudget(targetHz) {
+ if(targetHz!==60&&targetHz!==120)throw new RangeError('Expected a 60 or 120 Hz target');
+ const frameMs=1000/targetHz;
+ return {targetHz,frameMs,slowFrameThresholdMs:frameMs*1.5};
+}
+
+export function summarizeFrameBudget(samples,budget) {
+ let over=0,total=0;
+ for(const {dt} of samples){
+  if(!Number.isFinite(dt)||dt<=0)continue;
+  total++;
+  if(dt>budget.slowFrameThresholdMs)over++;
+ }
+ return {framesOutsideBudget:over,percentOutsideBudget:total?round(100*over/total):null};
+}

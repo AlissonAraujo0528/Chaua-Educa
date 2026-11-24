@@ -36,10 +36,11 @@ export const STAGES = JOURNEY.map(s=>s.name);
 export class FlightClock {
     constructor(game) { this.game = game; this.accumulator = 0; }
     reset() { this.accumulator = 0; }
-    advance(seconds) {
+    advance(seconds, beforeTick = null) {
         if (!['playing', 'countdown', 'impact', 'arrival'].includes(this.game.state)) return this.reset();
         this.accumulator += Math.min(.25, Math.max(0, seconds));
         while (this.accumulator + 1e-10 >= STEP) {
+            beforeTick?.(this.game);
             this.game.tick(STEP);
             this.accumulator -= STEP;
             if (!['playing', 'countdown', 'impact', 'arrival'].includes(this.game.state)) { this.reset(); break; }
@@ -563,20 +564,21 @@ export class Game {
         // Dispersao de sementes pelo chaua apos comer a fruta
         const seedColors = SEED_BURST_COLORS;
         const seedCount = 5;
+        const random = this.cosmeticRandom ?? Math.random;
         for (let s = 0; s < seedCount; s++) {
-            const seedAngle = (s * 0.45 - 0.9) + (Math.random() - 0.5) * 0.35;
+            const seedAngle = (s * 0.45 - 0.9) + (random() - 0.5) * 0.35;
             this.particle({
-                x: x + (Math.random() - 0.5) * 12,
-                y: y + (Math.random() - 0.5) * 10,
-                vx: Math.sin(seedAngle) * (30 + Math.random() * 40) - 20,
-                vy: Math.random() * 30 + 15,
-                life: 1.0 + Math.random() * 0.4,
+                x: x + (random() - 0.5) * 12,
+                y: y + (random() - 0.5) * 10,
+                vx: Math.sin(seedAngle) * (30 + random() * 40) - 20,
+                vy: random() * 30 + 15,
+                life: 1.0 + random() * 0.4,
                 maxLife: 1.4,
                 color: seedColors[s % seedColors.length],
                 spark: true, seed: true,
-                size: 6.5 + Math.random() * 1.5,
-                rotation: Math.random() * Math.PI * 2,
-                spin: (Math.random() - 0.5) * 9
+                size: 6.5 + random() * 1.5,
+                rotation: random() * Math.PI * 2,
+                spin: (random() - 0.5) * 9
             });
         }
         for (let j = 0; j < 3; j++) {
