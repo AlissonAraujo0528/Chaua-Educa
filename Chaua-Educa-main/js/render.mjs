@@ -10,7 +10,7 @@ import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mjs';
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
-import {drawActionSheet,preloadActionSheets} from './action-sheets.mjs';
+import {drawActionSheet,preloadActionSheets,ACTION_SHEET_DEFS} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather} from './tree-art.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
@@ -715,6 +715,18 @@ export class Renderer {
                 images.set('season-particles', off);
             }
             this.seasonalBackdrop=new SeasonalBackdrop();
+            // Prewarm active GPU surfaces inside the live canvas before start is enabled
+            // so first-appearance textures (snakes, action sheets, overlays, seasons) never stall mid-flight.
+            this.c.save();
+            this.c.setTransform(1,0,0,1,0,0);
+            this.c.globalAlpha=0.001;
+            for (const [key, img] of images) {
+                if (img?._rasterized) this.c.drawImage(img, 0, 0, 8, 8, 0, 0, 4, 4);
+            }
+            for (const key of SNAKE_SHEET_KEYS) warmupSnakeA2(this.c, key);
+            for (const key of Object.keys(ACTION_SHEET_DEFS)) drawActionSheet(this.c, key, 0, 0, 0, 4, 4);
+            this.c.clearRect(0, 0, 8, 8);
+            this.c.restore();
             // Prepare the first season during countdown, before the flight.
             // The menu uses forest.webp and does not need seasonal surfaces.
             // Initialize the enlarged predator compositor while assets load,

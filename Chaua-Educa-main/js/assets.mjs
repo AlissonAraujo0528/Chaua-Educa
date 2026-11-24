@@ -34,13 +34,14 @@ export const ASSET_PATHS = Object.fromEntries([
 export const images = new Map();
 const runtimeDimensions=new Map(Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((p,i)=>[`runtime-${family}-${i}`,[p.width,p.height]])));
 let pending;
+const DORMANT_OVERLAY_RE = /^trees-(?:lower|upper)-overlay-0[1-3]$/;
 export function loadAssets() {
  if(typeof Image==='undefined')return Promise.resolve([]);
  if(pending)return pending;
  pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
   const [width,height]=runtimeDimensions.get(key)||[];
   const url=new URL(path,import.meta.url).href;
-  const image=await loadImage(url,{width,height,errorMessage:`Não foi possível carregar ${key}: ${url}`});
+  const image=await loadImage(url,{width,height,rasterize:!DORMANT_OVERLAY_RE.test(key),errorMessage:`Não foi possível carregar ${key}: ${url}`});
   return [key,image];
  })).then(entries=>{
   // Publish only the complete attempt; late callbacks from a failed attempt stay local.
