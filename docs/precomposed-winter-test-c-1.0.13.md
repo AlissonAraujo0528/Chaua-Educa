@@ -13,7 +13,7 @@
 ## Como testar
 
 - **Teste C** (madeira com neve pré-composta): `?clima=winter&perf-ab=precomposed-snow&test-seed=3169729328`.
-- **Controle B** (legado): `?clima=winter&perf-test=1&perf-ab=baseline&test-seed=3169729328`.
+- **Controle B** (recorte direto): `?clima=winter&perf-test=1&perf-ab=baseline&test-seed=3169729328`.
 - **Controle A** (neve desligada): `?clima=winter&perf-test=1&perf-ab=snow-mask-off&test-seed=3169729328`.
 - O Teste C não exige `perf-test=1`. Para usar o perfilador manual, pode acrescentá-lo.
 
@@ -23,7 +23,7 @@
 - `assets.mjs` carrega os 43 novos WebPs somente no teste C; as pontas 0 e 15 das árvores comuns reaproveitam assets existentes.
 - `tree-art.mjs` faz uma única chamada de desenho da cap por árvore, com a neve já composta; **não** reconstrói máscaras no voo.
 - Texturas são pré-aquecidas no carregamento para evitar upload ao surgir um novo estágio.
-- O jogo regular mantém seu comportamento anterior até o Teste C ter desempenho e fidelidade comprovados.
+- O jogo regular aplica o recorte diretamente sobre a arte original em passos de 1/256. O modo anterior, que reconstruía a máscara em memória, continua disponível para diagnóstico com `?clima=winter&perf-test=1&perf-ab=legacy-snow-rebuild`.
 
 ## Testes de aceitação
 
@@ -38,7 +38,7 @@ Use a mesma URL base da publicação e acrescente um dos conjuntos abaixo:
 | Variante | Parâmetros da URL |
 |---|---|
 | A — sem neve nas árvores | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=snow-mask-off` |
-| B — neve padrão | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=baseline` |
+| B — neve padrão por recorte direto | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=baseline` |
 | C — neve pré-composta | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=precomposed-snow` |
 
 Selecione qualidade **Alta** no jogo, mantenha **Leve** no diagnóstico e pressione

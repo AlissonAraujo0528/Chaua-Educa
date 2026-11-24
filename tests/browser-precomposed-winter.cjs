@@ -54,6 +54,70 @@ const assert=require('node:assert/strict');
   console.log('TEST_C_PRECOMPOSED_PASS '+JSON.stringify(result));
   await page.close();
 
+  async function snowScene(variant){
+   const view=await browser.newPage();
+   try{
+    await view.route(/\/js\/script\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'text/javascript',body:''}));
+    const sceneUrl=new URL(url);
+    sceneUrl.searchParams.set('perf-test','1');
+    sceneUrl.searchParams.set('perf-ab',variant);
+    await view.goto(sceneUrl.toString(),{waitUntil:'domcontentloaded'});
+    return await view.evaluate(async()=>{
+     const [{loadAssets},{drawLivingTrunk,prepareTreeWeather},{setActiveProbe}]=await Promise.all([
+      import('/js/assets.mjs'),import('/js/tree-art.mjs'),import('/js/perf-hooks.mjs')
+     ]);
+     await loadAssets();
+     const canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;
+     const c=canvas.getContext('2d',{willReadFrequently:true});
+     let masks=0;
+     setActiveProbe({begin:()=>0,end:name=>{if(name==='render.snowMaskRebuild')masks++;}});
+     prepareTreeWeather(c);
+     const images=[];
+     for(const snow of [.05,.5,.98,1]){
+      c.clearRect(0,0,canvas.width,canvas.height);
+      for(let index=0;index<4;index++){
+       const x=160+index*315;
+       drawLivingTrunk(c,{x,y:250,upper:true,width:136,length:220,variant:index,snow});
+       drawLivingTrunk(c,{x,y:470,width:136,length:220,variant:index,snow});
+      }
+      images.push(canvas.toDataURL());
+     }
+     setActiveProbe(null);
+     return {images,masks};
+    });
+   }finally{await view.close();}
+  }
+  const legacy=await snowScene('legacy-snow-rebuild');
+  const direct=await snowScene('baseline');
+  assert.ok(legacy.masks>=6,'the comparison must exercise the previous mask rebuilds');
+  assert.equal(direct.masks,0,'regular winter must never rebuild either mask');
+  const compare=await browser.newPage();
+  const differences=await compare.evaluate(async({legacy,direct})=>{
+   const canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;
+   const c=canvas.getContext('2d',{willReadFrequently:true});
+   async function channels(url){
+    const img=new Image();img.src=url;await img.decode();
+    c.clearRect(0,0,canvas.width,canvas.height);
+    c.drawImage(img,0,0);
+    return c.getImageData(0,0,canvas.width,canvas.height).data;
+   }
+   const results=[];
+   for(let scene=0;scene<legacy.images.length;scene++){
+    const a=await channels(legacy.images[scene]),b=await channels(direct.images[scene]);
+    let changed=0,error=0;
+    for(let i=0;i<a.length;i++){
+     const delta=Math.abs(a[i]-b[i]);
+     if(delta){changed++;error+=delta;}
+    }
+    results.push({changedFraction:changed/a.length,meanError:error/a.length});
+   }
+   return results;
+  },{legacy,direct});
+  await compare.close();
+  assert.ok(differences.every(d=>d.changedFraction<.0025&&d.meanError<.3),JSON.stringify(differences));
+  assert.equal(differences.at(-1).changedFraction,0,'full cover must preserve the original winter art');
+  console.log('WINTER_MASK_PARITY_PASS '+JSON.stringify({legacyMasks:legacy.masks,directMasks:direct.masks,differences}));
+
   // Start the real fixed-step flight from the diagnostic panel and verify the exported result.
   const flight=await browser.newPage({viewport:{width:1280,height:720},acceptDownloads:true});
   const flightErrors=[];flight.on('pageerror',e=>flightErrors.push(e.message));

@@ -183,9 +183,8 @@ export class Game {
                 this._visualPool[i] = entity;
             }
             if (entity._lastId !== e.id) {
-                entity.tumbleAngle=undefined;entity.retreatTime=undefined;entity.snake=undefined;
-                entity.grazed=undefined;entity.hitRect=undefined;entity.hitPart=undefined;entity.hitSide=undefined;
-                entity.scored=undefined;entity.contacted=undefined;entity.broken=undefined;
+                // Prevent artwork and impact fields leaking across recycled IDs.
+                for (const key of Object.keys(entity)) delete entity[key];
                 entity._lastId = e.id;
             }
             Object.assign(entity, e);
@@ -200,7 +199,7 @@ export class Game {
                     this._visualSnakePool[i] = snake;
                 }
                 if (snake._lastId !== e.id) {
-                    snake.phaseAge=undefined;snake.warningAge=undefined;snake.age=undefined;snake.retreatTime=undefined;
+                    for (const key of Object.keys(snake)) delete snake[key];
                     snake._lastId = e.id;
                 }
                 Object.assign(snake, e.snake);

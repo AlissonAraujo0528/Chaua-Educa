@@ -114,16 +114,21 @@ test('the upper tree snow overlay touches only the exposed branch cap, never its
  const original={id:'original'},stage4={id:'stage4'};
  images.set('trees-upper',original);
  images.set('trees-upper-overlay-04',stage4);
- const oldCanvas=globalThis.OffscreenCanvas,inside=mock();inside.c.clearRect=()=>{};
- globalThis.OffscreenCanvas=class{getContext(){return inside.c}};
+ const oldCanvas=globalThis.OffscreenCanvas;
+ const offscreenSizes=[];
+ globalThis.OffscreenCanvas=class{
+  constructor(width,height){offscreenSizes.push([width,height]);}
+  getContext(){return mock().c;}
+ };
  t.after(()=>{globalThis.OffscreenCanvas=oldCanvas});
  const upper=mock();
  drawLivingTrunk(upper.c,{x:200,y:200,upper:true,width:TREE_WIDTH,length:900,snow:.375});
- const snowDraws=inside.calls.filter(x=>x.type==='image'&&x.args[0]===stage4);
- assert.equal(snowDraws.length,4,'each authored cell uses solid final snow');
- assert.ok(inside.calls.some(x=>x.type==='rect'),'coverage grows through a spatial mask');
- const composed=upper.calls.find(x=>x.type==='image'&&x.args[0]!==original);
- assert.ok(composed.args[4]>2,'the composed overlay uses the exposed cap rather than the ceiling strip');
+ const capDraws=upper.calls.filter(x=>x.type==='image'&&x.args[0]===stage4);
+ assert.equal(capDraws.length,1,'draw the original snow overlay directly');
+ assert.ok(upper.calls.some(x=>x.type==='rect'),'coverage grows through the spatial mask');
+ assert.ok(upper.calls.some(x=>x.type==='clip'),'the snow is clipped to the exposed cap');
+ assert.ok(offscreenSizes.every(([width,height])=>width!==1024||height!==1024));
+ assert.ok(capDraws[0].args[2]>=49,'the overlay starts at the cap splice, below the ceiling');
  assert.ok(upper.calls.some(x=>x.type==='image'&&x.args[0]===original),'the authored base tree must remain');
 });
 

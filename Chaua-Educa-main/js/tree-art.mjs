@@ -104,10 +104,25 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
  if(snow>0&&!fullSnow&&!PRECOMPOSED_SNOW_ACTIVE&&PERF_AB_VARIANT!=='snow-mask-off'){
-  const overlay=snowOverlay(kind,snow);
-  if(overlay){
-   if(upper)c.drawImage(overlay,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
-   else c.drawImage(overlay,sx+cx,sy,cw,splice,px,y-f.anchor[1]*s,cw*s,splice*s);
+  const destY=upper?join:y-f.anchor[1]*s;
+  const sourceY=sy+(upper?splice:0);
+  const sourceHeight=upper?snowyTipEnd-splice:splice;
+  if(PERF_AB_VARIANT==='legacy-snow-rebuild'){
+   const overlay=snowOverlay(kind,snow);
+   if(overlay)c.drawImage(overlay,sx+cx,sourceY,cw,sourceHeight,px,destY,cw*s,sourceHeight*s);
+  }else{
+   // Reuse the original art and reveal geometry with no mutable atlas per level.
+   const overlay=images.get(`trees-${kind}-overlay-04`);
+   if(overlay){
+    const sourceX=sx+cx;
+    const top=upper?f.spliceY:0;
+    const bottom=upper?Math.min(512,f.endY+30):f.spliceY;
+    const reveal=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
+    c.save();c.translate(px-sourceX*s,destY-sourceY*s);c.scale(s,s);
+    clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
+    c.drawImage(overlay,sourceX,sourceY,cw,sourceHeight,sourceX,sourceY,cw,sourceHeight);
+    c.restore();
+   }
   }
  }
 
@@ -312,7 +327,7 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 const snowMixBuffers=new Map();
 export function prepareTreeWeather(context){
  for(const kind of ['lower','upper']){
-  if(!PRECOMPOSED_SNOW_ACTIVE)snowOverlay(kind,0);
+  if(PERF_AB_VARIANT==='legacy-snow-rebuild')snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);

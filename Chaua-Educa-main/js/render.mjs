@@ -22,7 +22,7 @@ import { flightViewport, advanceFlightCamera } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination } from './weather.mjs';
-import {drawFood} from './food-art.mjs';
+import {drawFood,prewarmFoodArt} from './food-art.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {WeatherMotion} from './weather-motion.mjs';
 import {TreeDrips} from './weather-art.mjs';
@@ -696,6 +696,7 @@ export class Renderer {
     initializeAssets() {
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
             prepareTreeWeather(this.c);
+            prewarmFoodArt();
             // Warm up pickup radial caches during asset load so first spawn never stalls.
             getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
             getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
