@@ -1,5 +1,6 @@
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {loadImage} from './image-loader.mjs';
+import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
 import {PRECOMPOSED_SNOW_ACTIVE,winterCapKey} from './precomposed-winter.mjs';
 // One cache for gameplay, menus and results. All files are local.
@@ -31,7 +32,8 @@ export function loadAssets() {
  pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
   const [width,height]=runtimeDimensions.get(key)||[];
   const url=new URL(path,import.meta.url).href;
-  const image=await loadImage(url,{width,height,errorMessage:`Não foi possível carregar ${key}: ${url}`});
+  const representation=PERF_AB_VARIANT==='winter-caps-bitmap'&&key.startsWith('winter-caps-')?'bitmap':'canvas';
+  const image=await loadImage(url,{width,height,representation,errorMessage:`Não foi possível carregar ${key}: ${url}`});
   return [key,image];
  })).then(entries=>{
   // Publish only the complete attempt; late callbacks from a failed attempt stay local.

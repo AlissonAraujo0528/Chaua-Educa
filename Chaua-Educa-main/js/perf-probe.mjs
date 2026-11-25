@@ -5,7 +5,9 @@ import {getWeatherMode} from './weather.mjs';
 import {journeySeason} from './seasons.mjs';
 import {winterAmount} from './living-motion.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
-import {precomposedSnowStage,winterCapFrame} from './precomposed-winter.mjs';
+import {images} from './assets.mjs';
+import {WINTER_CAP_ART} from './winter-cap-data.mjs';
+import {precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 import {ForensicRecorder} from './perf-forensics.mjs';
 import {setActiveProbe} from './perf-hooks.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
@@ -177,7 +179,12 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
    stutterSelection:'bounded-reservoir-with-severe-frame-priority',
    diagnosticLevel:forensics.deep?'deep':'normal',
    snowCaps:{rebuilds:snowCapMetrics.rebuilds-snowStart.rebuilds,hits:snowCapMetrics.hits-snowStart.hits,directDraws:snowCapMetrics.directDraws-snowStart.directDraws},
-   experiments:{perfAB:PERF_AB_VARIANT,snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
+   experiments:{perfAB:PERF_AB_VARIANT,
+    winterCapRepresentations:WINTER_CAP_ART.pages.map((_,page)=>{
+     const asset=images.get(winterCapKey(page));
+     return asset?(asset._representation??'image'):null;
+    }),
+    snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
     snakeSheetsWarmed:renderer.snakeWarmupIndex||0,
     seasonalSliceRows:renderer.seasonalBackdrop?.sliceRows??null,
     seasonalBudgetMs:renderer.seasonalBackdrop?.budgetMs??null,
