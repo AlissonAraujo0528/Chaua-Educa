@@ -1,35 +1,16 @@
-# Chauá Educa 1.0.13 — neve pré-composta, Teste C
+# Chauá Educa 1.0.16 — neve pré-composta
 
-**Branch:** `preparacao-para-a-versao-2.0` — a `main` não foi alterada.
+A neve pré-composta é o padrão. Quatro atlas empacotam as copas das árvores
+inferiores, superiores e especiais em 16 níveis. As árvores comuns reutilizam
+as artes originais nos estados sem neve e totalmente coberto. A parte presa ao
+teto fica sem neve. O gerador `scripts/build_precomposed_winter_art.py` usa as
+artes aprovadas, preserva o canal alfa da imagem gerada na codificação WebP e
+monta a borda de acúmulo fora do jogo.
 
-## Artes fiéis à versão original
-
-- `assets/Seasons/Winter/Precomposed/` contém 16 estados por família: árvores inferiores, superiores e quatro variantes especiais.
-- 48 arquivos WebP gerados exclusivamente das spritesheets originais; nenhuma árvore foi redesenhada.
-- Estado 00 idêntico em bytes ao arquivo original; estágio 15 das árvores comuns idêntico em bytes à arte de neve final já aprovada.
-- `manifest.json` registra os caminhos e SHA-256. Gerador: `scripts/build_precomposed_winter_art.py`.
-- Preserva a regra: a parte superior colada ao teto não ganha cobertura de neve.
-
-## Como testar
-
-- **Teste C** (madeira com neve pré-composta): `?clima=winter&perf-ab=precomposed-snow&test-seed=3169729328`.
-- **Controle B** (recorte direto): `?clima=winter&perf-test=1&perf-ab=baseline&test-seed=3169729328`.
-- **Controle A** (neve desligada): `?clima=winter&perf-test=1&perf-ab=snow-mask-off&test-seed=3169729328`.
-- O Teste C não exige `perf-test=1`. Para usar o perfilador manual, pode acrescentá-lo.
-
-## Comportamento
-
-- Em C, `precomposed-winter.mjs` quantiza a cobertura em 16 estágios (0–15), sem interpolação alfa por quadro.
-- `assets.mjs` carrega os 43 novos WebPs somente no teste C; as pontas 0 e 15 das árvores comuns reaproveitam assets existentes.
-- `tree-art.mjs` faz uma única chamada de desenho da cap por árvore, com a neve já composta; **não** reconstrói máscaras no voo.
-- Texturas são pré-aquecidas no carregamento para evitar upload ao surgir um novo estágio.
-- O jogo regular aplica o recorte diretamente sobre a arte original em passos de 1/256. O modo anterior, que reconstruía a máscara em memória, continua disponível para diagnóstico com `?clima=winter&perf-test=1&perf-ab=legacy-snow-rebuild`.
-
-## Testes de aceitação
-
-`node --test tests/precomposed-winter.test.mjs`; navegador: `node tests/browser-precomposed-winter.cjs` com servidor na porta 5501.
-
-Comparar os primeiros 20–40 s de inverno forçado, mesma semente e configurações, nos cenários A, B e C. Registrar FPS, 1% low, stutters, `render.trees` e consumo de memória antes de decidir ativação geral. **Não afirmar 60 FPS antes de um teste em aparelho real.**
+O jogo seleciona o nível pelo tempo de voo e desenha a copa pronta. O cache da
+1.0.15 continua disponível para diagnóstico em `?perf-test=1&perf-ab=baseline`.
+O JSON registra `cold` (intensidade do inverno), `snow` (cobertura efetiva)
+e `snowStage` (nível da arte).
 
 ## Voo de referência gravado
 
@@ -38,7 +19,7 @@ Use a mesma URL base da publicação e acrescente um dos conjuntos abaixo:
 | Variante | Parâmetros da URL |
 |---|---|
 | A — sem neve nas árvores | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=snow-mask-off` |
-| B — neve padrão por recorte direto | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=baseline` |
+| B — recorte direto | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=direct-snow` |
 | C — neve pré-composta | `?clima=winter&perf-test=1&perf-replay=1&perf-ab=precomposed-snow` |
 
 Selecione qualidade **Alta** no jogo, mantenha **Leve** no diagnóstico e pressione

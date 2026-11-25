@@ -12,10 +12,10 @@ const assert=require('node:assert/strict');
   url.searchParams.set('clima','winter');
   await page.goto(url.toString(),{waitUntil:'domcontentloaded'});
   const result=await page.evaluate(async()=>{
-   const [{ASSET_PATHS,images,loadAssets},{drawLivingTrunk,drawTreeVariant},{PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage}]=await Promise.all([
+   const [{ASSET_PATHS,images,loadAssets},{drawLivingTrunk,drawTreeVariant},{PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage,winterCapFrame,winterCapKey}]=await Promise.all([
     import('/js/assets.mjs'),import('/js/tree-art.mjs'),import('/js/precomposed-winter.mjs')]);
    await loadAssets();
-   const keys=Object.keys(ASSET_PATHS).filter(k=>k.includes('-precomposed-'));
+   const keys=Object.keys(ASSET_PATHS).filter(k=>k.startsWith('winter-caps-'));
    const canvas=document.createElement('canvas');canvas.width=1500;canvas.height=800;
    const c=canvas.getContext('2d',{willReadFrequently:true});
    const results=[];
@@ -36,16 +36,17 @@ const assert=require('node:assert/strict');
    c.drawImage=saved;
    const [source,sx,sy,sw,sh,dx,dy,dw,dh]=specialSources[0]??[];
    const specialDraws=specialSources.length;
-   const snowySpecial=source===images.get('tree-variants-precomposed-08');
-   const anchored=sy===0&&dy<0&&Math.abs(dy+8*dh/sh)<1e-9;
+   const frame=winterCapFrame('special',precomposedSnowStage(.5),1);
+   const snowySpecial=source===images.get(winterCapKey(frame[0]))&&sx===frame[1]&&sy===frame[2];
+   const anchored=dy<0&&Math.abs(dy+8*dh/sh)<1e-9;
    return {snowySpecial,anchored,active:PRECOMPOSED_SNOW_ACTIVE,keys:keys.length,
     loaded:keys.filter(k=>images.has(k)).length,
     results,specialDraws};
   });
   assert.deepEqual(errors,[]);
   assert.equal(result.active,true);
-  assert.equal(result.keys,43);
-  assert.equal(result.loaded,43);
+  assert.equal(result.keys,4);
+  assert.equal(result.loaded,4);
   assert.ok(result.results.every(x=>x.draws===1),'one original-compatible draw per living tree');
   assert.ok(result.results.every(x=>x.visible>2000),'all winter stages render visible art');
   assert.equal(result.specialDraws,1,'precomposed special tree has no overlay pass');
@@ -135,6 +136,8 @@ const assert=require('node:assert/strict');
   assert.deepEqual(flightErrors,[]);
   assert.equal(report.replay.completed,true,JSON.stringify(report.replay));
   assert.equal(report.replay.steps,4949);
+  assert.ok(report.climateTimeline.some(item=>item.snow>0&&item.snow<1&&item.snowStage>0));
+  assert.deepEqual(report.snowCaps,{rebuilds:0,hits:0,directDraws:0});
   assert.equal(report.match.score,115);
   assert.equal(report.experiments.perfAB,'precomposed-snow');
   assert.equal(report.provenance.gitCommit,commit);

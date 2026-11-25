@@ -1,33 +1,30 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {resolvePerfVariant} from '../Chaua-Educa-main/js/perf-ab.mjs';
-import {precomposedSnowStage,precomposedAssetKey,PRECOMPOSED_SNOW_STAGES} from '../Chaua-Educa-main/js/precomposed-winter.mjs';
+import {precomposedSnowStage,winterCapFrame,PRECOMPOSED_SNOW_STAGES} from '../Chaua-Educa-main/js/precomposed-winter.mjs';
+import {WINTER_CAP_ART} from '../Chaua-Educa-main/js/winter-cap-data.mjs';
 
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const manifest=JSON.parse(fs.readFileSync(path.join(root,'Chaua-Educa-main/assets/Seasons/Winter/Precomposed/manifest.json'),'utf8'));
-
-test('Test C is opt-in on ordinary winter game URLs',()=>{
- assert.equal(resolvePerfVariant('?clima=winter&perf-ab=precomposed-snow'),'precomposed-snow');
- assert.equal(resolvePerfVariant(''),'baseline');
- assert.equal(resolvePerfVariant('?perf-ab=baseline'),'baseline');
+test('precomposed snow is the default and legacy controls remain available',()=>{
+ assert.equal(resolvePerfVariant(''),'precomposed-snow');
+ assert.equal(resolvePerfVariant('?perf-ab=baseline'),'precomposed-snow');
+ assert.equal(resolvePerfVariant('?perf-test=1&perf-ab=baseline'),'baseline');
 });
-test('sixteen precomposed snow levels quantize safely',()=>{
+
+test('sixteen snow levels progress in order and reserve full art for full cover',()=>{
  assert.equal(PRECOMPOSED_SNOW_STAGES,16);
- for(const [n,want] of [[-10,0],[0,0],[0.25,4],[0.5,8],[1,15],[10,15],[NaN,0]])
+ for(const [n,want] of [[-1,0],[0,0],[0.25,3],[0.5,7],[0.99,14],[1,15],[10,15],[NaN,0]])
   assert.equal(precomposedSnowStage(n),want);
+ for(let i=0;i<16;i++)assert.equal(precomposedSnowStage(i/15),i);
 });
-test('every stage exists and stage zero/full living stage exactly reuse original WebPs',()=>{
+
+test('all intermediate cap regions fit on their packed page',()=>{
  for(const kind of ['lower','upper','special']){
-  const family=manifest.families[kind];
-  assert.equal(family.files.length,16);
-  for(let stage=0;stage<16;stage++){
-   assert.ok(fs.existsSync(path.join(root,family.files[stage])),family.files[stage]);
-   assert.ok(precomposedAssetKey(kind,stage));
+  for(let level=1;level<16;level++)for(let variant=0;variant<4;variant++){
+   const frame=winterCapFrame(kind,level,variant);
+   if(level===15&&kind!=='special'){assert.equal(frame,undefined);continue;}
+   const [page,x,y,w,h]=frame;
+   const bounds=WINTER_CAP_ART.pages[page];
+   assert.ok(x>=2&&y>=2&&w>0&&h>0&&x+w+2<=bounds.width&&y+h+2<=bounds.height);
   }
-  assert.deepEqual(fs.readFileSync(path.join(root,family.files[0])),fs.readFileSync(path.join(root,family.base)));
-  if(kind!=='special')assert.deepEqual(fs.readFileSync(path.join(root,family.files[15])),fs.readFileSync(path.join(root,family.fullSnow)));
  }
 });

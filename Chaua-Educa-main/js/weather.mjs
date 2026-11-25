@@ -322,13 +322,14 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
  const tiltSlope=-(wind*.55+storm*.26+speed*.0016);
  const tiltStep=Math.round(tiltSlope*8);
  const sheet=useStamps?getRainDropSheet(tiltStep):null;
+ const squall=1+storm*.12*Math.sin(time*.76+stormTravel*.22);
  c.save();
  c.beginPath();c.rect(0,0,w,h);c.clip();
  if(!sheet)c.lineCap='round';
  for(const {depth,count} of bands){
   const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.55)));
   const driftX=(time*14+windTravel*48+stormTravel*14)*depth;
-  const opacity=rainClamp(rain*(foreground?.68:.37+depth*.32)+storm*.10);
+  const opacity=rainClamp((rain*(foreground?.68:.37+depth*.32)+storm*.10)*squall);
   c.globalAlpha=opacity;
   if(sheet){
    const bandRow=foreground?2:(depth<.6?0:1);

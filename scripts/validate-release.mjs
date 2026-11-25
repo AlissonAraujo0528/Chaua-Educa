@@ -33,19 +33,12 @@ for(const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)){
 for(const m of html.matchAll(/\b(?:for|aria-labelledby|aria-controls)="([^"]+)"/g))for(const id of m[1].split(/\s+/))if(!ids.has(id)&&!dynamicIds.has(id))fail(`Missing control/label: ${id}`);
 for(const m of read(cssPath).matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g))if(!m[1].startsWith('data:'))requireFile(resolve(dirname(cssPath),m[1]),'CSS URL');
 for(const p of Object.values(ASSET_PATHS))requireFile(resolve(js,p),'ASSET_PATHS');
-// All 16 precomposed stages remain intentional, verified publication assets.
-// The 43 extra WebPs load only in opt-in Test C, so this auditor also checks
-// the dormant stage files and the three review PNGs without boot-loading them.
 const winterArtDir=resolve(app,'assets/Seasons/Winter/Precomposed');
 const winterManifest=JSON.parse(read(resolve(winterArtDir,'manifest.json')));
-for(const [family,data] of Object.entries(winterManifest.families)){
- if(data.files.length!==16)fail(`Invalid precomposed stage count: ${family}`);
- for(let index=0;index<data.files.length;index++){
-  const path=resolve(root,data.files[index]);requireFile(path,'precomposed winter art');
-  if(existsSync(path)&&hash(path)!==data.hashes[index])fail(`Corrupted precomposed winter stage: ${family}/${index}`);
- }
- const preview=resolve(winterArtDir,`preview-${family}.png`);
- requireFile(preview,'winter original-art preview');
+if(winterManifest.stages!==16)fail('Invalid winter stage count');
+for(const page of winterManifest.pages){
+ const path=resolve(winterArtDir,page.file);requireFile(path,'packed winter caps');
+ if(existsSync(path)&&hash(path)!==page.sha256)fail(`Corrupted winter cap page: ${page.file}`);
 }
 for(const def of Object.values(ACTION_SHEET_DEFS))requireFile(resolve(js,def.path),'action sheet');
 const sprites=JSON.parse(read(resolve(root,'scripts/spritesheets.manifest.json')));

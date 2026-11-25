@@ -1,172 +1,118 @@
 #!/usr/bin/env python3
-"""Bake winter art from the game's exact approved WebP sheets.
-
-Never redraws trees. States 0 and 15 reuse the original artwork byte-for-byte
-for living trunks; intermediate states combine the original sheet with the
-approved snow overlay, using the game's 32-column snowRevealHeight geometry.
-Output is art-only: it does not change runtime rendering.
-"""
-from __future__ import annotations
-
+"""Bake and pack only the visible caps from the approved tree and snow art."""
 import hashlib
 import json
 import math
-import re
-import shutil
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "Chaua-Educa-main" / "assets"
-WINTER = ASSETS / "Seasons" / "Winter"
+GAME = ROOT / "Chaua-Educa-main"
+WINTER = GAME / "assets/Seasons/Winter"
 OUT = WINTER / "Precomposed"
-LEVELS = 16
-COLUMNS = 32
-TREE_METADATA = ROOT / "Chaua-Educa-main" / "js" / "forest-art-data.mjs"
+JS = GAME / "js"
+LEVELS, PAGE_STAGES, GUTTER = 16, 4, 2
+FAMILIES = ("lower", "upper", "special")
 
-def sha256(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
 
-def load_meta() -> dict:
-    src = TREE_METADATA.read_text(encoding="utf-8")
-    match = re.search(r"export const FOREST_ART=(\{.*\});", src, re.S)
-    if not match:
-        raise RuntimeError("Cannot parse game's authoritative forest art geometry")
-    return json.loads(match.group(1))
+def rgba(path):
+    with Image.open(path) as image:
+        return image.convert("RGBA")
 
-def open_rgba(p: Path) -> Image.Image:
-    if not p.is_file():
-        raise FileNotFoundError(p)
-    return Image.open(p).convert("RGBA")
 
-def snow_reveal_height(intensity: float, column: int) -> float:
-    amount = max(0.0, min(1.0, intensity))
-    progress = 1.0 - (1.0 - amount) ** 1.6
-    delay = (((column + 1) * 73) % 101) / 101.0 * 0.18
-    return max(0.0, min(1.0, (progress - delay) / (1.0 - delay)))
+def reveal_mask(size, level, variant):
+    """A connected, lightly feathered snow edge that grows monotonically."""
+    width, height = size
+    progress = level / (LEVELS - 1)
+    mask = Image.new("L", size)
+    for x in range(width):
+        u = x / max(1, width - 1)
+        phase = variant * 1.41
+        delay = .09 + .045 * math.sin(u * 9 + phase) + .025 * math.sin(u * 23 + phase)
+        reach = (max(0, progress - delay) / (1 - delay)) ** .86
+        edge = height * min(1, reach)
+        for y in range(min(height, math.ceil(edge + 1))):
+            mask.putpixel((x, y), round(255 * min(1, max(0, (edge - y) / 1.5))))
+    return mask
 
-def fill_reveal(mask: Image.Image, x: int, y: int, width: int, height: int, intensity: float) -> None:
-    draw = ImageDraw.Draw(mask)
-    for i in range(COLUMNS):
-        reach = snow_reveal_height(intensity, i)
-        if reach <= 0:
-            continue
-        x0 = x + math.floor(i * width / COLUMNS)
-        x1 = x + math.floor((i + 1) * width / COLUMNS)
-        y1 = y + math.floor(height * reach)
-        if x1 > x0 and y1 > y:
-            draw.rectangle((x0, y, x1 - 1, y1 - 1), fill=255)
 
-def save_lossless(im: Image.Image, dest: Path) -> None:
-    im.save(dest, format="WEBP", lossless=True, method=4, exact=True)
-
-def verify_untouched(base: Image.Image, baked: Image.Image, mask: Image.Image) -> None:
-    # Test exact source pixels outside the snow reveal before WebP encoding.
-    diff = ImageChops.difference(base, baked)
-    unchanged_area = ImageChops.invert(mask)
-    for rgba_band in diff.split():
-        if ImageChops.multiply(rgba_band, unchanged_area).getbbox():
-            raise AssertionError("Original tree pixels were altered outside snow-covered positions")
-
-def bake_living(kind: str, meta: dict) -> dict:
-    base_file = ASSETS / "v7" / f"trees-{kind}.webp"
-    snow_file = WINTER / f"trees-{kind}-snow-04.webp"
-    overlay_file = WINTER / f"trees-{kind}-overlay-04.webp"
-    base = open_rgba(base_file)
-    snow_full = open_rgba(snow_file)
-    overlay = open_rgba(overlay_file)
-    assert base.size == overlay.size == snow_full.size == (1024, 1024)
-    generated = []
-    for level in range(LEVELS):
-        dest = OUT / f"trees-{kind}-snow-{level:02d}.webp"
-        if level == 0:
-            shutil.copyfile(base_file, dest)
-        elif level == LEVELS - 1:
-            shutil.copyfile(snow_file, dest)
+def source_caps():
+    geometry = json.loads((JS / "forest-art-data.mjs").read_text().split("FOREST_ART=", 1)[1].rstrip().rstrip(";"))
+    out = {}
+    for kind in FAMILIES:
+        if kind == "special":
+            base = rgba(GAME / "assets/v9/tree-variants.webp")
+            overlay = rgba(GAME / "assets/v10/tree-variants-snow.webp")
+            boxes = [(i % 2 * 256, i // 2 * 256, 256, h) for i, h in enumerate((181, 180, 180, 182))]
         else:
-            mask = Image.new("L", base.size, 0)
-            for f in meta[kind]:
-                sx, sy, _, _ = f["rect"]
-                splice = int(f["spliceY"])
+            base = rgba(GAME / f"assets/v7/trees-{kind}.webp")
+            overlay = rgba(WINTER / f"trees-{kind}-overlay-04.webp")
+            boxes = []
+            for frame in geometry[kind]:
+                sx, sy, _, _ = frame["rect"]
+                cx, _, width, _ = frame["content"]
+                splice = frame["spliceY"]
                 top = splice if kind == "upper" else 0
-                bottom = min(512, int(f["endY"]) + 30) if kind == "upper" else splice
-                fill_reveal(mask, sx, sy + top, 512, bottom - top, level / (LEVELS - 1))
-            snow_layer = overlay.copy()
-            snow_layer.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
-            baked = Image.alpha_composite(base, snow_layer)
-            verify_untouched(base, baked, mask)
-            save_lossless(baked, dest)
-        assert open_rgba(dest).size == base.size
-        generated.append(dest)
-    assert sha256(generated[0]) == sha256(base_file)
-    assert sha256(generated[-1]) == sha256(snow_file)
-    return {"base": str(base_file.relative_to(ROOT)),
-            "overlay": str(overlay_file.relative_to(ROOT)),
-            "fullSnow": str(snow_file.relative_to(ROOT)),
-            "files": [str(p.relative_to(ROOT)) for p in generated],
-            "hashes": [sha256(p) for p in generated]}
+                end = min(512, frame["endY"] + 30) if kind == "upper" else splice - 1
+                boxes.append((sx + cx, sy + top, width, end - top))
+        out[kind] = [(base.crop((x, y, x + w, y + h)), overlay.crop((x, y, x + w, y + h)))
+                     for x, y, w, h in boxes]
+    return out
 
-def bake_special() -> dict:
-    # Original special cap geometry: tree-art.mjs's TREE_CAP_Y=8,
-    # TREE_SPLICES=[181,180,180,182], four 256px cells in a 512px atlas.
-    base_file = ASSETS / "v9" / "tree-variants.webp"
-    snow_file = ASSETS / "v10" / "tree-variants-snow.webp"
-    base = open_rgba(base_file)
-    full_snow = open_rgba(snow_file)
-    assert base.size == full_snow.size == (512, 512)
-    splits = (181, 180, 180, 182)
-    files = []
-    for level in range(LEVELS):
-        dest = OUT / f"tree-variants-snow-{level:02d}.webp"
-        if level == 0:
-            shutil.copyfile(base_file, dest)
-        else:
-            mask = Image.new("L", base.size, 0)
-            for variant, splice in enumerate(splits):
-                x, y = variant % 2 * 256, variant // 2 * 256
-                fill_reveal(mask, x, y + 8, 256, splice - 8, level / (LEVELS - 1))
-            baked = Image.composite(full_snow, base, mask)
-            verify_untouched(base, baked, mask)
-            save_lossless(baked, dest)
-        files.append(dest)
-    assert sha256(files[0]) == sha256(base_file)
-    return {"base": str(base_file.relative_to(ROOT)), "fullSnow": str(snow_file.relative_to(ROOT)),
-            "files": [str(p.relative_to(ROOT)) for p in files],
-            "hashes": [sha256(p) for p in files]}
 
-def write_preview(family: str, paths: list[str]) -> None:
-    preview = Image.new("RGBA", (1024, 1024))
-    for stage, rel in enumerate(paths):
-        frame = open_rgba(ROOT / rel)
-        thumb = frame.resize((256, 256), Image.Resampling.LANCZOS)
-        preview.alpha_composite(thumb, ((stage % 4) * 256, (stage // 4) * 256))
-    preview.save(OUT / f"preview-{family}.png")
+def bake(base, snow, kind, level, variant):
+    if level == LEVELS - 1:
+        return snow  # Only special caps need a packed final frame.
+    mask = reveal_mask(base.size, level, variant)
+    if kind == "special":
+        return Image.composite(snow, base, mask)
+    coating = snow.copy()
+    coating.putalpha(ImageChops.multiply(snow.getchannel("A"), mask))
+    return Image.alpha_composite(base, coating)
 
-def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
-    meta = load_meta()
-    manifest = {
-        "generator": "scripts/build_precomposed_winter_art.py",
-        "source": "Game original assets; no generative redrawing",
-        "stages": LEVELS,
-        "stageZero": "exact byte-for-byte original",
-        "stage15LivingTrees": "exact byte-for-byte approved full-snow source",
-        "intermediate": "approved snow overlay, 32-column reveal on original sheet",
-        "upperCeilingRule": "snow reveal clipped to below upper splice",
-        "size": {"living": [1024, 1024], "special": [512, 512]},
-        "families": {},
-    }
-    manifest["families"]["lower"] = bake_living("lower", meta)
-    manifest["families"]["upper"] = bake_living("upper", meta)
-    manifest["families"]["special"] = bake_special()
-    for name, entry in manifest["families"].items():
-        write_preview(name, entry["files"])
-        print(f"{name}: {len(entry['files'])} original-based stages")
-    (OUT / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+
+def main():
+    OUT.mkdir(exist_ok=True)
+    sources = source_caps()
+    frames = {kind: [None] * LEVELS for kind in FAMILIES}
+    pages = []
+    for start in range(1, LEVELS, PAGE_STAGES):
+        rows = []
+        for level in range(start, min(start + PAGE_STAGES, LEVELS)):
+            for kind, variants in sources.items():
+                if level == LEVELS - 1 and kind != "special":
+                    continue
+                rows.append((kind, level, [bake(*art, kind, level, i) for i, art in enumerate(variants)]))
+        width = max(sum(im.width + 2 * GUTTER for im in row) for _, _, row in rows)
+        height = sum(max(im.height for im in row) + 2 * GUTTER for _, _, row in rows)
+        page = Image.new("RGBA", (width, height))
+        y = GUTTER
+        for kind, level, row in rows:
+            x = GUTTER
+            frames[kind][level] = []
+            for im in row:
+                page.paste(im, (x, y))
+                frames[kind][level].append([len(pages), x, y, im.width, im.height])
+                x += im.width + 2 * GUTTER
+            y += max(im.height for im in row) + 2 * GUTTER
+        name = f"winter-caps-{len(pages)}.webp"
+        path = OUT / name
+        # Preserve the authored silhouette exactly. High quality WebP keeps
+        # the color detail while making the production download practical.
+        page.save(path, quality=94, method=6, alpha_quality=100, exact=True)
+        assert rgba(path).getchannel("A").tobytes() == page.getchannel("A").tobytes()
+
+        pages.append({"file": name, "width": width, "height": height,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        print(name, page.size, path.stat().st_size)
+    manifest = {"stages": LEVELS, "pages": pages, "frames": frames}
+    (OUT / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
+    (JS / "winter-cap-data.mjs").write_text(
+        "// Generated by scripts/build_precomposed_winter_art.py.\n"
+        f"export const WINTER_CAP_ART={json.dumps(manifest, separators=(',', ':'))};\n"
     )
-    print(f"Saved {3 * LEVELS} unaltered-geometry WebP sheets to {OUT}")
+
 
 if __name__ == "__main__":
     main()

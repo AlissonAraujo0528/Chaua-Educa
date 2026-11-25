@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.16
+
+- Ativa as copas nevadas pré-compostas como padrão, com 16 níveis em quatro atlas.
+- Suaviza a borda de acúmulo e distingue cobertura de intensidade do inverno no relatório.
+- Refina o movimento das pétalas, das folhas, a iluminação de verão e a chuva de tempestade.
+
 ## 1.0.15
 
 - Compara cache de copas e recorte direto no mesmo voo de referência.
