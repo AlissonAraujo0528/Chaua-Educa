@@ -88,7 +88,7 @@ const assert=require('node:assert/strict');
    }finally{await view.close();}
   }
   const legacy=await snowScene('legacy-snow-rebuild');
-  const direct=await snowScene('baseline');
+  const direct=await snowScene('direct-snow');
   assert.ok(legacy.masks>=6,'the comparison must exercise the previous mask rebuilds');
   assert.equal(direct.masks,0,'regular winter must never rebuild either mask');
   const compare=await browser.newPage();

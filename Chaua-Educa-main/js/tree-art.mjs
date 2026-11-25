@@ -62,6 +62,8 @@ function variantBark(image,index){
 }
 
 const snowCapBuffers = new Map();
+export const snowCapMetrics={rebuilds:0,hits:0,directDraws:0};
+
 function cachedLivingSnowOverlay(kind, variantIdx, overlay, sx, sy, cx, sourceOffsetY, cw, sourceHeight, top, bottom, reveal) {
  if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvasRenderingContext2D === 'undefined') return null;
  const step = Math.round(reveal * 256);
@@ -85,7 +87,8 @@ function cachedLivingSnowOverlay(kind, variantIdx, overlay, sx, sy, cx, sourceOf
   oc.restore();
   entry.step = step;
   entry.overlay = overlay;
- }
+  snowCapMetrics.rebuilds++;
+ }else snowCapMetrics.hits++;
  return entry.surface;
 }
 
@@ -111,7 +114,8 @@ function cachedVariantSnowOverlay(index, snowImage, sx, sy, splice, snow) {
   oc.restore();
   entry.step = step;
   entry.snowImage = snowImage;
- }
+  snowCapMetrics.rebuilds++;
+ }else snowCapMetrics.hits++;
  return entry.surface;
 }
 
@@ -180,6 +184,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
     if(cachedOverlay){
      c.drawImage(cachedOverlay,0,0,cw,sourceHeight,px,destY,cw*s,sourceHeight*s);
     }else{
+     snowCapMetrics.directDraws++;
      c.save();c.translate(px-sourceX*s,destY-sourceY*s);c.scale(s,s);
      clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
      c.drawImage(overlay,sourceX,sourceY,cw,sourceHeight,sourceX,sourceY,cw,sourceHeight);
@@ -258,6 +263,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
      if (cachedOverlay) {
       c.drawImage(cachedOverlay, 0, 0, TREE_CELL, splice, left, -TREE_CAP_Y * scale, TREE_CELL * scale, splice * scale);
      } else {
+      snowCapMetrics.directDraws++;
       c.save();
       c.globalAlpha = 1;
       // Include the first 8px of cap snow while keeping the original wood anchor.

@@ -1,3 +1,4 @@
+import {snowCapMetrics} from './tree-art.mjs';
 // Opt-in physical-device diagnostics. Imported only with ?perf-test=1.
 // Nothing is uploaded or persisted; reports are prepared and downloaded locally.
 import {getWeatherMode} from './weather.mjs';
@@ -59,6 +60,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  if(replayLaunch)panel.append(replay);
  document.body.append(panel);
  let active=false,startTime=0,previous=0,lastUI=0,hasPlayed=false,nextClimate=0;
+ let snowStart={...snowCapMetrics};
  let samples=[],changes=[],stutters=[],transitions=[],climateTimeline=[];
  let slowCount=0,severeCount=0,budgetStutters=0,lastCanvas='',lastProfile='',lastSeason='',lastWeather='',lastStage=null,lastReport=null;
  const forensics=new ForensicRecorder();
@@ -119,6 +121,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
    profileChanges:changes,stutters:stutters.sort((a,b)=>a.frame-b.frame),transitions,climateTimeline,
    stutterSelection:'bounded-reservoir-with-severe-frame-priority',
    diagnosticLevel:forensics.deep?'deep':'normal',
+   snowCaps:{rebuilds:snowCapMetrics.rebuilds-snowStart.rebuilds,hits:snowCapMetrics.hits-snowStart.hits,directDraws:snowCapMetrics.directDraws-snowStart.directDraws},
    experiments:{perfAB:PERF_AB_VARIANT,snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
     snakeSheetsWarmed:renderer.snakeWarmupIndex||0,
     seasonalSliceRows:renderer.seasonalBackdrop?.sliceRows??null,
@@ -187,6 +190,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  function startCapture(){
   if(active)return;
   for(const button of resultDownloads)button.hidden=true;
+  snowStart={...snowCapMetrics};
   active=true;hasPlayed=false;startTime=performance.now();previous=0;lastUI=0;nextClimate=0;
   forensics.clear();forensics.startedAt=startTime;
   forensics.deep=level.value==='deep';level.disabled=true;
