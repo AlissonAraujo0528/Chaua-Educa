@@ -6,11 +6,9 @@ import {PRECOMPOSED_SNOW_ACTIVE,winterCapKey} from './precomposed-winter.mjs';
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
- // Keep only the authored full-winter atlas plus transparent transition
- // overlays. Remove 2 identical legacy copies and 6 unused intermediate
- // full-size frames from BOOT, while keeping their on-disk originals intact.
+ // Keep the full winter art and its runtime transition fallback.
  ...['lower','upper'].map(k=>[`trees-${k}-snow-04`,`../assets/Seasons/Winter/trees-${k}-snow-04.webp`]),
- ...['lower','upper'].flatMap(k=>[1,2,3,4].map(s=>[`trees-${k}-overlay-0${s}`,`../assets/Seasons/Winter/trees-${k}-overlay-0${s}.webp`])),
+ ...['lower','upper'].map(k=>[`trees-${k}-overlay-04`,`../assets/Seasons/Winter/trees-${k}-overlay-04.webp`]),
  ...(PRECOMPOSED_SNOW_ACTIVE?WINTER_CAP_ART.pages.map((page,index)=>[
   winterCapKey(index),'../assets/Seasons/Winter/Precomposed/'+page.file
  ]):[]),
@@ -27,14 +25,13 @@ export const images = new Map();
 const runtimeDimensions=new Map(Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((p,i)=>[`runtime-${family}-${i}`,[p.width,p.height]])));
 WINTER_CAP_ART.pages.forEach((page,index)=>runtimeDimensions.set(winterCapKey(index),[page.width,page.height]));
 let pending;
-const DORMANT_OVERLAY_RE = /^trees-(?:lower|upper)-overlay-0[1-3]$/;
 export function loadAssets() {
  if(typeof Image==='undefined')return Promise.resolve([]);
  if(pending)return pending;
  pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
   const [width,height]=runtimeDimensions.get(key)||[];
   const url=new URL(path,import.meta.url).href;
-  const image=await loadImage(url,{width,height,rasterize:!DORMANT_OVERLAY_RE.test(key),errorMessage:`Não foi possível carregar ${key}: ${url}`});
+  const image=await loadImage(url,{width,height,errorMessage:`Não foi possível carregar ${key}: ${url}`});
   return [key,image];
  })).then(entries=>{
   // Publish only the complete attempt; late callbacks from a failed attempt stay local.
