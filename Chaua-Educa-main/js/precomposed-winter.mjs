@@ -2,7 +2,14 @@ import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 
 export const PRECOMPOSED_SNOW_STAGES=WINTER_CAP_ART.stages;
-export const PRECOMPOSED_SNOW_ACTIVE=['precomposed-snow','winter-caps-bitmap','snow-flakes-off','static-season-bg'].includes(PERF_AB_VARIANT);
+export const PRECOMPOSED_SNOW_STAGE_CACHE=PERF_AB_VARIANT==='winter-caps-stage-cache';
+export const PRECOMPOSED_SNOW_ACTIVE=[
+ 'precomposed-snow',
+ 'winter-caps-bitmap',
+ 'winter-caps-stage-cache',
+ 'snow-flakes-off',
+ 'static-season-bg'
+].includes(PERF_AB_VARIANT);
 export const winterCapKey=page=>'winter-caps-'+page;
 export function precomposedSnowStage(snow){
  const amount=Number.isFinite(snow)?Math.max(0,Math.min(1,snow)):0;

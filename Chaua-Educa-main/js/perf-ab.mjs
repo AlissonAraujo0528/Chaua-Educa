@@ -1,6 +1,15 @@
 // Test-only switches, deliberately ignored on ordinary game links.
 export const PERF_AB_OPTIONS=Object.freeze([
- 'baseline','direct-snow','precomposed-snow','winter-caps-bitmap','snow-mask-off','snow-flakes-off','static-season-bg','legacy-snow-clips','legacy-snow-rebuild'
+ 'baseline',
+ 'direct-snow',
+ 'precomposed-snow',
+ 'winter-caps-bitmap',
+ 'winter-caps-stage-cache',
+ 'snow-mask-off',
+ 'snow-flakes-off',
+ 'static-season-bg',
+ 'legacy-snow-clips',
+ 'legacy-snow-rebuild'
 ]);
 export function resolvePerfVariant(search='') {
  const params=new URLSearchParams(search);
