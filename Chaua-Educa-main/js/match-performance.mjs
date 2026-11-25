@@ -111,19 +111,34 @@ export class MatchPerformance {
    this.finish('returned-to-menu',game,quality,renderer);return;
   }
   if(!eligible){c.previous=0;c.previousCpuMs=null;return;}
-  const profile=quality.mode+'/'+quality.level+'/'+renderer.resolution+'/'+renderer.decoration;
-  if(profile!==c.lastProfile){
+  if(c.lastMode!==quality.mode||c.lastLevel!==quality.level||c.lastRes!==renderer.resolution||c.lastDeco!==renderer.decoration){
+   c.lastMode=quality.mode;c.lastLevel=quality.level;c.lastRes=renderer.resolution;c.lastDeco=renderer.decoration;
+   const profile=quality.mode+'/'+quality.level+'/'+renderer.resolution+'/'+renderer.decoration;
    if(c.profileChanges.length<MAX_SNAPSHOTS)c.profileChanges.push({
     gameSeconds:round(game.elapsed||0),profile,canvas:[renderer.canvas.width,renderer.canvas.height]
    });
    c.lastProfile=profile;
+   c.lastProfileArr=c.byProfile[profile]??(c.byProfile[profile]=[]);
   }
+  const profile=c.lastProfile;
   if(c.previous>0&&timestamp>c.previous&&c.samples.length<MAX_FRAMES){
-   const dt=timestamp-c.previous,stage=String(game.stage),windowKey=String(Math.floor((game.elapsed||0)/10)*10);
+   const dt=timestamp-c.previous;
+   const stageNum=game.stage;
+   if(c.lastStageNum!==stageNum){
+    c.lastStageNum=stageNum;
+    const sk=String(stageNum);
+    c.lastStageArr=c.byStage[sk]??(c.byStage[sk]=[]);
+   }
+   const winNum=Math.floor((game.elapsed||0)/10)*10;
+   if(c.lastWinNum!==winNum){
+    c.lastWinNum=winNum;
+    const wk=String(winNum);
+    c.lastWinArr=c.byWindow[wk]??(c.byWindow[wk]=[]);
+   }
    c.samples.push(dt);
-   (c.byStage[stage]??(c.byStage[stage]=[])).push(dt);
-   (c.byWindow[windowKey]??(c.byWindow[windowKey]=[])).push(dt);
-   (c.byProfile[profile]??(c.byProfile[profile]=[])).push(dt);
+   c.lastStageArr.push(dt);
+   c.lastWinArr.push(dt);
+   c.lastProfileArr.push(dt);
    if(dt>33.33){
     c.stutterTotal++;
     if(dt>50)c.over50++;

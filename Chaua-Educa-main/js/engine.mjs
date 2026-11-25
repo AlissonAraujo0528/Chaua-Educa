@@ -872,7 +872,7 @@ export class Game {
 
     tick(dt) {
         this.snapshot();
-        if(['playing','arrival','impact'].includes(this.state))this.sceneTime+=dt;
+        if(this.state==='playing'||this.state==='arrival'||this.state==='impact')this.sceneTime+=dt;
         if(this.state==='arrival') {
             this.arrival.age=this.reducedMotion?ARRIVAL_SECONDS:Math.min(ARRIVAL_SECONDS,this.arrival.age+dt);
             const t=this.arrival.age/ARRIVAL_SECONDS, ease=t*t*(3-2*t);
@@ -1029,7 +1029,7 @@ export class Game {
             this.entities.length=write;
         }
         if (this.routes.size > 0) {
-            this.routes.forEach((_, id) => {
+            for (const id of this.routes.keys()) {
                 let hasFruit = false;
                 for (let k = 0; k < this.entities.length; k++) {
                     const ent = this.entities[k];
@@ -1039,7 +1039,7 @@ export class Game {
                     }
                 }
                 if (!hasFruit) this.routes.delete(id);
-            });
+            }
         }
         this.advanceEffects(dt);
         this.maybeOpenQuiz();

@@ -37,11 +37,12 @@ export function dripOrigin(wood,time,wind=0,out={}){
  out.x=wood.x+29+(px-f.anchor[0])*scale+lean*(y-wood.top);out.y=y;return out;
 }
 export class TreeDrips{
- constructor(){this.items=Array.from({length:24},()=>({age:2,active:false}));this.emitters=new Map();this.activeIds=new Set();this.lastTime=undefined;}
+ constructor(){this.items=Array.from({length:24},()=>({age:2,active:false}));this.emitters=new Map();this.activeIds=new Set();this.lastTime=undefined;this.hasActive=false;}
  draw(c,game,time,wet,wind,low,reduced,bounds){
-  if(this.lastTime===undefined||time<this.lastTime){this.lastTime=time;this.emitters.clear();for(const p of this.items)p.active=false;}
+  if(this.lastTime===undefined||time<this.lastTime){this.lastTime=time;this.emitters.clear();for(const p of this.items)p.active=false;this.hasActive=false;}
   const dt=Math.max(0,Math.min(.25,time-this.lastTime));this.lastTime=time;
-  if(reduced){for(const p of this.items)p.active=false;return;}
+  if(reduced){if(this.hasActive)for(const p of this.items)p.active=false;this.hasActive=false;return;}
+  if(wet<=.035&&!this.hasActive){if(this.emitters.size>0)this.emitters.clear();return;}
   const limit=low?8:24,activeIds=this.activeIds;activeIds.clear();
   for(const wood of game.entities){
    if(wood.kind!=='wood'||wood.broken&&wood.brokenSide==='top'||wood.x<bounds.left-100||wood.x>bounds.right+100)continue;
@@ -51,10 +52,11 @@ export class TreeDrips{
    if(wet>.035&&dt>0&&time>=due){
     this.emitters.set(id,time+1.1+(1-wet)*2.8+(id%3)*.23);
     let p;for(let i=0;i<limit;i++)if(!this.items[i].active){p=this.items[i];break;}
-    if(p){dripOrigin(wood,time,wind,p);Object.assign(p,{active:true,id,age:0,vy:0,splashAge:-1});}
+    if(p){dripOrigin(wood,time,wind,p);p.active=true;p.id=id;p.age=0;p.vy=0;p.splashAge=-1;this.hasActive=true;}
    }
   }
-  this.emitters.forEach((_, id) => { if (!activeIds.has(id)) this.emitters.delete(id); });
+  for(const id of this.emitters.keys())if(!activeIds.has(id))this.emitters.delete(id);
+  let anyActive=false;
   for(let i=0;i<this.items.length;i++){
    const p=this.items[i];if(!p.active)continue;
    if(i>=limit){p.active=false;continue;}
@@ -64,7 +66,7 @@ export class TreeDrips{
    if(p.splashAge>=0){
     p.splashAge+=dt;p.x-=game.speed*dt;
     if(p.splashAge>=.28)p.active=false;
-    else drawWater(c,8+Math.min(3,Math.floor(p.splashAge/.07)),p.x,p.y,13);
+    else{drawWater(c,8+Math.min(3,Math.floor(p.splashAge/.07)),p.x,p.y,13);anyActive=true;}
     continue;
    }
    if(p.age<.36){
@@ -78,6 +80,8 @@ export class TreeDrips{
     }else{c.save();c.globalAlpha=Math.min(1,(1.2-p.age)*3);drawWater(c,5,p.x,p.y,5);c.restore();}
    }
    if(p.age>1.2||p.y>bounds.bottom+60)p.active=false;
+   else anyActive=true;
   }
+  this.hasActive=anyActive;
  }
 }

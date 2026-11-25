@@ -42,39 +42,58 @@ export function hawkAnimation(e,time=0,reduced=false){
  if(cycle>1.5)return flightFrame(CLIPS.hawk.glide,(cycle-1.5)*.5);
  return flightFrame(CLIPS.hawk.flight,cycle/1.5*2.2);
 }
+const _sortedItems = [], _blockers = [], _xs = [], _ys = [];
+function pushUnique(arr, val) {
+ for (let i = 0; i < arr.length; i++) if (arr[i] === val) return;
+ arr.push(val);
+}
+
 // Screen-space labels avoid both other labels and protected actor regions.
 // If a tiny viewport cannot fit everything, minimize covered area explicitly.
 export function placeWarnings(items,view,protectedRegions=[]){
  const result=[],gap=6,left=view.x+4,top=view.y+4;
  const area=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w+gap)-Math.max(a.x,b.x-gap))*
   Math.max(0,Math.min(a.y+a.h,b.y+b.h+gap)-Math.max(a.y,b.y-gap));
+ _sortedItems.length = 0;
+ for (let i = 0; i < items.length; i++) _sortedItems.push(items[i]);
+ _sortedItems.sort((a,b)=>b.h-a.h);
+ _blockers.length = 0;
+ for (let i = 0; i < protectedRegions.length; i++) _blockers.push(protectedRegions[i]);
  // Place the taller notices first so a small card cannot consume their only slot.
- for(const item of [...items].sort((a,b)=>b.h-a.h)){
-  const box={...item,w:Math.min(item.w,Math.max(1,view.w-8)),h:Math.min(item.h,Math.max(1,view.h-8))};
-  const right=Math.max(left,view.x+view.w-box.w-4),bottom=Math.max(top,view.y+view.h-box.h-4);
-  box.x=Math.max(left,Math.min(right,item.x));box.y=Math.max(top,Math.min(bottom,item.y));
-  const blockers=[...protectedRegions,...result];
-  // The first candidate is the original position. If it already has zero
-  // overlap, no candidate can improve on (overlap=0, distance=0).
-  // Early-exit the existing search instead of doing a redundant prepass,
-  // which regressed CPU times for three tightly overlapping notices.
-  const xs=[box.x,left,right],ys=[box.y,top,bottom];
-  for(const b of blockers){
-   xs.push(b.x-box.w-gap,b.x+b.w+gap);
-   ys.push(b.y-box.h-gap,b.y+b.h+gap);
+ for(let ii = 0; ii < _sortedItems.length; ii++){
+  const item = _sortedItems[ii];
+  const boxW=Math.min(item.w,Math.max(1,view.w-8)),boxH=Math.min(item.h,Math.max(1,view.h-8));
+  const right=Math.max(left,view.x+view.w-boxW-4),bottom=Math.max(top,view.y+view.h-boxH-4);
+  const bx=Math.max(left,Math.min(right,item.x)),by=Math.max(top,Math.min(bottom,item.y));
+  _xs.length=0;_ys.length=0;
+  _xs.push(bx);pushUnique(_xs,left);pushUnique(_xs,right);
+  _ys.push(by);pushUnique(_ys,top);pushUnique(_ys,bottom);
+  for(let bi=0;bi<_blockers.length;bi++){
+   const b=_blockers[bi];
+   pushUnique(_xs,b.x-boxW-gap);pushUnique(_xs,b.x+b.w+gap);
+   pushUnique(_ys,b.y-boxH-gap);pushUnique(_ys,b.y+b.h+gap);
   }
-  let best={x:box.x,y:box.y,overlap:Infinity,distance:Infinity};
-  const candidate={x:0,y:0,w:box.w,h:box.h};
-  search:for(const x of new Set(xs))for(const y of new Set(ys)){
-   if(x<left||x>right||y<top||y>bottom)continue;
-   candidate.x=x;candidate.y=y;
-   let overlap=0;
-   for(const b of blockers)overlap+=area(candidate,b);
-   const distance=(x-box.x)**2+(y-box.y)**2;
-   if(overlap<best.overlap||overlap===best.overlap&&distance<best.distance)best={x,y,overlap,distance};
-   if(best.overlap===0&&best.distance===0)break search;
+  let bestX=bx,bestY=by,bestOverlap=Infinity,bestDistance=Infinity;
+  const candidate={x:0,y:0,w:boxW,h:boxH};
+  search:for(let xi=0;xi<_xs.length;xi++){
+   const x=_xs[xi];
+   if(x<left||x>right)continue;
+   candidate.x=x;
+   for(let yi=0;yi<_ys.length;yi++){
+    const y=_ys[yi];
+    if(y<top||y>bottom)continue;
+    candidate.y=y;
+    let overlap=0;
+    for(let bi=0;bi<_blockers.length;bi++)overlap+=area(candidate,_blockers[bi]);
+    const distance=(x-bx)*(x-bx)+(y-by)*(y-by);
+    if(overlap<bestOverlap||(overlap===bestOverlap&&distance<bestDistance)){bestX=x;bestY=y;bestOverlap=overlap;bestDistance=distance;}
+    if(bestOverlap===0&&bestDistance===0)break search;
+   }
   }
-  result.push({...box,x:best.x,y:best.y});
+  const placed={...item,w:boxW,h:boxH,x:bestX,y:bestY};
+  result.push(placed);
+  _blockers.push(placed);
  }
+ _sortedItems.length=0;_blockers.length=0;_xs.length=0;_ys.length=0;
  return result;
 }

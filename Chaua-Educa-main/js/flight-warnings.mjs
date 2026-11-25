@@ -14,9 +14,11 @@ function hasActiveThreat(entities, playerX) {
  return false;
 }
 
+const EMPTY_WARNINGS = Object.freeze({boxes:Object.freeze([]),protectedRegions:Object.freeze([])});
+
 // Presentation only: protected regions do not alter collision or encounters.
 export function flightWarnings(game,view,reduced=false,shakeX=0,shakeY=0){
- if(!hasActiveThreat(game.entities, game.x))return {boxes:[],protectedRegions:[]};
+ if(!hasActiveThreat(game.entities, game.x))return EMPTY_WARNINGS;
  const notices=[],protectedRegions=[];
  const project=rect=>({x:view.x+(rect.x-view.worldLeft)*view.scale+shakeX,
   y:view.y+(rect.y-(view.worldTop||0))*view.scale+shakeY,w:rect.w*view.scale,h:rect.h*view.scale});

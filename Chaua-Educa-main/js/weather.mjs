@@ -5,15 +5,22 @@ import {seasonFromFlight,seasonWeights} from './climate-timeline.mjs';
 
 // All VISUAL weather in the active game reads the same seasonal clock.
 // Numeric-distance inputs remain for existing world-physics wind and tests.
+const visualWeightCache = new WeakMap();
 const visualWeights=source=>{
     if (source && typeof source === 'object' && Number.isFinite(source.elapsed)) {
-        if (source._vWeights && source._vWeightsElapsed === source.elapsed) {
-            return source._vWeights;
+        let entry = visualWeightCache.get(source);
+        if (entry && entry.elapsed === source.elapsed && entry.mode === source.mode && entry.tutorial === source.tutorial) {
+            return entry.weights;
         }
-        const w = seasonWeights(seasonFromFlight(source));
-        source._vWeights = w;
-        source._vWeightsElapsed = source.elapsed;
-        return w;
+        if (!entry) {
+            entry = {elapsed: NaN, mode: undefined, tutorial: undefined, state: {from: 0, to: 0, mix: 1}, weights: [0, 0, 0, 0]};
+            visualWeightCache.set(source, entry);
+        }
+        seasonWeights(seasonFromFlight(source, entry.state), entry.weights);
+        entry.elapsed = source.elapsed;
+        entry.mode = source.mode;
+        entry.tutorial = source.tutorial;
+        return entry.weights;
     }
     return seasonWeights(seasonFromFlight(source));
 };
