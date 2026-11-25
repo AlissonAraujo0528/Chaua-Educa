@@ -6,7 +6,7 @@ import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_STAGE_CACHE,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_STAGE_CACHE,PRECOMPOSED_SNOW_STAGE_PREFETCH,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 
 const WINTER_CAP_PAGE_ASSETS=Object.freeze(
  WINTER_CAP_ART.pages.map((_,page)=>`winter-cap:page-${page}`)
@@ -14,10 +14,13 @@ const WINTER_CAP_PAGE_ASSETS=Object.freeze(
 
 export const winterStageCacheMetrics={
  copies:0,
+ predecodedHits:0,
+ syncCopies:0,
  fallbacks:0,
  activeStage:null,
  activePage:null,
- onCopy:null
+ onCopy:null,
+ onPrefetch:null
 };
 
 let winterStageBands=null;
@@ -66,10 +69,83 @@ function getWinterStageBands(){
 }
 
 let activeWinterStageBuffer=null;
+let prefetchedWinterStage=null;
+let pendingWinterPrefetch=null;
+let winterPrefetchToken=0;
+let failedWinterPrefetch=new WeakMap();
+export function resetWinterPrefetchFailures(){
+ failedWinterPrefetch=new WeakMap();
+}
+
+async function prepareWinterStageBitmap(source,band){
+ return await createImageBitmap(source,0,band.y,band.width,band.height);
+}
+
+function clearPrefetchedWinterStage(){
+ if(prefetchedWinterStage?.bitmap){
+  prefetchedWinterStage.bitmap.close?.();
+ }
+ prefetchedWinterStage=null;
+}
+
+function prefetchWinterStage(stage){
+ if(!PRECOMPOSED_SNOW_STAGE_PREFETCH||typeof createImageBitmap!=='function')return;
+ if(stage<=0||stage>=WINTER_CAP_ART.stages)return;
+ const stageBands=getWinterStageBands();
+ const band=stageBands.bands[stage];
+ if(!band)return;
+ const sourceImage=images.get(winterCapKey(band.page));
+ if(!sourceImage||failedWinterPrefetch.get(sourceImage)?.has(stage))return;
+ if(
+  prefetchedWinterStage&&
+  prefetchedWinterStage.stage===stage&&
+  prefetchedWinterStage.page===band.page&&
+  prefetchedWinterStage.source===sourceImage
+ )return;
+ if(
+  pendingWinterPrefetch&&
+  pendingWinterPrefetch.stage===stage&&
+  pendingWinterPrefetch.page===band.page&&
+  pendingWinterPrefetch.source===sourceImage
+ )return;
+ clearPrefetchedWinterStage();
+ const token=++winterPrefetchToken;
+ pendingWinterPrefetch={stage,page:band.page,source:sourceImage,token};
+ winterStageCacheMetrics.onPrefetch?.({status:'started',stage,page:band.page});
+ prepareWinterStageBitmap(sourceImage,band).then(bitmap=>{
+  if(token!==winterPrefetchToken||!PRECOMPOSED_SNOW_STAGE_CACHE){
+   bitmap.close?.();
+   return;
+  }
+  if(activeWinterStageBuffer&&activeWinterStageBuffer.stage===stage&&activeWinterStageBuffer.source===sourceImage){
+   pendingWinterPrefetch=null;
+   bitmap.close?.();
+   return;
+  }
+  pendingWinterPrefetch=null;
+  winterStageCacheMetrics.onPrefetch?.({status:'ready',stage,page:band.page});
+  clearPrefetchedWinterStage();
+  prefetchedWinterStage={stage,page:band.page,source:sourceImage,bitmap,width:band.width,height:band.height};
+ },error=>{
+  if(token!==winterPrefetchToken)return;
+  pendingWinterPrefetch=null;
+  let failedStages=failedWinterPrefetch.get(sourceImage);
+  if(!failedStages){failedStages=new Set();failedWinterPrefetch.set(sourceImage,failedStages);}
+  failedStages.add(stage);
+  winterStageCacheMetrics.onPrefetch?.({status:'failed',stage,page:band.page,error:error?.name??'Error'});
+ });
+}
+
+function maybePrefetchFirstWinterStage(snow,precomposedLevel){
+ if(!PRECOMPOSED_SNOW_STAGE_PREFETCH||precomposedLevel!==0||snow<=0)return;
+ if(activeWinterStageBuffer&&activeWinterStageBuffer.stage===1)return;
+ prefetchWinterStage(1);
+}
+
 function winterStageCache(stage,sourceImage,expectedPage,warmup=false){
  const stageBands=getWinterStageBands();
  const band=stageBands.bands[stage];
- if(!band||!sourceImage||band.page!==expectedPage)return null;
+ if(!band||!sourceImage||(expectedPage!==undefined&&band.page!==expectedPage))return null;
  let buf=activeWinterStageBuffer;
  if(!buf){
   const surface=typeof OffscreenCanvas!=='undefined'
@@ -83,30 +159,51 @@ function winterStageCache(stage,sourceImage,expectedPage,warmup=false){
   buf=activeWinterStageBuffer={surface,oc,stage:-1,page:-1,source:null,y:0,width:0,height:0};
  }
  if(buf.stage!==stage||buf.source!==sourceImage){
+  let predecodedBitmap=null;
+  if(
+   prefetchedWinterStage&&
+   prefetchedWinterStage.stage===stage&&
+   prefetchedWinterStage.page===band.page&&
+   prefetchedWinterStage.source===sourceImage&&
+   prefetchedWinterStage.width===band.width&&
+   prefetchedWinterStage.height===band.height
+  ){
+   predecodedBitmap=prefetchedWinterStage.bitmap;
+   prefetchedWinterStage=null;
+  }
+  const predecoded=!!predecodedBitmap;
   const probe=activeProbe;
   const measure=!warmup&&probe?.deep&&probe.currentFrame&&probe.game?.state==='playing';
   const copyAt=measure?probe.begin('winterCap.stageCacheCopy'):0;
   // Clear the full reusable surface so shorter bands (stage 15) never retain stale pixels.
   buf.oc.clearRect(0,0,buf.surface.width,buf.surface.height);
-  buf.oc.drawImage(sourceImage,0,band.y,band.width,band.height,0,0,band.width,band.height);
+  if(predecodedBitmap){
+   try{buf.oc.drawImage(predecodedBitmap,0,0);}
+   finally{predecodedBitmap.close();}
+  }else{
+   buf.oc.drawImage(sourceImage,0,band.y,band.width,band.height,0,0,band.width,band.height);
+  }
   buf.stage=stage;buf.page=band.page;buf.source=sourceImage;
   buf.y=band.y;buf.width=band.width;buf.height=band.height;
   winterStageCacheMetrics.copies++;
+  if(predecoded)winterStageCacheMetrics.predecodedHits++;
+  else winterStageCacheMetrics.syncCopies++;
   winterStageCacheMetrics.activeStage=stage;
   winterStageCacheMetrics.activePage=band.page;
   let copyMs=null;
   if(measure){
    copyMs=Math.round(probe.end('winterCap.stageCacheCopy',copyAt,{
-    stage,page:band.page,width:band.width,height:band.height
+    stage,page:band.page,width:band.width,height:band.height,predecoded
    })*100)/100;
    probe.event('winter-stage-cache-copy',{
-    stage,page:band.page,width:band.width,height:band.height,copyMs,
+    stage,page:band.page,width:band.width,height:band.height,predecoded,copyMs,
     rafTimestamp:probe.currentFrame.rafTimestamp
    });
   }
   winterStageCacheMetrics.onCopy?.({
-   stage,page:band.page,width:band.width,height:band.height,warmup,copyMs
+   stage,page:band.page,width:band.width,height:band.height,predecoded,warmup,copyMs
   });
+  prefetchWinterStage(stage+1);
  }
  return buf;
 }
@@ -280,6 +377,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Test C: draw a single complete authored tree state, not tree plus overlay.
  const treeSnow=PERF_AB_VARIANT==='snow-mask-off'?0:snow;
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(treeSnow):0;
+ maybePrefetchFirstWinterStage(treeSnow,precomposedLevel);
 
  const fullSnow = treeSnow >= 1 - 1e-6;
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
@@ -378,6 +476,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  // Special upper trunks remain free of ceiling-attached snow.
  // Broken variants retain the original fracture sequence.
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
+ if(!upper&&breakAge===undefined)maybePrefetchFirstWinterStage(snow,precomposedLevel);
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
  const packed=winterCapFrame('special',precomposedLevel,index);
  const preparedVariant=packed?images.get(winterCapKey(packed[0])):null;

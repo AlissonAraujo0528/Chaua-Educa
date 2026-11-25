@@ -1,4 +1,4 @@
-import {snowCapMetrics,winterStageCacheMetrics} from './tree-art.mjs';
+import {snowCapMetrics,winterStageCacheMetrics,resetWinterPrefetchFailures} from './tree-art.mjs';
 // Opt-in physical-device diagnostics. Imported only with ?perf-test=1.
 // Nothing is uploaded or persisted; reports are prepared and downloaded locally.
 import {getWeatherMode} from './weather.mjs';
@@ -7,7 +7,7 @@ import {winterAmount} from './living-motion.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {images} from './assets.mjs';
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
-import {PRECOMPOSED_SNOW_STAGE_CACHE,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_STAGE_CACHE,PRECOMPOSED_SNOW_STAGE_PREFETCH,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 import {ForensicRecorder} from './perf-forensics.mjs';
 import {setActiveProbe} from './perf-hooks.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
@@ -76,7 +76,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  let active=false,startTime=0,previous=0,lastUI=0,hasPlayed=false,nextClimate=0,nextSeasonCheck=0;
  let snowStart={...snowCapMetrics};
  let stageCacheStart={copies:0,fallbacks:0};
- let stageCacheSwitches=[];
+ let stageCacheSwitches=[],stagePrefetchEvents=[];
  let samples=[],changes=[],stutters=[],transitions=[],climateTimeline=[];
  let slowCount=0,severeCount=0,budgetStutters=0,lastReport=null;
  // Scalar state mirrors prevent string/object allocations on every 60-120 Hz tick.
@@ -125,6 +125,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   if(!active){if(downloadNow&&lastReport)download(lastReport);return;}
   active=false;previous=0;
   winterStageCacheMetrics.onCopy=null;
+  winterStageCacheMetrics.onPrefetch=null;
   setActiveProbe(null);
   forensics.stopBrowserObservers();
   if(renderer.seasonalBackdrop)renderer.seasonalBackdrop.onTelemetry=null;
@@ -198,7 +199,10 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
     fallbacks:winterStageCacheMetrics.fallbacks-stageCacheStart.fallbacks,
     activeStage:winterStageCacheMetrics.activeStage,
     activePage:winterStageCacheMetrics.activePage,
-    switches:stageCacheSwitches
+    predecodedHits:winterStageCacheMetrics.predecodedHits-stageCacheStart.predecodedHits,
+    syncCopies:winterStageCacheMetrics.syncCopies-stageCacheStart.syncCopies,
+    switches:stageCacheSwitches,
+    prefetchEvents:stagePrefetchEvents
    },
    experiments:{perfAB:PERF_AB_VARIANT,
     winterCapRepresentations:WINTER_CAP_ART.pages.map((_,page)=>{
@@ -357,8 +361,17 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   if(active)return;
   for(const button of resultDownloads)button.hidden=true;
   snowStart={...snowCapMetrics};
-  stageCacheStart={copies:winterStageCacheMetrics.copies,fallbacks:winterStageCacheMetrics.fallbacks};
+  stageCacheStart={copies:winterStageCacheMetrics.copies,fallbacks:winterStageCacheMetrics.fallbacks,predecodedHits:winterStageCacheMetrics.predecodedHits,syncCopies:winterStageCacheMetrics.syncCopies};
   stageCacheSwitches=[];
+  stagePrefetchEvents=[];
+  if(PRECOMPOSED_SNOW_STAGE_PREFETCH){
+   resetWinterPrefetchFailures();
+   winterStageCacheMetrics.onPrefetch=info=>{
+    if(stagePrefetchEvents.length<MAX_DETAILS)stagePrefetchEvents.push({
+     ...info,atSeconds:round((performance.now()-startTime)/1000,3),gameSeconds:round(game.elapsed||0,3)
+    });
+   };
+  }
   winterStageCacheMetrics.onCopy=PRECOMPOSED_SNOW_STAGE_CACHE?logStageCacheCopy:null;
   active=true;hasPlayed=false;startTime=performance.now();previous=0;lastUI=0;nextClimate=0;nextSeasonCheck=0;
   forensics.clear();forensics.startedAt=startTime;
