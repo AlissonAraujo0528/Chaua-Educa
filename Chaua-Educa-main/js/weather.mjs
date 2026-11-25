@@ -137,12 +137,12 @@ function weatherGradients(c,w,h){
 }
 
 export function drawJourneyFog(context, width, height, fog) {
-    if (!fog) return;
+    if (!fog || fog <= .002) return;
     const mist=weatherGradients(context,width,height).fog;
     context.save();
     context.globalAlpha = fog;
     context.fillStyle = mist;
-    context.fillRect(0, 0, width, height);
+    context.fillRect(0, height * .25, width, height * .75);
     context.restore();
 }
 

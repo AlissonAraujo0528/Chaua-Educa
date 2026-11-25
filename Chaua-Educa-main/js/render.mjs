@@ -1203,18 +1203,21 @@ export class Renderer {
         drawLightning(c, w, h, time, storm, reduced);
         drawWindGusts(c,w,h,time,wind,this.decoration==='low',reduced,weatherMotion);
         // Golden pollen belongs to warm seasons; it must not mix with snow.
-        c.save();c.globalAlpha = (1-rain)*(1-winterLight);
-        c.fillStyle = '#ffedb275';
-        c.beginPath();
+        const dustAlpha = (1-rain)*(1-winterLight);
         const dustCount = winterLight>=.999?0:(this.decoration==='low'?8:23);
-        for (let i = 0; i < dustCount; i++) {
-            const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
-            const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
-            c.moveTo(x + 1.6, y);
-            c.arc(x, y, 1.6, 0, TAU);
+        if (dustAlpha > 0.004 && dustCount > 0) {
+            c.save();c.globalAlpha = dustAlpha;
+            c.fillStyle = '#ffedb275';
+            c.beginPath();
+            for (let i = 0; i < dustCount; i++) {
+                const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
+                const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
+                c.moveTo(x + 1.6, y);
+                c.arc(x, y, 1.6, 0, TAU);
+            }
+            c.fill();
+            c.restore();
         }
-        c.fill();
-        c.restore();
         if (home) {
             const wash = c.createLinearGradient(0, 0, w * .7, 0);
             wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');

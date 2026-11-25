@@ -1,4 +1,4 @@
-import {breeze, winterAmount, summerSunAmount} from './living-motion.mjs';
+import {winterAmount, summerSunAmount} from './living-motion.mjs';
 
 // Renders living forest atmosphere:
 // 1. Radiant tropical summer sun and volumetric crepuscular God rays
@@ -33,7 +33,6 @@ function atmosphereGradients(c,w,h){
 
 export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = false, low = false, storm = 0) {
     const t = reduced ? 0 : time;
-    const air = breeze(t, wind, reduced);
     const snow = winterAmount(distance);
     const sun = summerSunAmount(distance, rain, storm);
 
@@ -79,7 +78,7 @@ export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = fa
     }
 
     // 2. INVERNO E NEVASCAS (Winter snowfall & mountain cold)
-    if (snow > 0) {
+    if (snow > 0.005) {
         c.globalAlpha = snow * 0.10;
         c.fillStyle = '#deefff';
         c.fillRect(0, 0, w, h);
@@ -98,8 +97,8 @@ export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = fa
         c.fillStyle = mist;
 
         c.save();
-        c.translate(air * 10, Math.sin(t * 0.22) * 3);
-        c.fillRect(-30, mistTop, w + 60, h - mistTop + 10);
+        c.translate(0, Math.sin(t * 0.22) * 3);
+        c.fillRect(0, mistTop, w, h - mistTop + 10);
         c.restore();
     }
 

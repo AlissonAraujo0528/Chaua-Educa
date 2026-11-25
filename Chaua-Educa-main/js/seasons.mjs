@@ -124,12 +124,15 @@ export class SeasonalBackdrop {
   if(probe)probe.end('render.seasonalPrepare',prepAt);
   const blitAt=probe?probe.begin('render.seasonalBlit'):0;
   const drift=reduced||PERF_AB_VARIANT==='static-season-bg'?0:Math.sin(time*.035)*24;
+  const dx=Math.round((drift-margin)*dpr);
   c.save();c.setTransform(1,0,0,1,0,0);
   c.globalAlpha=1;
-  c.drawImage(this.frames.get(state.mix===1?state.to:state.from),Math.round((drift-margin)*dpr),0);
-  if(state.mix<1 && state.mix>0){
+  if(state.mix>=.998||state.mix<=.002){
+   c.drawImage(this.frames.get(state.mix>=.998?state.to:state.from),dx,0);
+  }else{
+   c.drawImage(this.frames.get(state.from),dx,0);
    c.globalAlpha=state.mix;
-   c.drawImage(this.frames.get(state.to),Math.round((drift-margin)*dpr),0);
+   c.drawImage(this.frames.get(state.to),dx,0);
   }
   c.restore();
   if(probe)probe.end('render.seasonalBlit',blitAt);
@@ -156,34 +159,38 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  const suppression=Math.max(r*r*(3-2*r),t*t*(3-2*t));
  const w0=((state.from===0?wFrom:0)+(state.to===0?wTo:0))*(1-suppression);
  const w2=((state.from===2?wFrom:0)+(state.to===2?wTo:0))*(1-suppression*.85);
- if(w0>0){
+ if(w0>.004){
   const count=low?1:3,layerAlpha=Math.min(0.92,w0*.85);
+  c.save();c.globalAlpha=layerAlpha;
   for(let i=0;i<count;i++){
    const size=32+(i%4)*4;
    const travel=time*(15+i%3*4)+driftOffset*.028;
    const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
    const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
-   c.save();c.globalAlpha=layerAlpha;
+   c.save();
    c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
    c.scale(.75+.25*Math.sin(time*1.4+i),1);
    const frame=i%2;
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();
   }
+  c.restore();
  }
- if(w2>0){
+ if(w2>.004){
   const count=low?7:14,layerAlpha=Math.min(0.92,w2*.85);
+  c.save();c.globalAlpha=layerAlpha;
   for(let i=0;i<count;i++){
    const size=38+(i%4)*4;
    const travel=time*(15+i%3*4)+driftOffset*.028;
    const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
    const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
-   c.save();c.globalAlpha=layerAlpha;
+   c.save();
    c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
    c.scale(.75+.25*Math.sin(time*1.4+i),1);
    const frame=2+(i%2);
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();
   }
+  c.restore();
  }
 }
