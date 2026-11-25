@@ -60,6 +60,6 @@ test('all diagnostic overrides are separated from normal rendering',()=>{
  assert.match(tree,/render\.snowMaskRebuild/);
  assert.match(tree,/PERF_AB_VARIANT!=='snow-mask-off'/);
  assert.match(season,/PERF_AB_VARIANT==='static-season-bg'/);
- assert.match(probe,/diagnosticRevision:'flight-benchmark-1'/);
+ assert.match(probe,/diagnosticRevision:'flight-benchmark-2'/);
  assert.match(probe,/if\(forensics.deep\)\{forensics.startBrowserObservers\(\)/);
 });
