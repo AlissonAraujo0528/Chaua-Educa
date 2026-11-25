@@ -1,13 +1,14 @@
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {loadImage} from './image-loader.mjs';
-import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE,winterCapKey} from './precomposed-winter.mjs';
+import {PERF_AB_VARIANT} from './perf-ab.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_STAGE_CACHE,winterCapKey} from './precomposed-winter.mjs';
 // One cache for gameplay, menus and results. All files are local.
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
- // Keep the full winter art and its runtime transition fallback.
+ // Keep the authored full-winter atlas and overlay-04 fallback/visual-test
+ // surface; overlays 01-03 are unused at runtime.
  ...['lower','upper'].map(k=>[`trees-${k}-snow-04`,`../assets/Seasons/Winter/trees-${k}-snow-04.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}-overlay-04`,`../assets/Seasons/Winter/trees-${k}-overlay-04.webp`]),
  ...(PRECOMPOSED_SNOW_ACTIVE?WINTER_CAP_ART.pages.map((page,index)=>[
@@ -24,15 +25,22 @@ export const ASSET_PATHS = Object.fromEntries([
 ]);
 export const images = new Map();
 const runtimeDimensions=new Map(Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((p,i)=>[`runtime-${family}-${i}`,[p.width,p.height]])));
-WINTER_CAP_ART.pages.forEach((page,index)=>runtimeDimensions.set(winterCapKey(index),[page.width,page.height]));
+const winterCapKeys=new Set();
+WINTER_CAP_ART.pages.forEach((page,index)=>{
+ const key=winterCapKey(index);
+ winterCapKeys.add(key);
+ runtimeDimensions.set(key,[page.width,page.height]);
+});
 let pending;
 export function loadAssets() {
  if(typeof Image==='undefined')return Promise.resolve([]);
  if(pending)return pending;
+ const winterCapRepresentation=PRECOMPOSED_SNOW_STAGE_CACHE?'image':
+  PERF_AB_VARIANT==='winter-caps-bitmap'?'bitmap':'canvas';
  pending=Promise.all(Object.entries(ASSET_PATHS).map(async([key,path])=>{
   const [width,height]=runtimeDimensions.get(key)||[];
   const url=new URL(path,import.meta.url).href;
-  const representation=PERF_AB_VARIANT==='winter-caps-bitmap'&&key.startsWith('winter-caps-')?'bitmap':'canvas';
+  const representation=winterCapKeys.has(key)?winterCapRepresentation:'canvas';
   const image=await loadImage(url,{width,height,representation,errorMessage:`Não foi possível carregar ${key}: ${url}`});
   return [key,image];
  })).then(entries=>{

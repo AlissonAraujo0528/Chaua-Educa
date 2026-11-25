@@ -1,4 +1,4 @@
-import {snowCapMetrics} from './tree-art.mjs';
+import {snowCapMetrics,winterStageCacheMetrics} from './tree-art.mjs';
 // Opt-in physical-device diagnostics. Imported only with ?perf-test=1.
 // Nothing is uploaded or persisted; reports are prepared and downloaded locally.
 import {getWeatherMode} from './weather.mjs';
@@ -7,7 +7,7 @@ import {winterAmount} from './living-motion.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {images} from './assets.mjs';
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
-import {precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_STAGE_CACHE,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 import {ForensicRecorder} from './perf-forensics.mjs';
 import {setActiveProbe} from './perf-hooks.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
@@ -75,6 +75,8 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
 
  let active=false,startTime=0,previous=0,lastUI=0,hasPlayed=false,nextClimate=0,nextSeasonCheck=0;
  let snowStart={...snowCapMetrics};
+ let stageCacheStart={copies:0,fallbacks:0};
+ let stageCacheSwitches=[];
  let samples=[],changes=[],stutters=[],transitions=[],climateTimeline=[];
  let slowCount=0,severeCount=0,budgetStutters=0,lastReport=null;
  // Scalar state mirrors prevent string/object allocations on every 60-120 Hz tick.
@@ -109,9 +111,20 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   document.body.append(a);a.click();a.remove();
   window.addEventListener('pagehide',()=>URL.revokeObjectURL(url),{once:true});
  };
+ const logStageCacheCopy=info=>{
+  if(stageCacheSwitches.length>=MAX_DETAILS)return;
+  stageCacheSwitches.push({
+   ...info,
+   atSeconds:round((performance.now()-startTime)/1000,3),
+   gameSeconds:round(game.elapsed||0,3),
+   replayStep:getReplay?.()?.step??null,
+   state:game.state
+  });
+ };
  function finish(reason,downloadNow=false){
   if(!active){if(downloadNow&&lastReport)download(lastReport);return;}
   active=false;previous=0;
+  winterStageCacheMetrics.onCopy=null;
   setActiveProbe(null);
   forensics.stopBrowserObservers();
   if(renderer.seasonalBackdrop)renderer.seasonalBackdrop.onTelemetry=null;
@@ -179,6 +192,14 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
    stutterSelection:'bounded-reservoir-with-severe-frame-priority',
    diagnosticLevel:forensics.deep?'deep':'normal',
    snowCaps:{rebuilds:snowCapMetrics.rebuilds-snowStart.rebuilds,hits:snowCapMetrics.hits-snowStart.hits,directDraws:snowCapMetrics.directDraws-snowStart.directDraws},
+   winterStageCache:{
+    active:PRECOMPOSED_SNOW_STAGE_CACHE,
+    copies:winterStageCacheMetrics.copies-stageCacheStart.copies,
+    fallbacks:winterStageCacheMetrics.fallbacks-stageCacheStart.fallbacks,
+    activeStage:winterStageCacheMetrics.activeStage,
+    activePage:winterStageCacheMetrics.activePage,
+    switches:stageCacheSwitches
+   },
    experiments:{perfAB:PERF_AB_VARIANT,
     winterCapRepresentations:WINTER_CAP_ART.pages.map((_,page)=>{
      const asset=images.get(winterCapKey(page));
@@ -336,6 +357,9 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   if(active)return;
   for(const button of resultDownloads)button.hidden=true;
   snowStart={...snowCapMetrics};
+  stageCacheStart={copies:winterStageCacheMetrics.copies,fallbacks:winterStageCacheMetrics.fallbacks};
+  stageCacheSwitches=[];
+  winterStageCacheMetrics.onCopy=PRECOMPOSED_SNOW_STAGE_CACHE?logStageCacheCopy:null;
   active=true;hasPlayed=false;startTime=performance.now();previous=0;lastUI=0;nextClimate=0;nextSeasonCheck=0;
   forensics.clear();forensics.startedAt=startTime;
   forensics.deep=level.value==='deep';level.disabled=true;
