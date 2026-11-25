@@ -8,6 +8,44 @@ import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 import {PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 
+const WINTER_CAP_PAGE_ASSETS=Object.freeze(
+ WINTER_CAP_ART.pages.map((_,page)=>`winter-cap:page-${page}`)
+);
+
+function drawWinterCap(c,image,packed,dx,dy,dw,dh,kind,stage,variant){
+ const probe=activeProbe;
+ if(probe?.deep&&probe.currentFrame&&probe.game?.state==='playing'){
+  const page=packed[0];
+  const asset=WINTER_CAP_PAGE_ASSETS[page]??`winter-cap:page-${page}`;
+  if(!probe.firstDraws.has(asset)){
+   const op='winterCap.firstDrawCpu';
+   const details={page,kind,stage,variant};
+   const drawAt=probe.begin(op);
+   c.drawImage(image,packed[1],packed[2],packed[3],packed[4],dx,dy,dw,dh);
+   const drawCpuMs=probe.end(op,drawAt,details);
+   probe.firstDraw(asset,drawCpuMs,details);
+   return;
+  }
+ }
+ c.drawImage(image,packed[1],packed[2],packed[3],packed[4],dx,dy,dw,dh);
+}
+
+function drawFullSnowTrunkCap(c,image,sx,sy,sw,sh,dx,dy,dw,dh,kind,variant){
+ const probe=activeProbe;
+ if(probe?.deep&&probe.currentFrame&&probe.game?.state==='playing'){
+  const asset=kind==='upper'?'winter-cap:full-upper':'winter-cap:full-lower';
+  if(!probe.firstDraws.has(asset)){
+   const op='winterCap.firstDrawCpu';
+   const details={kind,stage:WINTER_CAP_ART.stages-1,variant};
+   const drawAt=probe.begin(op);
+   c.drawImage(image,sx,sy,sw,sh,dx,dy,dw,dh);
+   const drawCpuMs=probe.end(op,drawAt,details);
+   probe.firstDraw(asset,drawCpuMs,details);
+   return;
+  }
+ }
+ c.drawImage(image,sx,sy,sw,sh,dx,dy,dw,dh);
+}
 
 // Repeat complete bark bands at the same scale as the authored cap.
 // A reflected pair has matching edges at every join. Tiles and patterns are
@@ -52,7 +90,7 @@ function wetVariantCap(image){
  canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(256,256):document.createElement('canvas');
  canvas.width=256;canvas.height=256;
  const c=canvas.getContext('2d');
- drawPackedSection(c,'wet','variants-0',0,0,256,256,0,0,256,256);
+ drawPackedSection(c,'wet','variants-0',0,0,256,256,0,0,256,256,{recordFirstDraw:false});
  c.globalCompositeOperation='destination-in';
  c.drawImage(image,0,0,256,256,0,0,256,256);
  wetVariantCaps.set(image,canvas);return canvas;
@@ -149,14 +187,16 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if (upper) {
   const start = y - length;
   fillBark(c,bark,coreLeft,join,width,s,join-start,true);
-  if(capImage)c.drawImage(capImage,packed[1],packed[2],packed[3],packed[4],px,join,packed[3]*s,packed[4]*s);
+  if(capImage)drawWinterCap(c,capImage,packed,px,join,packed[3]*s,packed[4]*s,kind,precomposedLevel,variantIdx);
+  else if(snowImg4)drawFullSnowTrunkCap(c,image,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s,kind,variantIdx);
   else c.drawImage(image,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
  } else {
   const end = y + length;
   fillBark(c,bark,coreLeft,join,width,s,end-join,false);
   // Preserve the snow dome above the bare wood's y=20 content bound.
   const capTop=treeSnow>0?0:cy;
-  if(capImage)c.drawImage(capImage,packed[1],packed[2],packed[3],packed[4],px,y-f.anchor[1]*s,packed[3]*s,packed[4]*s);
+  if(capImage)drawWinterCap(c,capImage,packed,px,y-f.anchor[1]*s,packed[3]*s,packed[4]*s,kind,precomposedLevel,variantIdx);
+  else if(snowImg4)drawFullSnowTrunkCap(c,image,sx+cx,sy+capTop,cw,splice-capTop,px,y+(capTop-f.anchor[1])*s,cw*s,(splice-capTop)*s,kind,variantIdx);
   else c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
    px,y+(capTop-f.anchor[1])*s,cw*s,(splice-capTop)*s);
  }
@@ -242,8 +282,8 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   fillBark(c,variantBark(image,index),-TREE_WIDTH/2,join,TREE_WIDTH,scale,reach-join,false);
   if(preparedVariant){
    // Draw the snow above the original cap without moving the wood anchor.
-   c.drawImage(preparedVariant,packed[1],packed[2],packed[3],packed[4],
-    left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
+   drawWinterCap(c,preparedVariant,packed,
+    left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale,'special',precomposedLevel,index);
   }else c.drawImage(image,sx,sy+TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,
    left,0,TREE_CELL*scale,join);
 
