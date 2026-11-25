@@ -1,3 +1,4 @@
+import {snowCapMetrics} from './tree-art.mjs';
 // Built-in, low-overhead per-match diagnosis for the ordinary game URL.
 // No second RAF, deep hooks, pixel readbacks, network calls or player names.
 // All records stay in localStorage (or memory if unavailable) until exported.
@@ -67,6 +68,7 @@ export class MatchPerformance {
   if(!this.enabled)return;
   if(this.current)this.finish('restarted',game,quality,renderer);
   this.current={
+   snowStart:{...snowCapMetrics},
    id:Date.now()+'-'+Math.floor(Math.random()*100000),
    start:new Date().toISOString(),startNow:typeof performance!=='undefined'?performance.now():0,
    seed:game.seed,mode:game.mode,training:!!training,
@@ -186,6 +188,7 @@ export class MatchPerformance {
    device:viewportInfo(renderer),
    match:{seed:c.seed,mode:c.mode,training:c.training,score:game.score,
     won:!!game.won,flightSeconds:round(game.elapsed||0),stage:game.stage},
+   snowCaps:{rebuilds:snowCapMetrics.rebuilds-c.snowStart.rebuilds,hits:snowCapMetrics.hits-c.snowStart.hits,directDraws:snowCapMetrics.directDraws-c.snowStart.directDraws},
    endReason:reason,experiment:{perfAbVariant:PERF_AB_VARIANT},settings:{qualityMode:quality.mode,qualityLevel:quality.level,
     resolution:renderer.resolution,decoration:renderer.decoration},
    measurement:{eligibleOnly:'visible-focused-playing',deepInstrumentation:false,

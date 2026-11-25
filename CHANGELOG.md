@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.15
+
+- Compara cache de copas e recorte direto no mesmo voo de referência.
+- Inclui contadores de reconstruções, acertos de cache e recortes diretos no JSON.
+
 ## 1.0.11 — candidata em validação
 
 - Reduz as pétalas da primavera para 3 no perfil detalhado e 1 no econômico; preserva o outono com 14/7 e mantém verão/inverno sem pétalas. Revisão de interface 1.0.11-ui2.
