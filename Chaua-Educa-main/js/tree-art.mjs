@@ -61,6 +61,60 @@ function variantBark(image,index){
   Math.floor(index/2)*TREE_CELL+TREE_SPLICES[index]-96,TREE_CORE_WIDTH,96,true);
 }
 
+const snowCapBuffers = new Map();
+function cachedLivingSnowOverlay(kind, variantIdx, overlay, sx, sy, cx, sourceOffsetY, cw, sourceHeight, top, bottom, reveal) {
+ if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvasRenderingContext2D === 'undefined') return null;
+ const step = Math.round(reveal * 256);
+ const key = `${kind}:${variantIdx}`;
+ let entry = snowCapBuffers.get(key);
+ if (!entry || entry.w !== cw || entry.h !== sourceHeight) {
+  const surface = entry?.surface ?? new OffscreenCanvas(cw, sourceHeight);
+  surface.width = cw; surface.height = sourceHeight;
+  const oc = surface.getContext('2d');
+  if (!oc) return null;
+  entry = { surface, oc, w: cw, h: sourceHeight, step: -1, overlay: null };
+  snowCapBuffers.set(key, entry);
+ }
+ if (entry.step !== step || entry.overlay !== overlay) {
+  const oc = entry.oc;
+  oc.clearRect(0, 0, cw, sourceHeight);
+  oc.save();
+  oc.translate(-(sx + cx), -(sy + sourceOffsetY));
+  clipSnowReveal(oc, sx, sy + top, 512, bottom - top, reveal);
+  oc.drawImage(overlay, sx + cx, sy + sourceOffsetY, cw, sourceHeight, sx + cx, sy + sourceOffsetY, cw, sourceHeight);
+  oc.restore();
+  entry.step = step;
+  entry.overlay = overlay;
+ }
+ return entry.surface;
+}
+
+const variantSnowCapBuffers = new Map();
+function cachedVariantSnowOverlay(index, snowImage, sx, sy, splice, snow) {
+ if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvasRenderingContext2D === 'undefined') return null;
+ const step = Math.round(Math.min(1, Math.max(0, snow)) * 256);
+ let entry = variantSnowCapBuffers.get(index);
+ if (!entry || entry.h !== splice) {
+  const surface = entry?.surface ?? new OffscreenCanvas(TREE_CELL, splice);
+  surface.width = TREE_CELL; surface.height = splice;
+  const oc = surface.getContext('2d');
+  if (!oc) return null;
+  entry = { surface, oc, h: splice, step: -1, snowImage: null };
+  variantSnowCapBuffers.set(index, entry);
+ }
+ if (entry.step !== step || entry.snowImage !== snowImage) {
+  const oc = entry.oc;
+  oc.clearRect(0, 0, TREE_CELL, splice);
+  oc.save();
+  clipSnowReveal(oc, 0, 0, TREE_CELL, splice, snow);
+  oc.drawImage(snowImage, sx, sy, TREE_CELL, splice, 0, 0, TREE_CELL, splice);
+  oc.restore();
+  entry.step = step;
+  entry.snowImage = snowImage;
+ }
+ return entry.surface;
+}
+
 // Caps, knots, branches and foliage retain the authored proportions.
 export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, length = 900, variant = 0, time = 0, snow = 0, rain = 0}) {
  const kind = upper ? 'upper' : 'lower';
@@ -73,16 +127,18 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  const image = (PRECOMPOSED_SNOW_ACTIVE?preparedImage:null) || snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
- const f = FOREST_ART[kind][((variant % 4) + 4) % 4], s = width / (f.core[1] - f.core[0]);
+ const variantIdx=((variant % 4) + 4) % 4;
+ const f = FOREST_ART[kind][variantIdx], s = width / (f.core[1] - f.core[0]);
  const sx = f.rect[0], sy = f.rect[1], cx = f.content[0], cy = f.content[1], cw = f.content[2], ch = f.content[3];
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
  const coreLeft = x + (f.core[0] - f.anchor[0]) * s;
  const barkImage=images.get(`trees-${kind}`);
- const bark=livingBark(barkImage,kind,((variant%4)+4)%4,f);
+ const bark=livingBark(barkImage,kind,variantIdx,f);
  const splice = upper ? f.spliceY : f.spliceY - 1;
  // Snow icicles may extend past original alpha bounds. Visual clip only.
  const snowyTipEnd=upper&&treeSnow>0?Math.max(f.endY,Math.min(512,f.endY+30)):f.endY;
  const join = y + (splice - f.anchor[1]) * s;
+
  if (upper) {
   const start = y - length;
   fillBark(c,bark,coreLeft,join,width,s,join-start,true);
@@ -98,7 +154,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
 
  // Restrained wet detail on existing bark, near the visible trunk cap.
  if(rain>0){c.save();c.globalAlpha=rain*.42;
-  drawPackedSection(c,'wet',`${kind}-${((variant%4)+4)%4}`,cx,upper?splice:cy,cw,(upper?f.endY:splice)-(upper?splice:cy),px,upper?join:py,cw*s,((upper?f.endY:splice)-(upper?splice:cy))*s);c.restore();}
+  drawPackedSection(c,'wet',`${kind}-${variantIdx}`,cx,upper?splice:cy,cw,(upper?f.endY:splice)-(upper?splice:cy),px,upper?join:py,cw*s,((upper?f.endY:splice)-(upper?splice:cy))*s);c.restore();}
 
  // Reveal solid authored snow progressively over the exposed surface.
  // Only the visible branch/cap is coated; a suspended tree must never gain
@@ -118,10 +174,17 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
     const top=upper?f.spliceY:0;
     const bottom=upper?Math.min(512,f.endY+30):f.spliceY;
     const reveal=Math.round(Math.min(1,Math.max(0,snow))*256)/256;
-    c.save();c.translate(px-sourceX*s,destY-sourceY*s);c.scale(s,s);
-    clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
-    c.drawImage(overlay,sourceX,sourceY,cw,sourceHeight,sourceX,sourceY,cw,sourceHeight);
-    c.restore();
+    const cachedOverlay=PERF_AB_VARIANT==='baseline'?cachedLivingSnowOverlay(
+     kind,variantIdx,overlay,sx,sy,cx,upper?splice:0,cw,sourceHeight,top,bottom,reveal
+    ):null;
+    if(cachedOverlay){
+     c.drawImage(cachedOverlay,0,0,cw,sourceHeight,px,destY,cw*s,sourceHeight*s);
+    }else{
+     c.save();c.translate(px-sourceX*s,destY-sourceY*s);c.scale(s,s);
+     clipSnowReveal(c,sx,sy+top,512,bottom-top,reveal);
+     c.drawImage(overlay,sourceX,sourceY,cw,sourceHeight,sourceX,sourceY,cw,sourceHeight);
+     c.restore();
+    }
    }
   }
  }
@@ -184,20 +247,26 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   if (snow > 0 && breakAge === undefined && !PRECOMPOSED_SNOW_ACTIVE && PERF_AB_VARIANT!=='snow-mask-off') {
    const snowImage = images.get('tree-variants-snow');
    if (snowImage) {
-    c.save();
-    c.globalAlpha = 1;
     // Keep the original snowy cut face, but do not tile the snowy bark
     // strip all the way to the ceiling: repeating it made vertical stripes.
     // Upper trunks are turned upside down. Mirroring this white cut-face
     // onto their underside would make snow adhere against gravity, so
     // falling crystals are handled separately by drawSnowContact().
     if (!upper) {
-     // Include the first 8px of cap snow while keeping the original wood anchor.
-     clipSnowReveal(c,left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale,snow);
-     c.drawImage(snowImage,sx,sy,TREE_CELL,splice,
-      left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
+     const cachedOverlay = PERF_AB_VARIANT === 'baseline'
+      ? cachedVariantSnowOverlay(index, snowImage, sx, sy, splice, snow) : null;
+     if (cachedOverlay) {
+      c.drawImage(cachedOverlay, 0, 0, TREE_CELL, splice, left, -TREE_CAP_Y * scale, TREE_CELL * scale, splice * scale);
+     } else {
+      c.save();
+      c.globalAlpha = 1;
+      // Include the first 8px of cap snow while keeping the original wood anchor.
+      clipSnowReveal(c,left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale,snow);
+      c.drawImage(snowImage,sx,sy,TREE_CELL,splice,
+       left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
+      c.restore();
+     }
     }
-    c.restore();
    }
   }
 

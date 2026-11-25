@@ -526,11 +526,33 @@ export function drawAnimalBreath(c, x, y, snow, time, period = 2.4, duration = 0
     c.restore();
 }
 
+const turboGradients = new WeakMap();
+function getTurboGradients(c) {
+    let grads = turboGradients.get(c);
+    if (grads) return grads;
+    const g0 = c.createLinearGradient(0, 0, -1, 0);
+    g0.addColorStop(0, '#ff3700ee');
+    g0.addColorStop(0.6, '#ff8000cc');
+    g0.addColorStop(1, '#ff370000');
+    const g1 = c.createLinearGradient(0, 0, -1, 0);
+    g1.addColorStop(0, '#ffbb00ee');
+    g1.addColorStop(0.5, '#ffe600cc');
+    g1.addColorStop(1, '#ff800000');
+    const g2 = c.createLinearGradient(0, 0, -1, 0);
+    g2.addColorStop(0, '#ffffff');
+    g2.addColorStop(0.4, '#ffffaacc');
+    g2.addColorStop(1, '#ffea0000');
+    grads = [g0, g1, g2];
+    turboGradients.set(c, grads);
+    return grads;
+}
+
 function drawTurboFlames(c, size, t) {
     c.save();
     const tailX = -size * 0.44;
     const tailY = size * 0.06;
     c.translate(tailX, tailY);
+    const grads = getTurboGradients(c);
 
     for (let f = 0; f < 3; f++) {
         const angle = 0.08 * (f - 1) + Math.sin(t * 30 + f) * 0.06;
@@ -539,27 +561,14 @@ function drawTurboFlames(c, size, t) {
 
         c.save();
         c.rotate(angle);
+        c.scale(len, 1);
         c.beginPath();
-        c.moveTo(2, -w * 0.6);
-        c.quadraticCurveTo(-len * 0.5, -w, -len, 0);
-        c.quadraticCurveTo(-len * 0.5, w, 2, w * 0.6);
+        c.moveTo(2 / len, -w * 0.6);
+        c.quadraticCurveTo(-0.5, -w, -1, 0);
+        c.quadraticCurveTo(-0.5, w, 2 / len, w * 0.6);
         c.closePath();
 
-        const grad = c.createLinearGradient(0, 0, -len, 0);
-        if (f === 0) {
-            grad.addColorStop(0, '#ff3700ee');
-            grad.addColorStop(0.6, '#ff8000cc');
-            grad.addColorStop(1, '#ff370000');
-        } else if (f === 1) {
-            grad.addColorStop(0, '#ffbb00ee');
-            grad.addColorStop(0.5, '#ffe600cc');
-            grad.addColorStop(1, '#ff800000');
-        } else {
-            grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.4, '#ffffaacc');
-            grad.addColorStop(1, '#ffea0000');
-        }
-        c.fillStyle = grad;
+        c.fillStyle = grads[f];
         c.fill();
         c.restore();
     }
@@ -1631,7 +1640,7 @@ export class Renderer {
             }
             if (e.decorSide === side) drawTreeVariant(c, x, y, upper, e.decorKind, undefined, snow, rain, time, visibleReach);
             else this.trunk(`trunk-${variant}`, null, x, y, upper, time,
-                !upper && e.variant === 'branch' ? 3 : variant, snow, rain);
+                !upper && e.variant === 'branch' ? 3 : variant, snow, rain, visibleReach);
             if (lean) c.restore();
             if(snow>.15)drawSnowContact(c,x,upper?y+4:y-18,snow,time,e.id||0,reduced,this.decoration==='low',upper);
             if(rain>.03&&!reduced)
@@ -1640,8 +1649,8 @@ export class Renderer {
             if (!upper && e.snake) this.snake(e, reduced, snow, rain, time, this.decoration==='low', winter);
         }
     }
-    trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0){
-        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length:1000,variant,time,snow,rain});
+    trunk(key,preset,x,y,flip,time=0,variant=0,snow=0,rain=0,length=1000){
+        drawLivingTrunk(this.c,{x,y,upper:flip,width:TREE_WIDTH,length,variant,time,snow,rain});
     }
     snake(wood,reduced,snow=0,rain=0,time=0,low=false,cold=snow){
         const s=wood.snake,place=snakePlacement(wood),c=this.c;

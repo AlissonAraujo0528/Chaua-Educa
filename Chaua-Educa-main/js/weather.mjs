@@ -239,6 +239,66 @@ const RAIN_BANDS_FG_LOW = Object.freeze([{depth:1,count:10}]);
 const RAIN_BANDS_FG_NORM = Object.freeze([{depth:1,count:38}]);
 const RAIN_BANDS_BG_LOW = Object.freeze([{depth:.40,count:18},{depth:.73,count:28}]);
 const RAIN_BANDS_BG_NORM = Object.freeze([{depth:.40,count:68},{depth:.73,count:104}]);
+const rainDropSheets = new Map();
+const RAIN_DROP_SCALE = 2;
+const RAIN_BAND_SPECS = Object.freeze([
+ {foreground:false,depth:.40},
+ {foreground:false,depth:.73},
+ {foreground:true,depth:1}
+]);
+function getRainDropSheet(tiltStep) {
+ let entry = rainDropSheets.get(tiltStep);
+ if (entry) return entry;
+ const tilt = tiltStep / 8;
+ const maxLength = 21;
+ const sidewaysMax = tilt * maxLength;
+ const pad = 5;
+ const minX = Math.floor(Math.min(0, sidewaysMax * .22, sidewaysMax * .42) - pad);
+ const maxX = Math.ceil(Math.max(0, sidewaysMax * .22, sidewaysMax * .42) + pad);
+ const cellW = Math.max(16, maxX - minX);
+ const cellH = 30;
+ const ox = -minX, oy = 4;
+ const surface = new OffscreenCanvas(cellW * 3 * RAIN_DROP_SCALE, cellH * 3 * RAIN_DROP_SCALE);
+ const oc = surface.getContext('2d');
+ if (!oc) return null;
+ oc.lineCap = 'round';
+ for (let row = 0; row < RAIN_BAND_SPECS.length; row++) {
+  const {foreground, depth} = RAIN_BAND_SPECS[row];
+  const strokeMain = foreground ? '#e5f8ff' : '#c4e4f0';
+  const baseLen = (foreground ? 10 : 6) + depth * 8;
+  const baseRad = (foreground ? .95 : .48) + depth * .52;
+  const lwOuter = foreground ? 2.1 : 1.1 + depth * .75;
+  const lwInner = foreground ? 1.15 : .65 + depth * .4;
+  for (let variant = 0; variant < 3; variant++) {
+   const length = baseLen + variant * 1.5;
+   const radius = baseRad + variant * .08;
+   const sideways = tilt * length;
+   const tipX = sideways * .42;
+   oc.save();
+   oc.scale(RAIN_DROP_SCALE, RAIN_DROP_SCALE);
+   oc.translate(variant * cellW + ox, row * cellH + oy);
+   oc.beginPath();
+   oc.moveTo(0, 0);
+   oc.quadraticCurveTo(sideways * .22, length * .5, tipX, length);
+   oc.strokeStyle = '#305768';
+   oc.lineWidth = lwOuter;
+   oc.stroke();
+   oc.strokeStyle = strokeMain;
+   oc.lineWidth = lwInner;
+   oc.stroke();
+   oc.fillStyle = strokeMain;
+   oc.beginPath();
+   oc.ellipse(tipX, length, radius, radius * 1.28, -.1, 0, Math.PI * 2);
+   oc.fill();
+   oc.restore();
+  }
+ }
+ if (rainDropSheets.size >= 32) rainDropSheets.delete(rainDropSheets.keys().next().value);
+ entry = { surface, cellW, cellH, ox, oy };
+ rainDropSheets.set(tiltStep, entry);
+ return entry;
+}
+
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250,motion=null){
  if(w<=0||h<=0)return;
  const bands=foreground?(low?RAIN_BANDS_FG_LOW:RAIN_BANDS_FG_NORM):
@@ -251,14 +311,33 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
  const stormTravel=motion?.storm??time*storm;
  const windTravel=motion?.wind??time*wind;
  const speedTravel=motion?.speed??time*speed;
+ const useStamps=typeof OffscreenCanvas!=='undefined'&&typeof OffscreenCanvasRenderingContext2D!=='undefined';
+ const tiltSlope=-(wind*.55+storm*.26+speed*.0016);
+ const tiltStep=Math.round(tiltSlope*8);
+ const sheet=useStamps?getRainDropSheet(tiltStep):null;
  c.save();
  c.beginPath();c.rect(0,0,w,h);c.clip();
- c.lineCap='round';
+ if(!sheet)c.lineCap='round';
  for(const {depth,count} of bands){
   const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.55)));
   const driftX=(time*14+windTravel*48+stormTravel*14)*depth;
   const opacity=rainClamp(rain*(foreground?.68:.37+depth*.32)+storm*.10);
   c.globalAlpha=opacity;
+  if(sheet){
+   const bandRow=foreground?2:(depth<.6?0:1);
+   const sy=bandRow*sheet.cellH*RAIN_DROP_SCALE;
+   const sw=sheet.cellW*RAIN_DROP_SCALE,sh=sheet.cellH*RAIN_DROP_SCALE;
+   const cw=sheet.cellW,ch=sheet.cellH,ox=sheet.ox,oy=sheet.oy;
+   const baseA=230+depth*270,baseB=stormTravel*120+speedTravel*.1;
+   for(let i=0;i<visibleCount;i++){
+    const seed=(i+1)*67.17+depth*119.7;
+    const y=rainWrap(seed*11.17+time*(baseA+(i%4)*27)+baseB,h+64)-32;
+    const x=rainWrap(seed*23.79-driftX,w+64)-32;
+    const sx=(i%3)*sw;
+    c.drawImage(sheet.surface,sx,sy,sw,sh,x-ox,y-oy,cw,ch);
+   }
+   continue;
+  }
   c.strokeStyle='#305768';
   c.fillStyle=foreground?'#e5f8ff':'#c4e4f0';
   c.lineWidth=foreground?2.1:1.1+depth*.75;
@@ -269,11 +348,11 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
    const y=rainWrap(seed*11.17+time*(230+depth*270+(i%4)*27)+stormTravel*120+speedTravel*.1,h+64)-32;
    const x=rainWrap(seed*23.79-driftX,w+64)-32;
    const length=(foreground?10:6)+depth*8+(i%3)*1.5;
-   const sideways=-(wind*.55+storm*.26+speed*.0016)*length;
+   const sideways=tiltSlope*length;
    const item=rainScratch[i]||(rainScratch[i]={x:0,y:0,length:0,tipX:0,radius:0});
    item.x=x;item.y=y;item.length=length;
    item.radius=(foreground?.95:.48)+depth*.52+(i%3)*.08;
-   item.tipX=x-(wind*.55+storm*.26+speed*.0016)*length*.42;
+   item.tipX=x+tiltSlope*length*.42;
    c.moveTo(x,y);
    c.quadraticCurveTo(x+sideways*.22,y+length*.5,x+sideways*.42,y+length);
   }
