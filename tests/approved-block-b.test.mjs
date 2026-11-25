@@ -9,7 +9,7 @@ const root=new URL('../Chaua-Educa-main/assets/',import.meta.url);
 
 test('winter assets and six shedding frames remain available in runtime',()=>{
  for(const kind of ['lower','upper']){
-  for(const stage of ['snow-04','overlay-01','overlay-02','overlay-03','overlay-04']){
+  for(const stage of ['snow-04','overlay-04']){
    const file=new URL(`Seasons/Winter/trees-${kind}-${stage}.webp`,root);
    const b=readFileSync(file);
    assert.equal(b.toString('ascii',8,12),'WEBP',file.pathname);

@@ -43,12 +43,13 @@ test('gavião keeps the same real flight atlas across the crossing to leaving bo
   'inclined dive must continue using its established original art');
 });
 
-test('unused winter textures stop loading, but all authored overlays and shedding remain available',()=>{
+test('unused winter textures stay out of boot while overlay-04 and shedding remain available',()=>{
  for(const kind of ['lower','upper']){
   assert.equal(ASSET_PATHS[`trees-${kind}-snow`],undefined);
   for(const i of [1,2,3])assert.equal(ASSET_PATHS[`trees-${kind}-snow-0${i}`],undefined);
   assert.ok(ASSET_PATHS[`trees-${kind}-snow-04`]);
-  for(const i of [1,2,3,4])assert.ok(ASSET_PATHS[`trees-${kind}-overlay-0${i}`]);
+  for(const i of [1,2,3])assert.equal(ASSET_PATHS[`trees-${kind}-overlay-0${i}`],undefined);
+  assert.ok(ASSET_PATHS[`trees-${kind}-overlay-04`]);
  }
  assert.ok(ASSET_PATHS['runtime-fx-0'],'packed shedding remains required');
 });
