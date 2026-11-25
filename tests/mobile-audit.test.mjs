@@ -6,12 +6,12 @@ import {clipSnowReveal,snowRevealHeight} from '../Chaua-Educa-main/js/winter-vfx
 import {readFileSync} from 'node:fs';
 
 test('A/B modes never affect game unless perf-test is enabled',()=>{
- assert.equal(PERF_AB_VARIANT,'baseline');
- assert.equal(resolvePerfVariant('?perf-ab=snow-mask-off'),'baseline');
- for(const v of ['direct-snow','snow-mask-off','snow-flakes-off','static-season-bg','legacy-snow-clips','legacy-snow-rebuild']){
+ assert.equal(PERF_AB_VARIANT,'precomposed-snow');
+ assert.equal(resolvePerfVariant('?perf-ab=snow-mask-off'),'precomposed-snow');
+ for(const v of ['baseline','direct-snow','snow-mask-off','snow-flakes-off','static-season-bg','legacy-snow-clips','legacy-snow-rebuild']){
   assert.equal(resolvePerfVariant('?perf-test=1&perf-ab='+v),v);
  }
- assert.equal(resolvePerfVariant('?perf-test=1&perf-ab=invalid'),'baseline');
+ assert.equal(resolvePerfVariant('?perf-test=1&perf-ab=invalid'),'precomposed-snow');
 });
 test('clip reveal preserves all 32 columns on the fallback path',()=>{
  const calls=[],ctx={beginPath(){calls.push('begin');},rect(...args){calls.push(args);},clip(){calls.push('clip');}};

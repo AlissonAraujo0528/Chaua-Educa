@@ -150,6 +150,7 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
  drawSnowfall(c,w,h,time,weight3,reduced,low,wind,false,motion);
  if(!atlas)return;
  const cell=(atlas.naturalWidth||atlas.width)/2;
+ const drift=motion?.wind??time*wind;
  // Rain and storm are independent weather modes, not seasons. Suppress
  // decorative petals/foliage under severe precipitation instead of silently
  // remapping storm to winter or rain to autumn.
@@ -164,12 +165,13 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
   c.save();c.globalAlpha=layerAlpha;
   for(let i=0;i<count;i++){
    const size=32+(i%4)*4;
-   const travel=time*(15+i%3*4)+driftOffset*.028;
-   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
-   const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
+   const phase=i*2.1;
+   const travel=time*(9+i%3*3)+driftOffset*.017+drift*8;
+   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.72+phase)*16;
+   const y=((i*97.4+time*(16+i%4*5))%(h+80))-40;
    c.save();
-   c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
-   c.scale(.75+.25*Math.sin(time*1.4+i),1);
+   c.translate(x,y);c.rotate(Math.sin(time*.92+phase)*.68+wind*.16);
+   c.scale(.79+.21*Math.sin(time*1.3+phase),1);
    const frame=i%2;
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();
@@ -181,12 +183,13 @@ export function drawSeasonParticles(c,atlas,w,h,time,game,reduced,low,wind=0,mot
   c.save();c.globalAlpha=layerAlpha;
   for(let i=0;i<count;i++){
    const size=38+(i%4)*4;
-   const travel=time*(15+i%3*4)+driftOffset*.028;
-   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*.9+i)*16;
-   const y=((i*97.4+time*(22+i%4*7))%(h+80))-40;
+   const phase=i*1.73;
+   const travel=time*(19+i%3*5)+driftOffset*.028+drift*22;
+   const x=w+48-((i*147.7+travel)%(w+96))+Math.sin(time*1.05+phase)*19;
+   const y=((i*97.4+time*(25+i%4*8))%(h+80))-40+Math.sin(time*1.25+phase)*9;
    c.save();
-   c.translate(x,y);c.rotate(Math.sin(time*1.1+i)*.65+time*.25+wind*.3);
-   c.scale(.75+.25*Math.sin(time*1.4+i),1);
+   c.translate(x,y);c.rotate(time*.36+Math.sin(time*1.55+phase)*.95+wind*.36);
+   c.scale(.75+.25*Math.sin(time*1.65+phase),1);
    const frame=2+(i%2);
    c.drawImage(atlas,(frame%2)*cell,Math.floor(frame/2)*cell,cell,cell,-size/2,-size/2,size,size);
    c.restore();

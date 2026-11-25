@@ -1,3 +1,4 @@
+import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {FOREST_ART} from './forest-art-data.mjs';
 import {images} from './assets.mjs';
@@ -5,7 +6,7 @@ import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage,precomposedAssetKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
 
 
 // Repeat complete bark bands at the same scale as the authored cap.
@@ -125,13 +126,15 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Test C: draw a single complete authored tree state, not tree plus overlay.
  const treeSnow=PERF_AB_VARIANT==='snow-mask-off'?0:snow;
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(treeSnow):0;
- const preparedImage=precomposedLevel>0?images.get(precomposedAssetKey(kind,precomposedLevel)):null;
+
  const fullSnow = treeSnow >= 1 - 1e-6;
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
- const image = (PRECOMPOSED_SNOW_ACTIVE?preparedImage:null) || snowImg4 || images.get(`trees-${kind}`);
+ const image = snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
  const variantIdx=((variant % 4) + 4) % 4;
+ const packed=winterCapFrame(kind,precomposedLevel,variantIdx);
+ const capImage=packed?images.get(winterCapKey(packed[0])):null;
  const f = FOREST_ART[kind][variantIdx], s = width / (f.core[1] - f.core[0]);
  const sx = f.rect[0], sy = f.rect[1], cx = f.content[0], cy = f.content[1], cw = f.content[2], ch = f.content[3];
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
@@ -146,13 +149,15 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if (upper) {
   const start = y - length;
   fillBark(c,bark,coreLeft,join,width,s,join-start,true);
-  c.drawImage(image, sx + cx, sy + splice, cw, snowyTipEnd - splice, px, join, cw * s, (snowyTipEnd - splice) * s);
+  if(capImage)c.drawImage(capImage,packed[1],packed[2],packed[3],packed[4],px,join,packed[3]*s,packed[4]*s);
+  else c.drawImage(image,sx+cx,sy+splice,cw,snowyTipEnd-splice,px,join,cw*s,(snowyTipEnd-splice)*s);
  } else {
   const end = y + length;
   fillBark(c,bark,coreLeft,join,width,s,end-join,false);
   // Preserve the snow dome above the bare wood's y=20 content bound.
   const capTop=treeSnow>0?0:cy;
-  c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
+  if(capImage)c.drawImage(capImage,packed[1],packed[2],packed[3],packed[4],px,y-f.anchor[1]*s,packed[3]*s,packed[4]*s);
+  else c.drawImage(image,sx+cx,sy+capTop,cw,splice-capTop,
    px,y+(capTop-f.anchor[1])*s,cw*s,(splice-capTop)*s);
  }
 
@@ -163,7 +168,7 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  // Reveal solid authored snow progressively over the exposed surface.
  // Only the visible branch/cap is coated; a suspended tree must never gain
  // snow along the trunk section attached to the ceiling.
- if(snow>0&&!fullSnow&&!PRECOMPOSED_SNOW_ACTIVE&&PERF_AB_VARIANT!=='snow-mask-off'){
+ if(snow>0&&!fullSnow&&!capImage&&(!PRECOMPOSED_SNOW_ACTIVE||!!packed)&&PERF_AB_VARIANT!=='snow-mask-off'){
   const destY=upper?join:y-f.anchor[1]*s;
   const sourceY=sy+(upper?splice:0);
   const sourceHeight=upper?snowyTipEnd-splice:splice;
@@ -217,8 +222,9 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  // Special upper trunks remain free of ceiling-attached snow.
  // Broken variants retain the original fracture sequence.
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
- const preparedVariant=precomposedLevel>0?images.get(precomposedAssetKey('special',precomposedLevel)):null;
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
+ const packed=winterCapFrame('special',precomposedLevel,index);
+ const preparedVariant=packed?images.get(winterCapKey(packed[0])):null;
  if (!image || index < 0) return;
  const sx = (index % 2) * TREE_CELL;
  const sy = Math.floor(index / 2) * TREE_CELL;
@@ -236,7 +242,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
   fillBark(c,variantBark(image,index),-TREE_WIDTH/2,join,TREE_WIDTH,scale,reach-join,false);
   if(preparedVariant){
    // Draw the snow above the original cap without moving the wood anchor.
-   c.drawImage(preparedVariant,sx,sy,TREE_CELL,splice,
+   c.drawImage(preparedVariant,packed[1],packed[2],packed[3],packed[4],
     left,-TREE_CAP_Y*scale,TREE_CELL*scale,splice*scale);
   }else c.drawImage(image,sx,sy+TREE_CAP_Y,TREE_CELL,splice-TREE_CAP_Y,
    left,0,TREE_CELL*scale,join);
@@ -412,9 +418,9 @@ export function prepareTreeWeather(context){
  // Warm each prepared sheet before gameplay: avoid texture upload during flight.
  if(PRECOMPOSED_SNOW_ACTIVE&&context){
   context.save();
-  for(const kind of ['lower','upper','special'])for(let stage=1;stage<=15;stage++){
-   const img=images.get(precomposedAssetKey(kind,stage));
-   if(img)context.drawImage(img,100,100,20,20,0,0,1,1);
+  for(let page=0;page<WINTER_CAP_ART.pages.length;page++){
+   const img=images.get(winterCapKey(page));
+   if(img)context.drawImage(img,2,2,20,20,0,0,1,1);
   }
   context.restore();
  }

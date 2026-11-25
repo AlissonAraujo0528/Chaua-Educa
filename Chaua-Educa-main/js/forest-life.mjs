@@ -56,7 +56,7 @@ export function drawForestLife(c, w, h, time, distance, rain, wind, reduced = fa
 
         // Volumetric Crepuscular Sunbeams (God Rays) piercing the canopy
         if (!reduced && !low) {
-            const beamAlpha = sun * (0.16 + 0.04 * Math.sin(t * 0.8));
+            const beamAlpha = sun * (0.13 + 0.025 * Math.sin(t * 0.48));
             c.globalAlpha = beamAlpha;
             c.fillStyle=gradients.beam;
             // The five authored rays share a paint/alpha. One compound

@@ -1,3 +1,4 @@
+import {winterCapFrame,winterCapKey} from '../Chaua-Educa-main/js/precomposed-winter.mjs';
 import {canvasSpy,installCanvasMock} from './helpers/canvas.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -57,7 +58,7 @@ test('snow in variant trunks is painted on lower exposed cap once, not tiled alo
  const previous=new Map(images);
  t.after(()=>{images.clear();for(const [k,v] of previous)images.set(k,v)});
  const base={id:'base'},snow={id:'snow'};
- images.set('tree-variants',base);images.set('tree-variants-snow',snow);
+ images.set('tree-variants',base);images.set(winterCapKey(winterCapFrame('special',15,0)[0]),snow);
  const {c:ctx,draws}=canvasSpy();
  drawTreeVariant(ctx,400,190,false,'rot',undefined,1,0,0);
  const lower=draws.filter(args=>args[0]===snow);

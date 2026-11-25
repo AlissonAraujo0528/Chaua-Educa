@@ -4,6 +4,8 @@ import {snowCapMetrics} from './tree-art.mjs';
 import {getWeatherMode} from './weather.mjs';
 import {journeySeason} from './seasons.mjs';
 import {winterAmount} from './living-motion.mjs';
+import {surfaceSnow} from './surface-weather.mjs';
+import {precomposedSnowStage} from './precomposed-winter.mjs';
 import {ForensicRecorder} from './perf-forensics.mjs';
 import {setActiveProbe} from './perf-hooks.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
@@ -72,7 +74,8 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   const season=journeySeason(game);
   climateTimeline.push({reason,seconds:round(game.elapsed||0),distance:Math.round(game.distance||0),
    weather:getWeatherMode(),from:SEASON_NAMES[season.from],to:SEASON_NAMES[season.to],
-   mix:round(season.mix,3),snow:round(winterAmount(game),3)});
+   mix:round(season.mix,3),cold:round(winterAmount(game),3),
+   snow:round(surfaceSnow(game),3),snowStage:precomposedSnowStage(surfaceSnow(game))});
  };
  const logBackdrop=(event,details={})=>{
   addTransition({type:'seasonal-backdrop-'+event,
