@@ -265,7 +265,10 @@ function getRainDropSheet(tiltStep) {
  const cellW = Math.max(16, maxX - minX);
  const cellH = 30;
  const ox = -minX, oy = 4;
- const surface = new OffscreenCanvas(cellW * 3 * RAIN_DROP_SCALE, cellH * 3 * RAIN_DROP_SCALE);
+ const surface = typeof document !== 'undefined' ? document.createElement('canvas') :
+  new OffscreenCanvas(cellW * 3 * RAIN_DROP_SCALE, cellH * 3 * RAIN_DROP_SCALE);
+ surface.width = cellW * 3 * RAIN_DROP_SCALE;
+ surface.height = cellH * 3 * RAIN_DROP_SCALE;
  const oc = surface.getContext('2d');
  if (!oc) return null;
  oc.lineCap = 'round';
@@ -300,10 +303,29 @@ function getRainDropSheet(tiltStep) {
    oc.restore();
   }
  }
- if (rainDropSheets.size >= 32) rainDropSheets.delete(rainDropSheets.keys().next().value);
+ if (rainDropSheets.size >= 32) {
+  const oldest = rainDropSheets.keys().next().value;
+  const oldEntry = rainDropSheets.get(oldest);
+  if (oldEntry?.surface) { oldEntry.surface.width = 0; oldEntry.surface.height = 0; }
+  rainDropSheets.delete(oldest);
+ }
  entry = { surface, cellW, cellH, ox, oy };
  rainDropSheets.set(tiltStep, entry);
  return entry;
+}
+
+export function prewarmRainWeather(c, w = 960, h = 640) {
+ if (!c) return;
+ if (w > 0 && h > 0) weatherGradients(c, w, h);
+ if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvasRenderingContext2D === 'undefined') return;
+ c.save();
+ c.setTransform(1, 0, 0, 1, 0, 0);
+ c.globalAlpha = 0.004;
+ for (let tiltStep = 0; tiltStep >= -7; tiltStep--) {
+  const sheet = getRainDropSheet(tiltStep);
+  if (sheet) c.drawImage(sheet.surface, 0, 0, 4, 4, 0, 0, 2, 2);
+ }
+ c.restore();
 }
 
 function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=250,motion=null){

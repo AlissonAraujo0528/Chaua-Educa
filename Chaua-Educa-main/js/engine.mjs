@@ -21,6 +21,7 @@ import {createSurfaceWeather,advanceSurfaceWeather} from './surface-weather.mjs'
 export const WIDTH = 960;
 export const HEIGHT = 640;
 export const STEP = 1 / 120;
+const ACTIVE_CLOCK_STATES = new Set(['playing', 'countdown', 'impact', 'arrival']);
 export const FEATHER_SECONDS = 10;
 export const CONTACT = Object.freeze({top:20, bottom:HEIGHT-25, recoveryMargin:36, grace:1.6});
 export const MEDAL_SCORE = 1000;
@@ -37,13 +38,13 @@ export class FlightClock {
     constructor(game) { this.game = game; this.accumulator = 0; }
     reset() { this.accumulator = 0; }
     advance(seconds, beforeTick = null) {
-        if (!['playing', 'countdown', 'impact', 'arrival'].includes(this.game.state)) return this.reset();
+        if (!ACTIVE_CLOCK_STATES.has(this.game.state)) return this.reset();
         this.accumulator += Math.min(.25, Math.max(0, seconds));
         while (this.accumulator + 1e-10 >= STEP) {
             beforeTick?.(this.game);
             this.game.tick(STEP);
             this.accumulator -= STEP;
-            if (!['playing', 'countdown', 'impact', 'arrival'].includes(this.game.state)) { this.reset(); break; }
+            if (!ACTIVE_CLOCK_STATES.has(this.game.state)) { this.reset(); break; }
         }
     }
 }
@@ -125,7 +126,7 @@ export class Game {
     }
 
     visual(alpha) {
-        if (!['playing','arrival'].includes(this.state) || !this.previous) return this;
+        if ((this.state !== 'playing' && this.state !== 'arrival') || !this.previous) return this;
         const lerp = (a,b) => a + (b-a) * Math.max(0, Math.min(1, alpha));
         if (!this._visualObj) {
             Object.defineProperty(this, '_visualObj', { value: Object.create(this), writable: true, enumerable: false });
@@ -165,10 +166,12 @@ export class Game {
 
         if (!this._visualEntities) {
             Object.defineProperty(this, '_visualEntities', { value: [], writable: true, enumerable: false });
-            Object.defineProperty(this, '_visualPool', { value: [], writable: true, enumerable: false });
-            Object.defineProperty(this, '_visualSnakePool', { value: [], writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualEntityMap', { value: new Map(), writable: true, enumerable: false });
+            Object.defineProperty(this, '_visualSnakeMap', { value: new Map(), writable: true, enumerable: false });
         }
         const out = this._visualEntities;
+        const entityMap = this._visualEntityMap;
+        const snakeMap = this._visualSnakeMap;
         out.length = this.entities.length;
         for (let i = 0; i < this.entities.length; i++) {
             const e = this.entities[i];
@@ -177,15 +180,10 @@ export class Game {
                 out[i] = e;
                 continue;
             }
-            let entity = this._visualPool[i];
+            let entity = entityMap.get(e.id);
             if (!entity) {
                 entity = {};
-                this._visualPool[i] = entity;
-            }
-            if (entity._lastId !== e.id) {
-                // Prevent artwork and impact fields leaking across recycled IDs.
-                for (const key of Object.keys(entity)) delete entity[key];
-                entity._lastId = e.id;
+                entityMap.set(e.id, entity);
             }
             Object.assign(entity, e);
             entity.x = lerp(old.x, e.x);
@@ -193,14 +191,10 @@ export class Game {
             if (Number.isFinite(e.tumbleAngle)) entity.tumbleAngle = lerp(old.tumbleAngle ?? 0, e.tumbleAngle);
             if (Number.isFinite(e.retreatTime)) entity.retreatTime = lerp(old.hawkRetreatTime ?? 0, e.retreatTime);
             if (e.snake) {
-                let snake = this._visualSnakePool[i];
+                let snake = snakeMap.get(e.id);
                 if (!snake) {
                     snake = {};
-                    this._visualSnakePool[i] = snake;
-                }
-                if (snake._lastId !== e.id) {
-                    for (const key of Object.keys(snake)) delete snake[key];
-                    snake._lastId = e.id;
+                    snakeMap.set(e.id, snake);
                 }
                 Object.assign(snake, e.snake);
                 snake.phaseAge = old.snakePhase === e.snake.phase ? lerp(old.snakePhaseAge ?? 0, e.snake.phaseAge ?? 0) : e.snake.phaseAge;
@@ -212,6 +206,14 @@ export class Game {
                 entity.snake = undefined;
             }
             out[i] = entity;
+        }
+        if (entityMap.size > this.entities.length) {
+            for (const id of entityMap.keys()) {
+                if (!this.previous.entities.has(id)) {
+                    entityMap.delete(id);
+                    snakeMap.delete(id);
+                }
+            }
         }
         view.entities = out;
         // 120Hz simulation vs 180/240Hz monitors: interpolate VFX as well

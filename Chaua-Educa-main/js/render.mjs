@@ -11,7 +11,9 @@ import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mj
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SHEET_DEFS} from './action-sheets.mjs';
-import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather} from './tree-art.mjs';
+import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,warmWinterCapPage} from './tree-art.mjs';
+import {WINTER_CAP_ART} from './winter-cap-data.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE} from './precomposed-winter.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation} from './animation.mjs';
@@ -20,9 +22,10 @@ import {predictedHawkY} from './animals.mjs';
 import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
 import { flightViewport, advanceFlightCamera } from './viewport.mjs';
 import { images, loadAssets } from './assets.mjs';
+import { yieldTaskSlice, resetTaskSlice } from './image-loader.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
-import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination } from './weather.mjs';
-import {drawFood,prewarmFoodArt} from './food-art.mjs';
+import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination, prewarmRainWeather, getWeatherMode } from './weather.mjs';
+import {drawFood,prewarmFoodArt,getFrozenFoodAtlas} from './food-art.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {WeatherMotion} from './weather-motion.mjs';
 import {TreeDrips} from './weather-art.mjs';
@@ -35,6 +38,11 @@ const HAWK_LINE_DASH = Object.freeze([6, 8]);
 const SHIELD_EMPTY_DASH = Object.freeze([5, 7]);
 const BACKGROUND_PALETTE=['#dbe7b5','#dde0a1','#e6d8a0','#d9e9b7'];
 const TINT_PALETTE=['#bdcf8c','#e4c16b','#507b63','#92bf74'];
+const PEPPER_TRAIL_COLORS = Object.freeze(Array.from({ length: 8 }, (_, idx) => {
+    const i = idx + 1;
+    return `rgba(255, ${Math.floor(80 + i * 18)}, 40, ${0.8 - i * 0.09})`;
+}));
+const FEATHER_TRAIL_COLORS = Object.freeze(Array.from({ length: 8 }, (_, idx) => `rgba(255, 225, 110, ${0.8 - (idx + 1) * 0.08})`));
 
 const mixColor = (a, b, t) => {
     const r = Math.round(parseInt(a.slice(1, 3), 16) * (1 - t) + parseInt(b.slice(1, 3), 16) * t);
@@ -50,8 +58,8 @@ function blendSprite(c, first, second, blend, extent=128) {
     if(!buffer){
         const rasterScale=extent===180?320/HAWK_ART.size:2;
         const size=Math.ceil(extent*2*rasterScale);
-        const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(size,size):
-            typeof document!=='undefined'?document.createElement('canvas'):null;
+        const surface=typeof document!=='undefined'?document.createElement('canvas'):
+            typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(size,size):null;
         if(!surface){(blend<.5?first:second)(c);return;}
         surface.width=size;surface.height=size;
         buffer={surface,layer:surface.getContext('2d'),rasterScale};spriteBlendBuffers.set(extent,buffer);
@@ -217,9 +225,12 @@ function getSeedSprite(color = '#a0582c') {
         const sw = 7, sh = sw * 1.65;
         const width = 36, height = 48;
         const cx = 18, cy = 24;
-        const canvas = typeof OffscreenCanvas !== 'undefined'
-            ? new OffscreenCanvas(width, height)
-            : document.createElement('canvas');
+        const canvas = typeof document !== 'undefined'
+            ? document.createElement('canvas')
+            : typeof OffscreenCanvas !== 'undefined'
+                ? new OffscreenCanvas(width, height)
+                : null;
+        if (!canvas) return null;
         canvas.width = width; canvas.height = height;
         const c = canvas.getContext('2d');
 
@@ -273,9 +284,12 @@ function getFeatherSprite(color) {
         const size = 10;
         const width = 24, height = 30;
         const cx = 12, cy = 14;
-        const canvas = typeof OffscreenCanvas !== 'undefined'
-            ? new OffscreenCanvas(width, height)
-            : document.createElement('canvas');
+        const canvas = typeof document !== 'undefined'
+            ? document.createElement('canvas')
+            : typeof OffscreenCanvas !== 'undefined'
+                ? new OffscreenCanvas(width, height)
+                : null;
+        if (!canvas) return null;
         canvas.width = width; canvas.height = height;
         const c = canvas.getContext('2d');
         c.beginPath();c.moveTo(cx,cy-size);c.bezierCurveTo(cx+size*.8,cy-size*.4,cx+size*.55,cy+size*.5,cx,cy+size);
@@ -390,16 +404,28 @@ const TEXT_CACHE_LIMIT = 128;
 const TEXT_CACHE_SCALE = 2;
 const textSprites = new Map();
 let fontCacheHooked = false;
+let textMeasureCtx = null;
+function getTextMeasureCtx() {
+    if (textMeasureCtx) return textMeasureCtx;
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    textMeasureCtx = canvas?.getContext?.('2d') || null;
+    return textMeasureCtx;
+}
 function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, lineWidth = 0, textBaseline = 'alphabetic') {
     if (typeof OffscreenCanvas !== 'undefined' && typeof OffscreenCanvasRenderingContext2D !== 'undefined' && typeof document !== 'undefined') {
         if (!fontCacheHooked && document.fonts?.ready) {
             fontCacheHooked = true;
-            document.fonts.ready.then(() => textSprites.clear()).catch(() => {});
+            document.fonts.ready.then(() => {
+                for (const entry of textSprites.values()) {
+                    if (entry?.surface) { entry.surface.width = 0; entry.surface.height = 0; }
+                }
+                textSprites.clear();
+            }).catch(() => {});
         }
         const key = `${font}|${fillStyle}|${strokeStyle || ''}|${lineWidth}|${textBaseline}|${text}`;
         let entry = textSprites.get(key);
         if (!entry) {
-            const probe = document.createElement('canvas').getContext('2d');
+            const probe = getTextMeasureCtx();
             if (probe && typeof probe.measureText === 'function') {
                 probe.font = font;
                 probe.textAlign = 'center';
@@ -414,7 +440,11 @@ function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, line
                 const h = Math.max(1, asc + desc + pad * 2);
                 const anchorX = pad + leftExt;
                 const anchorY = pad + asc;
-                const surface = new OffscreenCanvas(w * TEXT_CACHE_SCALE, h * TEXT_CACHE_SCALE);
+                const surface = typeof document !== 'undefined'
+                    ? document.createElement('canvas')
+                    : new OffscreenCanvas(w * TEXT_CACHE_SCALE, h * TEXT_CACHE_SCALE);
+                surface.width = w * TEXT_CACHE_SCALE;
+                surface.height = h * TEXT_CACHE_SCALE;
                 const oc = surface.getContext('2d');
                 if (oc) {
                     oc.scale(TEXT_CACHE_SCALE, TEXT_CACHE_SCALE);
@@ -428,7 +458,12 @@ function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, line
                     }
                     oc.fillStyle = fillStyle;
                     oc.fillText(text, anchorX, anchorY);
-                    if (textSprites.size >= TEXT_CACHE_LIMIT) textSprites.delete(textSprites.keys().next().value);
+                    if (textSprites.size >= TEXT_CACHE_LIMIT) {
+                        const oldestKey = textSprites.keys().next().value;
+                        const old = textSprites.get(oldestKey);
+                        if (old?.surface) { old.surface.width = 0; old.surface.height = 0; }
+                        textSprites.delete(oldestKey);
+                    }
                     entry = { surface, w, h, anchorX, anchorY };
                     textSprites.set(key, entry);
                 }
@@ -662,8 +697,8 @@ function getPickupCache(key, radius, stops) {
     let surface = pickupCaches.get(key);
     if (surface) return surface;
     const size = radius * 2;
-    surface = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) :
-        typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    surface = typeof document !== 'undefined' ? document.createElement('canvas') :
+        typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) : null;
     if (!surface) return null;
     surface.width = size; surface.height = size;
     const gc = surface.getContext('2d');
@@ -678,8 +713,8 @@ function getPickupCache(key, radius, stops) {
 let pepperVectorCache = null;
 function getPepperSprite() {
     if (pepperVectorCache) return pepperVectorCache;
-    const surface = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(48, 56) :
-        typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const surface = typeof document !== 'undefined' ? document.createElement('canvas') :
+        typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(48, 56) : null;
     if (!surface) return null;
     surface.width = 48; surface.height = 56;
     const gc = surface.getContext('2d');
@@ -757,52 +792,101 @@ export class Renderer {
         // so wind drift and 8-stripe transitions blit 1:1 without bilinear rescaling.
         this.scaledForestCacheEnabled = true;
         this.cachedView = null;
+        this.winterCapWarmupIndex = 0;
+        this._countdownWarmFrames = 0;
+        this._skyGrads = null;
+        this._homeWashGrad = null;
+        this._mobileWashGrad = null;
         this.initializeAssets();
         this.resize();
     }
     initializeAssets() {
-        this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(() => {
-            prepareTreeWeather(this.c);
-            prewarmFoodArt();
-            // Warm up pickup radial caches during asset load so first spawn never stalls.
-            getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]);
-            getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]);
-            getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]);
-            getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]);
-            getPickupCache('chaua-shield-aura', 78, [[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]);
-            getPepperSprite();
+        this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(async () => {
+            resetTaskSlice();
+            prepareTreeWeather(this.c, { skipWinterCapGpuWarmup: true });
+            await yieldTaskSlice(5);
+            const frozenFood = getFrozenFoodAtlas();
+            // Warm up pickup, particle and HUD-label caches during asset load so first spawn never stalls.
+            const warmSurface = (src, sw = 8, sh = 8) => {
+                if (!src) return;
+                this.c.save();
+                this.c.setTransform(1,0,0,1,0,0);
+                this.c.globalAlpha=0.004;
+                this.c.drawImage(src, 0, 0, sw, sh, 0, 0, 4, 4);
+                this.c.restore();
+            };
+            warmSurface(frozenFood);
+            warmSurface(getPickupCache('fruit-glow', 28, [[4, 0, '#ffffffaa'], [4, 0.5, '#f4d87c44'], [4, 1, '#ffffff00']]));
+            warmSurface(getPickupCache('pepper-glow', 36, [[4, 0, '#ff5233bb'], [4, 0.6, '#ff803355'], [4, 1, '#ffffff00']]));
+            warmSurface(getPickupCache('feather-glow', 42, [[6, 0, '#ffe399dd'], [6, 0.6, '#ffd55e66'], [6, 1, '#ffffff00']]));
+            warmSurface(getPickupCache('shield-glow', 42, [[6, 0, '#a8f5d0dd'], [6, 0.6, '#46e49e66'], [6, 1, '#ffffff00']]));
+            warmSurface(getPickupCache('chaua-shield-aura', 78, [[38, 0, 'rgba(46, 245, 195, 0.04)'], [38, 0.7, 'rgba(46, 245, 195, 0.28)'], [38, 1, 'rgba(46, 245, 195, 0)']]));
+            warmSurface(getPepperSprite());
+            for (const cColor of ['#d7edab', '#8fb969', '#498245', '#efc25a']) warmSurface(getFeatherSprite(cColor));
+            for (const sColor of ['#a0582c', '#80492c', '#c63b2b', '#d97c3a']) warmSurface(getSeedSprite(sColor));
+            this.c.save();
+            this.c.setTransform(1,0,0,1,0,0);
+            this.c.globalAlpha=0.004;
+            drawCachedText(this.c, '+10', 2, 2, '800 18px Nunito', '#f1ffd4', '#254a35', 3);
+            drawCachedText(this.c, 'TURBO', 2, 2, '900 10px Nunito', '#ffe9b6');
+            drawCachedText(this.c, '×2', 2, 2, '900 12px Nunito', '#fff4c2');
+            this.c.restore();
             const particlesImg = images.get('season-particles');
             if (particlesImg && !particlesImg._rasterized) {
                 const pw = particlesImg.naturalWidth || particlesImg.width;
                 const ph = particlesImg.naturalHeight || particlesImg.height;
-                const off = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : document.createElement('canvas');
-                off.width = pw; off.height = ph;
-                off.getContext('2d').drawImage(particlesImg, 0, 0);
-                off._rasterized = true;
-                images.set('season-particles', off);
+                const off = typeof document !== 'undefined' ? document.createElement('canvas') :
+                    typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : null;
+                if (off) {
+                    off.width = pw; off.height = ph;
+                    off.getContext('2d').drawImage(particlesImg, 0, 0);
+                    off._rasterized = true;
+                    images.set('season-particles', off);
+                }
             }
             this.seasonalBackdrop=new SeasonalBackdrop();
-            // Prewarm active GPU surfaces inside the live canvas before start is enabled
-            // so first-appearance textures (snakes, action sheets, overlays, seasons) never stall mid-flight.
-            this.c.save();
-            this.c.setTransform(1,0,0,1,0,0);
-            this.c.globalAlpha=0.001;
+            await yieldTaskSlice(5);
+            // Prewarm active GPU surfaces incrementally so first-appearance textures
+            // (world, snakes, action sheets, rain, winter caps) never freeze countdown or mid-flight frames.
             for (const [key, img] of images) {
-                if (img?._rasterized) this.c.drawImage(img, 0, 0, 8, 8, 0, 0, 4, 4);
+                if (!img?._rasterized || key.startsWith('winter-caps-')) continue;
+                warmSurface(img);
+                await yieldTaskSlice(5);
             }
-            for (const key of SNAKE_SHEET_KEYS) warmupSnakeA2(this.c, key);
-            for (const key of Object.keys(ACTION_SHEET_DEFS)) drawActionSheet(this.c, key, 0, 0, 0, 4, 4);
-            this.c.clearRect(0, 0, 8, 8);
-            this.c.restore();
-            // Prepare the first season during countdown, before the flight.
-            // The menu uses forest.webp and does not need seasonal surfaces.
+            while (this.warmNextWinterCap()) {
+                await yieldTaskSlice(0);
+            }
+            prewarmRainWeather(this.c, this.w || 960, this.h || 640);
+            await yieldTaskSlice(5);
+            for (const key of SNAKE_SHEET_KEYS) {
+                warmupSnakeA2(this.c, key);
+                await yieldTaskSlice(5);
+            }
+            for (const key of Object.keys(ACTION_SHEET_DEFS)) {
+                this.c.save();
+                this.c.setTransform(1,0,0,1,0,0);
+                this.c.globalAlpha=0.004;
+                drawActionSheet(this.c, key, 0, 0, 0, 4, 4);
+                this.c.restore();
+                await yieldTaskSlice(5);
+            }
             // Initialize the enlarged predator compositor while assets load,
             // before the start button is enabled, not at its first encounter.
             this.c.save();this.c.translate(-1000,-1000);
             this.hawk({id:1,x:0,y:0,warning:0,phase:'crossing'},0,false);
             this.c.restore();
+            this.c.save();
+            this.c.setTransform(1,0,0,1,0,0);
+            this.c.clearRect(0, 0, 8, 8);
+            this.c.restore();
         });
         return this.ready;
+    }
+    warmNextWinterCap() {
+        if (!PRECOMPOSED_SNOW_ACTIVE || this.winterCapWarmupIndex >= WINTER_CAP_ART.pages.length) return false;
+        const page = this.winterCapWarmupIndex++;
+        warmWinterCapPage(this.c, page);
+        return true;
     }
     setQuality(level) {
         const next=level==='low'?'low':'high';
@@ -890,13 +974,19 @@ export class Renderer {
     }
     paintSky(c,light){
         const w=this.w,h=this.h;
-        const bg = c.createLinearGradient(0, 0, 0, h);
-        bg.addColorStop(0, light); bg.addColorStop(.5, '#abc68d'); bg.addColorStop(1, '#355f45');
-        c.fillStyle = bg; c.fillRect(0, 0, w, h);
-        // Filtered sunlight through distant crowns.
-        const sun = c.createRadialGradient(w * .7, h * .15, 0, w * .7, h * .15, h * .8);
-        sun.addColorStop(0, '#fff4c299'); sun.addColorStop(.5, '#fff0b52a'); sun.addColorStop(1, '#fff0b500');
-        c.fillStyle = sun; c.fillRect(0, 0, w, h);
+        if(!this._skyGrads)this._skyGrads=new WeakMap();
+        let entry=this._skyGrads.get(c);
+        if(!entry||entry.w!==w||entry.h!==h||entry.light!==light){
+            const bg = c.createLinearGradient(0, 0, 0, h);
+            bg.addColorStop(0, light); bg.addColorStop(.5, '#abc68d'); bg.addColorStop(1, '#355f45');
+            // Filtered sunlight through distant crowns.
+            const sun = c.createRadialGradient(w * .7, h * .15, 0, w * .7, h * .15, h * .8);
+            sun.addColorStop(0, '#fff4c299'); sun.addColorStop(.5, '#fff0b52a'); sun.addColorStop(1, '#fff0b500');
+            entry={w,h,light,bg,sun};
+            this._skyGrads.set(c,entry);
+        }
+        c.fillStyle = entry.bg; c.fillRect(0, 0, w, h);
+        c.fillStyle = entry.sun; c.fillRect(0, 0, w, h);
     }
     prepareSky(light){
         if(typeof OffscreenCanvas==='undefined'&&typeof document==='undefined')return null;
@@ -1113,14 +1203,13 @@ export class Renderer {
         const backdropMix=stageMix===1?1:Math.round(Math.max(0,Math.min(1,stageMix))*64)/64;
         const backdropLight=stageMix===1?light:mixColor(palette[Math.max(0,stage-1)],palette[stage],backdropMix);
         const backdropAlpha=stage===2?1-.4*backdropMix:stage===3?.6+.4*backdropMix:1;
+        const forestDrift = !home&&!reduced&&forest
+            ? Math.sin(time*.035)*Math.min(24,(forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2)
+            : 0;
         const cachedBackdrop=!home&&!reduced&&forest?
             (stage>0&&(stageMix<1||this.transitionBackdrop?.active)?
-                this.prepareStagedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
-                    (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
-                    backdropAlpha,stageMix===1,stage===3):
-                this.prepareFragmentedBackdrop(forest,backdropLight,Math.sin(time*.035)*Math.min(24,
-                    (forest.naturalWidth*Math.max(w/forest.naturalWidth,h/forest.naturalHeight)*1.08-w)/2),
-                    backdropAlpha)):null;
+                this.prepareStagedBackdrop(forest,backdropLight,forestDrift,backdropAlpha,stageMix===1,stage===3):
+                this.prepareFragmentedBackdrop(forest,backdropLight,forestDrift,backdropAlpha)):null;
         if(cachedBackdrop){
             c.save();c.setTransform(1,0,0,1,0,0);
             c.drawImage(cachedBackdrop.surface,0,0);c.restore();
@@ -1219,9 +1308,12 @@ export class Renderer {
             c.restore();
         }
         if (home) {
-            const wash = c.createLinearGradient(0, 0, w * .7, 0);
-            wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');
-            c.fillStyle = wash; c.fillRect(0, 0, w, h);
+            if (!this._homeWashGrad || this._homeWashGrad.c !== c || this._homeWashGrad.w !== w) {
+                const wash = c.createLinearGradient(0, 0, w * .7, 0);
+                wash.addColorStop(0, '#f1f2da'); wash.addColorStop(.66, '#f0f1d9ef'); wash.addColorStop(1, '#e7edcb00');
+                this._homeWashGrad = { c, w, grad: wash };
+            }
+            c.fillStyle = this._homeWashGrad.grad; c.fillRect(0, 0, w, h);
         }
     }
 
@@ -1230,8 +1322,12 @@ export class Renderer {
         const c = this.c, mobile = this.w <= 700;
         this.background(time, 0, 0, !mobile, reduced);
         if (mobile) {
-            const wash = c.createLinearGradient(0, this.h * .50, 0, this.h * .78); wash.addColorStop(0, '#f0f1da'); wash.addColorStop(1, '#f0f1da00');
-            c.fillStyle = '#f0f1da'; c.fillRect(0, 0, this.w, this.h * .5); c.fillStyle = wash; c.fillRect(0, this.h * .5, this.w, this.h * .28);
+            if (!this._mobileWashGrad || this._mobileWashGrad.c !== c || this._mobileWashGrad.h !== this.h) {
+                const wash = c.createLinearGradient(0, this.h * .50, 0, this.h * .78);
+                wash.addColorStop(0, '#f0f1da'); wash.addColorStop(1, '#f0f1da00');
+                this._mobileWashGrad = { c, h: this.h, grad: wash };
+            }
+            c.fillStyle = '#f0f1da'; c.fillRect(0, 0, this.w, this.h * .5); c.fillStyle = this._mobileWashGrad.grad; c.fillRect(0, this.h * .5, this.w, this.h * .28);
         }
         if(!this.homeHideCharacter && (!this.homeMobileLayout || this.homePreview)){
         const {x,y,scale}=this.homePreview||homePerchLayout(this.w,this.h);
@@ -1364,7 +1460,7 @@ export class Renderer {
                     const trailX = game.x - i * 14;
                     const trailY = game.y + Math.sin(game.elapsed * 16 - i * 0.8) * 8;
                     const sz = (8 - i) * 1.5;
-                    oval(c, trailX, trailY, sz * 1.8, sz * 0.8, `rgba(255, ${Math.floor(80 + i * 18)}, 40, ${0.8 - i * 0.09})`, -0.2);
+                    oval(c, trailX, trailY, sz * 1.8, sz * 0.8, PEPPER_TRAIL_COLORS[i - 1], -0.2);
                 }
                 c.strokeStyle = '#ffecd166';
                 c.lineWidth = 1.8;
@@ -1395,7 +1491,7 @@ export class Renderer {
             }
             if (!reduced) {
                 for (let i = 1; i < 9; i++) {
-                    oval(c, game.x - i * 11, game.y + Math.sin(game.elapsed * 7 - i) * 8, 4 * (1 - i / 10), 4, `rgba(255, 225, 110, ${0.8 - i * 0.08})`);
+                    oval(c, game.x - i * 11, game.y + Math.sin(game.elapsed * 7 - i) * 8, 4 * (1 - i / 10), 4, FEATHER_TRAIL_COLORS[i - 1]);
                 }
             }
             c.restore();
@@ -1666,7 +1762,7 @@ export class Renderer {
         this.animalWeather?.actor(c,{id:`snake:${wood.id}`,pose:{sheet:`snake-${pose.key}`,frame:pose.frame,
             rect:[-192*artFactor,-352*artFactor,384*artFactor,384*artFactor],mirror:snakeA2NeedsMirror(pose)},
             moving:s.phase==='striking'||!!s.retreat,hidden:!!s.dazed});
-        if(cold>.18&&!s.retreat&&!['windup','striking','recovering'].includes(s.phase)){
+        if(cold>.18&&!s.retreat&&s.phase!=='windup'&&s.phase!=='striking'&&s.phase!=='recovering'){
             const breath=winterBreathSettings('snake',cold,time,
                 {low,reduced,activity:activePhase,seed:wood.id||0});
             if(breath){

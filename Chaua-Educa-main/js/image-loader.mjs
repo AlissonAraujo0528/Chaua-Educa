@@ -1,11 +1,53 @@
+const CAN_YIELD_TASK = typeof window !== 'undefined' && typeof document !== 'undefined'
+ && typeof OffscreenCanvas !== 'undefined' && typeof requestAnimationFrame === 'function'
+ && typeof performance !== 'undefined';
+let sliceStartedAt = 0;
+let rasterQueue = Promise.resolve();
+
+function hasNativeRaf() {
+ if (!CAN_YIELD_TASK || document.hidden) return false;
+ try {
+  return typeof window.requestAnimationFrame === 'function'
+   && String(window.requestAnimationFrame).includes('[native code]');
+ } catch { return false; }
+}
+
+function nextFrameOrTimer() {
+ if (!hasNativeRaf()) return new Promise(resolve => setTimeout(resolve, 0));
+ return new Promise(resolve => {
+  let done = false;
+  const finish = () => { if (done) return; done = true; clearTimeout(timer); resolve(); };
+  const timer = setTimeout(finish, 25);
+  window.requestAnimationFrame(finish);
+ });
+}
+
+export function resetTaskSlice() {
+ sliceStartedAt = typeof performance !== 'undefined' ? performance.now() : 0;
+}
+
+export async function yieldTaskSlice(budgetMs = 5) {
+ if (!CAN_YIELD_TASK) return;
+ const now = performance.now();
+ if (!sliceStartedAt) {
+  sliceStartedAt = now;
+  return;
+ }
+ if (now - sliceStartedAt < budgetMs) return;
+ await nextFrameOrTimer();
+ sliceStartedAt = performance.now();
+}
+
 function rasterizeLoadedImage(image) {
  // Keep decoded pixel data in a persistent canvas surface so Chromium does not
  // evict discardable LazyPixelRefs and synchronously re-decode WebPs mid-flight.
+ // Prefer an HTMLCanvasElement in browsers so drawing onto the main 2D canvas
+ // avoids OffscreenCanvas cross-surface sync stalls during warmup and gameplay.
  if (typeof document === 'undefined' && typeof OffscreenCanvasRenderingContext2D === 'undefined') return image;
  const w = image.naturalWidth, h = image.naturalHeight;
  if (!(w > 0 && h > 0)) return image;
- const surface = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) :
-  typeof document !== 'undefined' ? document.createElement('canvas') : null;
+ const surface = typeof document !== 'undefined' ? document.createElement('canvas') :
+  typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : null;
  if (!surface) return image;
  surface.width = w; surface.height = h;
  const ctx = surface.getContext('2d');
@@ -59,7 +101,23 @@ export function loadImage(url,{width,height,errorMessage=`Não foi possível car
       bitmap.close();
      }
     }
-    finish(null,representation==='image'?image:rasterizeLoadedImage(image));
+    if(representation==='image'){finish(null,image);return;}
+    if(!CAN_YIELD_TASK){finish(null,rasterizeLoadedImage(image));return;}
+    // Download & decode succeeded; cancel network timeout before waiting in rasterQueue.
+    clearTimeout(timer);
+    // Serialize and cooperatively slice canvas rasterization across macrotasks
+    // so dozens of simultaneous WebP decodes never block main-thread input/paint.
+    const step = async () => {
+     if (settled) return image;
+     await yieldTaskSlice(4);
+     if (settled) return image;
+     if (!sliceStartedAt) sliceStartedAt = performance.now();
+     return rasterizeLoadedImage(image);
+    };
+    const next = rasterQueue.then(step, step);
+    rasterQueue = next.catch(() => {});
+    const asset = await next;
+    if (!settled) finish(null, asset);
    }
    catch(error){finish(new Error(`${errorMessage} · falha de decodificação`,{cause:error}));}
   };

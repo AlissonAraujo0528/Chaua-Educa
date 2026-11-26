@@ -11,12 +11,16 @@ const wetCache=new Map();
 let frozenSource=null,frozenAtlas=null;
 
 function surface(width,height){
- const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):
-  typeof document!=='undefined'?document.createElement('canvas'):null;
+ const canvas=typeof document!=='undefined'?document.createElement('canvas'):
+  typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):null;
  if(!canvas)return null;
  canvas.width=width;canvas.height=height;
  const c=canvas.getContext('2d');
  return c?{canvas,c}:null;
+}
+
+export function getFrozenFoodAtlas(){
+ return prewarmFoodArt()?frozenAtlas:null;
 }
 
 // Called during Renderer.initializeAssets(), outside the active flight loop.

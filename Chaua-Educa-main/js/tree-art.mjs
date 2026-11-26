@@ -268,7 +268,7 @@ function barkTile(image,key,sx,sy,width,height,reverse){
  let entries=barkTiles.get(image);
  if(!entries){entries=new Map();barkTiles.set(image,entries);}
  if(entries.has(key))return entries.get(key);
- const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(Math.ceil(width),height*2):document.createElement('canvas');
+ const canvas=typeof document!=='undefined'?document.createElement('canvas'):new OffscreenCanvas(Math.ceil(width),height*2);
  canvas.width=Math.ceil(width);canvas.height=height*2;
  const c=canvas.getContext('2d');
  for(let row=0;row<2;row++){
@@ -661,17 +661,42 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 }
 
 const snowMixBuffers=new Map();
-export function prepareTreeWeather(context){
+export function warmWinterCapPage(context,page){
+ if(!PRECOMPOSED_SNOW_ACTIVE||!context)return false;
+ const img=images.get(winterCapKey(page));
+ if(!img)return false;
+ context.save();
+ context.setTransform(1,0,0,1,0,0);
+ context.globalAlpha=.004;
+ context.drawImage(img,2,2,20,20,0,0,1,1);
+ context.restore();
+ return true;
+}
+export function prepareTreeWeather(context,options={}){
+ const skipWinterCapGpuWarmup=options?.skipWinterCapGpuWarmup===true;
+ const warmPattern=(pattern)=>{
+  if(!context||!pattern)return;
+  context.save();
+  context.setTransform(1,0,0,1,0,0);
+  context.globalAlpha=.004;
+  context.fillStyle=pattern;
+  context.fillRect(0,0,1,1);
+  context.restore();
+ };
  for(const kind of ['lower','upper']){
   if(PERF_AB_VARIANT==='legacy-snow-rebuild')snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);
-   if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+   if(context){
+    const pattern=context.createPattern(tile.canvas,'repeat');
+    tile.patterns.set(context,pattern);
+    warmPattern(pattern);
+   }
   });
  }
  // Validate bands and warm only the compact active-stage surface in the
- // experimental stage-cache variant; control keeps warming all 4 pages.
+ // experimental stage-cache variant; control keeps warming all pages unless deferred.
  if(PRECOMPOSED_SNOW_STAGE_CACHE){
   const stageBands=getWinterStageBands();
   const firstBand=stageBands.bands[1];
@@ -682,7 +707,7 @@ export function prepareTreeWeather(context){
    context.drawImage(cached.surface,2,2,20,20,0,0,1,1);
    context.restore();
   }
- }else if(PRECOMPOSED_SNOW_ACTIVE&&context){
+ }else if(PRECOMPOSED_SNOW_ACTIVE&&context&&!skipWinterCapGpuWarmup){
   context.save();
   for(let page=0;page<WINTER_CAP_ART.pages.length;page++){
    const img=images.get(winterCapKey(page));
@@ -694,7 +719,11 @@ export function prepareTreeWeather(context){
  if(image)wetVariantCap(image);
  if(image)for(let index=0;index<4;index++){
   const tile=variantBark(image,index);
-  if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+  if(context){
+   const pattern=context.createPattern(tile.canvas,'repeat');
+   tile.patterns.set(context,pattern);
+   warmPattern(pattern);
+  }
  }
 }
 function snowOverlay(kind,amount){

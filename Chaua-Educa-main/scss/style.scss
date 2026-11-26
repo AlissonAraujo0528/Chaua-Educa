@@ -267,6 +267,7 @@ h2 {
   margin-top: 28px;
   max-width: 400px;
   position: relative;
+  isolation: isolate;
 }
 
 .start-card > label {
@@ -490,7 +491,7 @@ h2 {
   gap: 10px;
   background: rgba(255, 251, 231, 0.7882352941);
   border: 1px solid rgba(255, 246, 214, 0.6666666667);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
   padding: 14px 18px;
   border-radius: 14px;
   box-shadow: 0 8px 25px rgba(30, 73, 43, 0.062745098);
@@ -603,6 +604,7 @@ h2 {
 .score-pill strong {
   font: 700 34px "Baloo 2";
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   will-change: transform;
 }
 
@@ -786,20 +788,21 @@ kbd {
   position: absolute;
   top: 110px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(6px);
   padding: 9px 17px;
   border-radius: 30px;
   background: rgba(255, 251, 237, 0.9294117647);
   font-size: 12px;
   font-weight: 800;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease, transform 0.2s ease;
   max-width: 70%;
   text-align: center;
 }
 
 .toast.visible {
   opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .countdown {
@@ -1159,6 +1162,7 @@ dialog::backdrop {
 }
 
 .new-record {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1168,8 +1172,19 @@ dialog::backdrop {
   border: 2px solid #f59e0b;
   padding: 4px 12px;
   border-radius: 16px;
-  animation: record-glow 2s ease-in-out infinite;
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+}
+
+.new-record::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 22px rgba(237, 197, 101, 0.55);
+  opacity: 0.25;
+  will-change: opacity;
+  animation: record-glow 2s ease-in-out infinite;
 }
 
 .new-record svg {
@@ -1343,9 +1358,8 @@ dd {
 }
 
 @keyframes record-glow {
-  50% {
-    box-shadow: 0 0 22px rgba(237, 197, 101, 0.4);
-  }
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
 }
 .home .start-button svg {
   transition: transform 0.2s;
@@ -1699,10 +1713,6 @@ dd {
   from { opacity: 0; transform: translateY(16px) scale(.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes forest-backdrop {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 @keyframes button-sheen {
   0%, 72% { transform: translateX(-160%) skewX(-18deg); }
   100% { transform: translateX(260%) skewX(-18deg); }
@@ -1712,8 +1722,8 @@ dd {
   50% { transform: rotate(1deg) scale(1.025); }
 }
 @keyframes canopy-glow {
-  0%, 100% { box-shadow: 0 0 0 0 #a6ca6350, 0 16px 40px #24452b12; }
-  50% { box-shadow: 0 0 0 5px #a6ca6300, 0 20px 48px #658f4528; }
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.012); }
 }
 @keyframes podium-enter {
   from { opacity: 0; transform: translateX(-12px); }
@@ -1742,13 +1752,24 @@ button:not(:disabled):active { transform: translateY(2px) scale(.98); }
 .home:not([hidden]) .eyebrow { animation: forest-enter .45s both; }
 .home:not([hidden]) h1 { animation: forest-enter .55s .06s both; }
 .home:not([hidden]) .intro { animation: forest-enter .55s .12s both; }
-.home:not([hidden]) .start-card { animation: forest-enter .6s .18s backwards, canopy-glow 6s 1s infinite; }
+.home:not([hidden]) .start-card { animation: forest-enter .6s .18s backwards; }
+.home:not([hidden]) .start-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  box-shadow: 0 0 0 4px #a6ca6338, 0 20px 48px #658f4528;
+  opacity: 0.2;
+  will-change: opacity, transform;
+  animation: canopy-glow 6s 1s infinite;
+}
 .home:not([hidden]) .home-links { animation: forest-enter .55s .26s both; }
 .name-field { transition: box-shadow .2s ease, border-color .2s ease; }
 .name-field:focus-within { box-shadow: 0 0 0 4px #9cbd6529; }
 
 dialog[open] { animation: forest-enter .32s cubic-bezier(.2,.8,.2,1) both; }
-dialog[open]::backdrop { animation: forest-backdrop .25s ease both; }
 #result-dialog[open] .result-bird { animation: forest-enter .5s .08s both; }
 #result-dialog[open] .result-bird canvas { animation: resting-bird 4s ease-in-out infinite; transform-origin: 50% 75%; }
 #result-dialog[open] .result-stats > div { animation: forest-enter .45s .15s both; }
