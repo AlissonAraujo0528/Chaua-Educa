@@ -1,6 +1,6 @@
 // Offline audit of exactly what GitHub Pages serves. No external service is required.
 import {readFileSync,existsSync,readdirSync,statSync,writeFileSync,mkdirSync} from 'node:fs';
-import {resolve,relative,dirname,extname} from 'node:path';
+import {resolve,relative,dirname,extname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {ASSET_PATHS} from '../Chaua-Educa-main/js/assets.mjs';
@@ -13,7 +13,7 @@ const root=fileURLToPath(new URL('../',import.meta.url)),app=resolve(root,'Chaua
 const files=new Set(),modules=new Set(),externals=new Set(),errors=[];
 const fail=m=>errors.push(m),read=p=>readFileSync(p,'utf8'),hash=p=>createHash('sha256').update(readFileSync(p)).digest('hex');
 function requireFile(path,origin){
- const p=resolve(path);if(!p.startsWith(app+'/')&&p!==resolve(root,'index.html')){fail(`Path escapes publication: ${origin}`);return;}
+ const p=resolve(path);if(!p.startsWith(app+sep)&&p!==resolve(root,'index.html')){fail(`Path escapes publication: ${origin}`);return;}
  if(!existsSync(p)||!statSync(p).isFile()){fail(`Missing/case-mismatched file: ${relative(root,p)} (${origin})`);return;}
  if(!statSync(p).size)fail(`Empty resource: ${relative(root,p)}`);files.add(p);
 }
@@ -40,6 +40,11 @@ for(const page of winterManifest.pages){
  const path=resolve(winterArtDir,page.file);requireFile(path,'packed winter caps');
  if(existsSync(path)&&hash(path)!==page.sha256)fail(`Corrupted winter cap page: ${page.file}`);
 }
+for(const page of winterManifest.stagePages||[]){
+ if(!page)continue;
+ const path=resolve(winterArtDir,page.file);requireFile(path,'packed winter stage cap');
+ if(existsSync(path)&&hash(path)!==page.sha256)fail(`Corrupted winter stage cap page: ${page.file}`);
+}
 for(const def of Object.values(ACTION_SHEET_DEFS))requireFile(resolve(js,def.path),'action sheet');
 const sprites=JSON.parse(read(resolve(root,'scripts/spritesheets.manifest.json')));
 for(const entry of sprites.spritesheets){const p=resolve(root,entry.path);requireFile(p,'sprite integrity');if(existsSync(p)&&hash(p)!==entry.sha256)fail(`Changed original sprite: ${entry.path}`);}
@@ -52,7 +57,7 @@ const entry=resolve(root,'index.html');requireFile(entry,'Pages root');if(exists
 const build=html.match(/<meta name="chaua-build" content="([^"]+)"/)[1];
 try {
  const map=JSON.parse(html.match(/<script type="importmap" id="chaua-modules">([\s\S]*?)<\/script>/)[1]).imports;
- for(const p of modules){const key='./js/'+relative(js,p);if(map[key]!==key+'?v='+build)fail('Missing/incoherent module revision: '+key);}
+ for(const p of modules){const key='./js/'+relative(js,p).replaceAll(sep,'/');if(map[key]!==key+'?v='+build)fail('Missing/incoherent module revision: '+key);}
  for(const [key,value] of Object.entries(map)){if(!key.startsWith('./js/')||value!==key+'?v='+build)fail('Invalid revisioned module: '+key);requireFile(resolve(app,key),'import map');}
  if(!html.includes('css/style.css?v='+build)||!html.includes('js/script.js?v='+build))fail('Entry/stylesheet revisions differ');
  if(build!==GAME_VERSION&&!build.startsWith(GAME_VERSION+'-'))fail('Interface revision differs from package');

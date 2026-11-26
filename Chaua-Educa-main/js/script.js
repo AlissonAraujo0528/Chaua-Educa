@@ -156,10 +156,12 @@ function resize() {
     insets.bottom=parseFloat(style.getPropertyValue('--safe-bottom'))||0;
     insets.left=parseFloat(style.getPropertyValue('--safe-left'))||0;
     renderer.resize();
-    const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
-    if(slot?.width>0&&slot.height>0){
-        const appRect=app.getBoundingClientRect();
-        renderer.homePreview={x:slot.x-appRect.x+slot.width/2,y:slot.y-appRect.y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170),clip:{x:slot.x-appRect.x,y:slot.y-appRect.y,width:slot.width,height:slot.height}};
+    if(!$('#home').hidden){
+        const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
+        if(slot?.width>0&&slot.height>0){
+            const appRect=app.getBoundingClientRect();
+            renderer.homePreview={x:slot.x-appRect.x+slot.width/2,y:slot.y-appRect.y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170),clip:{x:slot.x-appRect.x,y:slot.y-appRect.y,width:slot.width,height:slot.height}};
+        }else renderer.homePreview=null;
     }else renderer.homePreview=null;
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(!openingFlight && lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
@@ -246,8 +248,16 @@ async function launchFlight(training = false, checkpoint = null, benchmark = nul
     openingFlight = true;
     if(mobileDevice)document.activeElement?.blur();
     const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
+    const wasFullscreen = document.fullscreenElement;
+    const wasLandscape = innerWidth > innerHeight;
     try {
-        if(mobile){await requestFlightLandscape(app, document, screen);await settleOpeningViewport();resize();}
+        if(mobile){
+            await requestFlightLandscape(app, document, screen);
+            if(document.fullscreenElement!==wasFullscreen||(innerWidth>innerHeight)!==wasLandscape){
+                await settleOpeningViewport();
+            }
+            resize();
+        }
     } finally {
         openingFlight = false;
     }

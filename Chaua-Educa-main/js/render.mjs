@@ -3,17 +3,17 @@ import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
 import {pickupPose} from './pickup-geometry.mjs';
 import {snakeAttack,HAWK_ATTACKS} from './attack-patterns.mjs';
 import {breeze,treeBend,winterAmount} from './living-motion.mjs';
-import {drawForestLife} from './forest-life.mjs';
+import {drawForestLife,prewarmForestLife} from './forest-life.mjs';
 import {HAWK_ART} from './hawk-geometry.mjs';
 import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {activeProbe} from './perf-hooks.mjs';
-import {drawSnowfall,drawSnowContact,winterBreathSettings} from './winter-vfx.mjs';
+import {drawSnowfall,drawSnowContact,winterBreathSettings,prewarmWinterVfx} from './winter-vfx.mjs';
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
 import {parrotAction,ACTION_TIMINGS} from './action-states.mjs';
 import {drawActionSheet,preloadActionSheets,ACTION_SHEET_DEFS} from './action-sheets.mjs';
 import {drawLivingTrunk,drawTreeVariant,drawRefugeTree,prepareTreeWeather,warmWinterCapPage} from './tree-art.mjs';
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_COMPACT_STAGES} from './precomposed-winter.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {SPRITES} from './sprite-data.mjs';
 import {birdAnimation,hawkAnimation} from './animation.mjs';
@@ -50,6 +50,69 @@ const mixColor = (a, b, t) => {
     const bl = Math.round(parseInt(a.slice(5, 7), 16) * (1 - t) + parseInt(b.slice(5, 7), 16) * t);
     return `rgb(${r},${g},${bl})`;
 };
+
+let shieldRingSprite=null;
+function getShieldRingSprite(){
+ if(shieldRingSprite)return shieldRingSprite;
+ if(typeof document==='undefined')return null;
+ const canvas=document.createElement('canvas');
+ canvas.width=288;canvas.height=288;
+ const sc=canvas.getContext('2d');
+ if(!sc)return null;
+ sc.scale(2,2);
+ sc.strokeStyle='#2ef5c3aa';sc.lineWidth=2;
+ sc.beginPath();sc.arc(72,72,68,0,Math.PI*2);sc.stroke();
+ shieldRingSprite=canvas;
+ return shieldRingSprite;
+}
+let dustSprite=null;
+function getDustSprite(){
+ if(dustSprite)return dustSprite;
+ if(typeof document==='undefined')return null;
+ const canvas=document.createElement('canvas');
+ canvas.width=12;canvas.height=12;
+ const sc=canvas.getContext('2d');
+ if(!sc)return null;
+ sc.fillStyle='#ffedb275';
+ sc.beginPath();sc.arc(6,6,3.2,0,Math.PI*2);sc.fill();
+ dustSprite=canvas;
+ return dustSprite;
+}
+let shieldDashedSprite=null;
+function getShieldDashedRingSprite(){
+ if(shieldDashedSprite)return shieldDashedSprite;
+ if(typeof document==='undefined')return null;
+ const canvas=document.createElement('canvas');
+ canvas.width=216;canvas.height=216;
+ const sc=canvas.getContext('2d');
+ if(!sc)return null;
+ sc.scale(2,2);
+ sc.setLineDash(SHIELD_EMPTY_DASH);sc.strokeStyle='#d0e9ff';sc.lineWidth=2;
+ sc.beginPath();sc.arc(54,54,48,0,Math.PI*2);sc.stroke();
+ shieldDashedSprite=canvas;
+ return shieldDashedSprite;
+}
+let miniSparkleSprite=null;
+function getMiniSparkleSprite(){
+ if(miniSparkleSprite)return miniSparkleSprite;
+ if(typeof document==='undefined')return null;
+ const canvas=document.createElement('canvas');
+ canvas.width=48;canvas.height=48;
+ const sc=canvas.getContext('2d');
+ if(!sc)return null;
+ sc.translate(24,24);
+ const r=16;
+ sc.beginPath();
+ sc.moveTo(0,-r);sc.lineTo(r*.28,-r*.28);
+ sc.lineTo(r,0);sc.lineTo(r*.28,r*.28);
+ sc.lineTo(0,r);sc.lineTo(-r*.28,r*.28);
+ sc.lineTo(-r,0);sc.lineTo(-r*.28,-r*.28);
+ sc.closePath();
+ sc.fillStyle='#fff4a8';sc.fill();
+ sc.lineWidth=2.4;sc.strokeStyle='#8c6600';sc.stroke();
+ miniSparkleSprite=canvas;
+ return miniSparkleSprite;
+}
 
 const spriteBlendBuffers=new Map();
 function blendSprite(c, first, second, blend, extent=128) {
@@ -383,9 +446,16 @@ function drawOrbitingStars(c, hx, hy, size, t) {
 }
 
 function drawMiniSparkle(c, x, y, r, rot) {
+    const sprite = typeof c.drawImage === 'function' ? getMiniSparkleSprite() : null;
     c.save();
     c.translate(x, y);
     c.rotate(rot);
+    if (sprite) {
+        const size = r * 1.5;
+        c.drawImage(sprite, -size, -size, size * 2, size * 2);
+        c.restore();
+        return;
+    }
     c.beginPath();
     c.moveTo(0, -r); c.lineTo(r * 0.28, -r * 0.28);
     c.lineTo(r, 0); c.lineTo(r * 0.28, r * 0.28);
@@ -857,6 +927,22 @@ export class Renderer {
                 await yieldTaskSlice(0);
             }
             prewarmRainWeather(this.c, this.w || 960, this.h || 640);
+            prewarmWinterVfx(this.c);
+            prewarmForestLife(this.c);
+            const warmDust = getDustSprite();
+            const warmRing = getShieldRingSprite();
+            const warmDashed = getShieldDashedRingSprite();
+            const warmSparkle = getMiniSparkleSprite();
+            if (warmDust || warmRing || warmDashed || warmSparkle) {
+                this.c.save();
+                this.c.setTransform(1,0,0,1,0,0);
+                this.c.globalAlpha=0.004;
+                if (warmDust) this.c.drawImage(warmDust, 0, 0, 4, 4, 0, 0, 2, 2);
+                if (warmRing) this.c.drawImage(warmRing, 0, 0, 4, 4, 0, 0, 2, 2);
+                if (warmDashed) this.c.drawImage(warmDashed, 0, 0, 4, 4, 0, 0, 2, 2);
+                if (warmSparkle) this.c.drawImage(warmSparkle, 0, 0, 4, 4, 0, 0, 2, 2);
+                this.c.restore();
+            }
             await yieldTaskSlice(5);
             for (const key of SNAKE_SHEET_KEYS) {
                 warmupSnakeA2(this.c, key);
@@ -883,9 +969,12 @@ export class Renderer {
         return this.ready;
     }
     warmNextWinterCap() {
-        if (!PRECOMPOSED_SNOW_ACTIVE || this.winterCapWarmupIndex >= WINTER_CAP_ART.pages.length) return false;
+        const count = PRECOMPOSED_SNOW_COMPACT_STAGES
+            ? Math.max(0, (WINTER_CAP_ART.stagePages?.length || 1) - 1)
+            : WINTER_CAP_ART.pages.length;
+        if (!PRECOMPOSED_SNOW_ACTIVE || this.winterCapWarmupIndex >= count) return false;
         const page = this.winterCapWarmupIndex++;
-        warmWinterCapPage(this.c, page);
+        warmWinterCapPage(this.c, PRECOMPOSED_SNOW_COMPACT_STAGES ? page + 1 : page);
         return true;
     }
     setQuality(level) {
@@ -1295,16 +1384,25 @@ export class Renderer {
         const dustAlpha = (1-rain)*(1-winterLight);
         const dustCount = winterLight>=.999?0:(this.decoration==='low'?8:23);
         if (dustAlpha > 0.004 && dustCount > 0) {
+            const dustImg = typeof c.drawImage === 'function' ? getDustSprite() : null;
             c.save();c.globalAlpha = dustAlpha;
-            c.fillStyle = '#ffedb275';
-            c.beginPath();
-            for (let i = 0; i < dustCount; i++) {
-                const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
-                const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
-                c.moveTo(x + 1.6, y);
-                c.arc(x, y, 1.6, 0, TAU);
+            if (dustImg) {
+                for (let i = 0; i < dustCount; i++) {
+                    const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
+                    const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
+                    c.drawImage(dustImg, x - 3, y - 3, 6, 6);
+                }
+            } else {
+                c.fillStyle = '#ffedb275';
+                c.beginPath();
+                for (let i = 0; i < dustCount; i++) {
+                    const x = ((i * 137.7 + (reduced ? 0 : Math.sin(time * .19 + i) * 22)) % w + w) % w;
+                    const y = ((i * 93.4 + (reduced ? 0 : time * 3)) % (h * .9));
+                    c.moveTo(x + 1.6, y);
+                    c.arc(x, y, 1.6, 0, TAU);
+                }
+                c.fill();
             }
-            c.fill();
             c.restore();
         }
         if (home) {
@@ -1413,7 +1511,10 @@ export class Renderer {
         }
         // Trees continue into the canopy and ground outside the flight corridor.
         // Keep horizontal camera clipping, but do not cut their trunks at the HUD.
-        c.save(); c.beginPath(); c.rect(view.x, 0, view.w, this.h); c.clip();
+        const needHorizClip=view.x>0.5||view.w<this.w-0.5;
+        const needViewClip=needHorizClip||view.y>0.5||view.h<this.h-0.5;
+        c.save();
+        if(needHorizClip){c.beginPath();c.rect(view.x,0,view.w,this.h);c.clip();}
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY);
         c.scale(s, s);
         // Physical screen clip extends to y=0 and y=canvas height, not just
@@ -1440,9 +1541,9 @@ export class Renderer {
         this.treeDrips.draw(c,game,sceneTime,game.surfaceWeather?.drip??0,wind,this.decoration==='low',reduced,dripsBounds);
         if(probe&&probe.deep)probe.end('render.trees',treesAt);
         c.restore();
-        c.save(); c.beginPath(); c.rect(view.x, view.y, view.w, view.h); c.clip();
+        c.save();
+        if(needViewClip){c.beginPath();c.rect(view.x,view.y,view.w,view.h);c.clip();}
         c.translate(view.x - view.worldLeft * s + shakeX, view.y - view.worldTop * s + shakeY); c.scale(s, s);
-        c.beginPath(); c.rect(view.worldLeft - 120, view.worldTop - 600, Math.max(WIDTH, view.worldWidth) + 240, view.worldHeight + 1200); c.clip();
         if (game.pepper > 0) {
             c.save();
             const remaining = Math.min(1, game.pepper / 2);
@@ -1567,8 +1668,13 @@ export class Renderer {
                 c.fillStyle = aura;
                 c.beginPath(); c.arc(game.x, game.y, auraRadius, 0, TAU); c.fill();
             }
-            c.strokeStyle = '#2ef5c3aa'; c.lineWidth = 2;
-            c.beginPath(); c.arc(game.x, game.y, r, 0, TAU); c.stroke();
+            const ringSurface = typeof c.drawImage === 'function' ? getShieldRingSprite() : null;
+            if (ringSurface) {
+                c.drawImage(ringSurface, game.x - 72, game.y - 72, 144, 144);
+            } else {
+                c.strokeStyle = '#2ef5c3aa'; c.lineWidth = 2;
+                c.beginPath(); c.arc(game.x, game.y, r, 0, TAU); c.stroke();
+            }
             const shieldImg = images.get('shield');
             if (game.shield) {
                 const count = 8;
@@ -1589,8 +1695,13 @@ export class Renderer {
                     c.restore();
                 }
             } else {
-                c.setLineDash(SHIELD_EMPTY_DASH); c.strokeStyle = '#d0e9ff'; c.lineWidth = 2;
-                c.beginPath(); c.arc(game.x, game.y, 48, 0, TAU); c.stroke(); c.setLineDash([]);
+                const dashedSurface = typeof c.drawImage === 'function' ? getShieldDashedRingSprite() : null;
+                if (dashedSurface) {
+                    c.drawImage(dashedSurface, game.x - 54, game.y - 54, 108, 108);
+                } else {
+                    c.setLineDash(SHIELD_EMPTY_DASH); c.strokeStyle = '#d0e9ff'; c.lineWidth = 2;
+                    c.beginPath(); c.arc(game.x, game.y, 48, 0, TAU); c.stroke(); c.setLineDash([]);
+                }
             }
             c.restore();
         }

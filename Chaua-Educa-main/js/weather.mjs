@@ -127,6 +127,26 @@ export function journeyFog(distance, tutorial = false) {
 // Context-bound reusable gradients: changing canvas size invalidates the
 // cache. Reusing a CanvasGradient across different contexts is unsafe.
 const weatherGradientCache=new WeakMap();
+let weatherStripCache=null;
+function getWeatherGradientStrips(){
+    if(weatherStripCache)return weatherStripCache;
+    if(typeof document==='undefined')return null;
+    const make=(stops)=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=1;canvas.height=256;
+        const sc=canvas.getContext('2d');
+        if(!sc)return null;
+        const g=sc.createLinearGradient(0,0,0,256);
+        for(const [pos,color] of stops)g.addColorStop(pos,color);
+        sc.fillStyle=g;sc.fillRect(0,0,1,256);
+        return canvas;
+    };
+    const fog=make([[0,'#d8eee700'],[.55,'#d8eee738'],[1,'#d8eee789']]);
+    const rain=make([[0,'#324f61'],[.62,'#6d8790'],[1,'#92aaa8']]);
+    if(!fog||!rain)return null;
+    weatherStripCache={fog,rain};
+    return weatherStripCache;
+}
 function weatherGradients(c,w,h){
     const previous=weatherGradientCache.get(c);
     if(previous&&previous.w===w&&previous.h===h)return previous;
@@ -145,11 +165,15 @@ function weatherGradients(c,w,h){
 
 export function drawJourneyFog(context, width, height, fog) {
     if (!fog || fog <= .002) return;
-    const mist=weatherGradients(context,width,height).fog;
+    const strips=typeof context.drawImage==='function'?getWeatherGradientStrips():null;
     context.save();
     context.globalAlpha = fog;
-    context.fillStyle = mist;
-    context.fillRect(0, height * .25, width, height * .75);
+    if(strips){
+        context.drawImage(strips.fog, 0, height * .25, width, height * .75);
+    }else{
+        context.fillStyle = weatherGradients(context,width,height).fog;
+        context.fillRect(0, height * .25, width, height * .75);
+    }
     context.restore();
 }
 
@@ -164,6 +188,43 @@ export function lightningFlashStrength(time, storm=1, reduced=false) {
     if(phase<.35)flash=Math.sin(phase/.35*Math.PI);
     else if(phase>=.42&&phase<.75)flash=Math.sin((phase-.42)/.33*Math.PI)*.72;
     return flash>.01?Math.min(1,flash*storm):0;
+}
+
+let lightningBoltCache=null;
+function getLightningBoltSprite(strikeIndex,width,height){
+ if(typeof document==='undefined')return null;
+ if(lightningBoltCache&&lightningBoltCache.index===strikeIndex&&lightningBoltCache.w===width&&lightningBoltCache.h===height){
+  return lightningBoltCache.canvas;
+ }
+ const minX=Math.floor(Math.min(width*0.46,width*0.62)-38);
+ const maxX=Math.ceil(Math.max(width*0.46,width*0.62)+78);
+ const maxY=Math.ceil(height*0.78+16);
+ const bw=Math.max(32,maxX-minX),bh=Math.max(32,maxY);
+ const canvas=lightningBoltCache?.canvas??document.createElement('canvas');
+ canvas.width=bw;canvas.height=bh;
+ const lc=canvas.getContext('2d');
+ if(!lc)return null;
+ lc.clearRect(0,0,bw,bh);
+ lc.save();lc.translate(-minX,0);
+ const startX=width*.62,targetX=width*.46,targetY=height*.48,steps=10;
+ lc.beginPath();
+ let currX=startX,currY=0;
+ lc.moveTo(currX,currY);
+ for(let s=1;s<=steps;s++){
+  const progress=s/steps,seed=strikeIndex*17+s*11,jitter=Math.sin(seed*.8)*26;
+  currX=startX+(targetX-startX)*progress+jitter;currY=targetY*progress;
+  lc.lineTo(currX,currY);
+ }
+ lc.globalAlpha=.28;lc.strokeStyle='#93c5fd';lc.lineWidth=9;lc.stroke();
+ lc.globalAlpha=1;lc.strokeStyle='#ffffff';lc.lineWidth=2.8;lc.stroke();
+ lc.lineWidth=1.6;lc.beginPath();
+ lc.moveTo(startX+(targetX-startX)*.5,targetY*.5);
+ lc.lineTo(startX+(targetX-startX)*.5+40,targetY*.65);
+ lc.lineTo(startX+(targetX-startX)*.5+65,targetY*.78);
+ lc.stroke();
+ lc.restore();
+ lightningBoltCache={index:strikeIndex,w:width,h:height,x:minX,bw,bh,canvas};
+ return canvas;
 }
 
 // Atmospheric brightness plus a visible electric bolt in the clouds.
@@ -181,6 +242,14 @@ export function drawLightning(context, width, height, time, storm, reduced) {
 
     // 2. Visible jagged electric lightning bolt tearing through the sky
     if (!reduced && flash > 0.25) {
+        const boltSprite = typeof context.drawImage === 'function'
+            ? getLightningBoltSprite(strike.index, width, height) : null;
+        if (boltSprite) {
+            context.globalAlpha = Math.min(1, flash * 1.1);
+            context.drawImage(boltSprite, lightningBoltCache.x, 0, lightningBoltCache.bw, lightningBoltCache.bh);
+            context.restore();
+            return;
+        }
         context.globalAlpha = Math.min(1, flash * 1.1);
         // Two opaque/transparent strokes preserve the bolt's authored
         // silhouette without an expensive Canvas shadowBlur gaussian pass.
@@ -314,16 +383,79 @@ function getRainDropSheet(tiltStep) {
  return entry;
 }
 
+let weatherVfxSprites=null;
+function getWeatherVfxSprites(){
+ if(weatherVfxSprites)return weatherVfxSprites;
+ if(typeof document==='undefined')return null;
+ // Ripples (4 quantized radii inside 24x16 cells -> 96x16) and surface impacts (4 inside 16x12 -> 64x12).
+ const ripples=document.createElement('canvas');
+ ripples.width=96;ripples.height=16;
+ const rc=ripples.getContext('2d');
+ if(!rc)return null;
+ rc.strokeStyle='#a4d6df';rc.lineWidth=1.8;
+ for(let q=0;q<4;q++){
+  const phase=(q+.5)/4;
+  rc.beginPath();
+  rc.ellipse(q*24+12,8,(1.7+phase*6)*1.2,(.6+phase*2.3)*1.2,0,0,Math.PI*2);
+  rc.stroke();
+ }
+ const impacts=document.createElement('canvas');
+ impacts.width=64;impacts.height=12;
+ const ic=impacts.getContext('2d');
+ if(!ic)return null;
+ ic.fillStyle='#b8dce5';
+ for(let q=0;q<4;q++){
+  const phase=(q+.5)/4;
+  ic.beginPath();
+  ic.ellipse(q*16+8,6,(1.15+phase*2)*1.5,(.55+phase*1.1)*1.5,0,0,Math.PI*2);
+  ic.fill();
+ }
+ // Wind gust Bezier curve pre-baked at 2x (row 0: dark outline, row 1: crisp highlight).
+ const gusts=document.createElement('canvas');
+ gusts.width=320;gusts.height=160;
+ const gc=gusts.getContext('2d');
+ if(!gc)return null;
+ gc.lineCap='round';
+ gc.beginPath();gc.moveTo(300,40);gc.bezierCurveTo(210,14,90,70,20,46);
+ gc.strokeStyle='#315965';gc.lineWidth=6.6;gc.stroke();
+ gc.beginPath();gc.moveTo(300,120);gc.bezierCurveTo(210,94,90,150,20,126);
+ gc.strokeStyle='#eaf5e4';gc.lineWidth=2.9;gc.stroke();
+ weatherVfxSprites={ripples,impacts,gusts};
+ return weatherVfxSprites;
+}
+function isFullSurfaceViewport(c,w,h){
+ if(typeof document==='undefined'||!c?.canvas||typeof c.getTransform!=='function')return false;
+ const m=c.getTransform();
+ return m.b===0&&m.c===0&&Math.abs(m.e)<=1&&Math.abs(m.f)<=1&&
+  Math.abs(w*m.a-c.canvas.width)<=2&&Math.abs(h*m.d-c.canvas.height)<=2;
+}
+
 export function prewarmRainWeather(c, w = 960, h = 640) {
  if (!c) return;
  if (w > 0 && h > 0) weatherGradients(c, w, h);
- if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvasRenderingContext2D === 'undefined') return;
+ const strips = getWeatherGradientStrips();
+ const vfx = getWeatherVfxSprites();
+ const bolt = getLightningBoltSprite(0, w, h);
  c.save();
  c.setTransform(1, 0, 0, 1, 0, 0);
  c.globalAlpha = 0.004;
- for (let tiltStep = 0; tiltStep >= -7; tiltStep--) {
-  const sheet = getRainDropSheet(tiltStep);
-  if (sheet) c.drawImage(sheet.surface, 0, 0, 4, 4, 0, 0, 2, 2);
+ if (strips) {
+  c.drawImage(strips.fog, 0, 0, 1, 4, 0, 0, 1, 2);
+  c.drawImage(strips.rain, 0, 0, 1, 4, 0, 0, 1, 2);
+ }
+ if (vfx) {
+  c.drawImage(vfx.ripples, 0, 0, 4, 4, 0, 0, 2, 2);
+  c.drawImage(vfx.impacts, 0, 0, 4, 4, 0, 0, 2, 2);
+  c.drawImage(vfx.gusts, 0, 0, 4, 4, 0, 0, 2, 2);
+ }
+ if (bolt) {
+  c.drawImage(bolt, 0, 0, 4, 4, 0, 0, 2, 2);
+ }
+ if (typeof OffscreenCanvas !== 'undefined' && typeof OffscreenCanvasRenderingContext2D !== 'undefined') {
+  for (let tiltStep = 2; tiltStep >= -14; tiltStep--) {
+   const sheet = getRainDropSheet(tiltStep);
+   if (sheet) c.drawImage(sheet.surface, 0, 0, 4, 4, 0, 0, 2, 2);
+  }
  }
  c.restore();
 }
@@ -346,7 +478,7 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
  const sheet=useStamps?getRainDropSheet(tiltStep):null;
  const squall=1+storm*.12*Math.sin(time*.76+stormTravel*.22);
  c.save();
- c.beginPath();c.rect(0,0,w,h);c.clip();
+ if(!sheet||!isFullSurfaceViewport(c,w,h)){c.beginPath();c.rect(0,0,w,h);c.clip();}
  if(!sheet)c.lineCap='round';
  for(const {depth,count} of bands){
   const visibleCount=Math.max(1,Math.round(count*areaScale*(1+storm*.55)));
@@ -408,7 +540,20 @@ function renderRainBands(c,w,h,time,rain,storm,wind,low,foreground=false,speed=2
 export function drawRainRipples(c,w,h,time,rain,storm,low,reduced=false){
  if(reduced||rain<=0||w<=0||h<=0)return;
  const count=low?4:9;
+ const vfx=typeof c.drawImage==='function'?getWeatherVfxSprites():null;
  c.save();
+ if(vfx){
+  for(let i=0;i<count;i++){
+   const phase=rainWrap(time*(1.2+storm*.37)+i*.417,1);
+   const x=rainWrap(i*173.6+24,w);
+   const y=h-20-(i*17.1)%33;
+   const q=Math.min(3,Math.floor(phase*4));
+   c.globalAlpha=rain*(1-phase)*.30;
+   c.drawImage(vfx.ripples,q*24,0,24,16,x-10,y-6.5,20,13);
+  }
+  c.restore();
+  return;
+ }
  c.strokeStyle='#a4d6df';c.lineWidth=.9;
  for(let i=0;i<count;i++){
   const phase=rainWrap(time*(1.2+storm*.37)+i*.417,1);
@@ -426,7 +571,21 @@ export function drawRainRipples(c,w,h,time,rain,storm,low,reduced=false){
 export function drawSurfaceRainImpacts(c,x,y,wet,time,seed=0,low=false,reduced=false){
  if(wet<=.03||reduced)return;
  const count=low?2:4;
- c.save();c.fillStyle='#b8dce5';
+ const vfx=typeof c.drawImage==='function'?getWeatherVfxSprites():null;
+ c.save();
+ if(vfx){
+  for(let i=0;i<count;i++){
+   const phase=rainWrap(time*(1.5+(i%3)*.19)+seed*.37+i*.28,1);
+   const sx=x+(i-(count-1)*.5)*12;
+   const sy=y-(1-phase)*6;
+   const q=Math.min(3,Math.floor(phase*4));
+   c.globalAlpha=wet*(1-phase)*.58;
+   c.drawImage(vfx.impacts,q*16,0,16,12,sx-5.5,sy-4,11,8);
+  }
+  c.restore();
+  return;
+ }
+ c.fillStyle='#b8dce5';
  for(let i=0;i<count;i++){
   const phase=rainWrap(time*(1.5+(i%3)*.19)+seed*.37+i*.28,1);
   const sx=x+(i-(count-1)*.5)*12;
@@ -444,10 +603,15 @@ export function drawSurfaceRainImpacts(c,x,y,wet,time,seed=0,low=false,reduced=f
 export function drawJourneyRain(context,width,height,time,rain,reduced,lowDetail,storm=0,wind=0,speed=250,motion=null){
  if(rain<=0||width<=0||height<=0)return;
  const c=context;
+ const strips=typeof c.drawImage==='function'?getWeatherGradientStrips():null;
  c.save();
- const wash=weatherGradients(c,width,height).rain;
  c.globalAlpha=rainClamp(rain*(.18+storm*.16));
- c.fillStyle=wash;c.fillRect(0,0,width,height);
+ if(strips){
+  c.drawImage(strips.rain,0,0,width,height);
+ }else{
+  const wash=weatherGradients(c,width,height).rain;
+  c.fillStyle=wash;c.fillRect(0,0,width,height);
+ }
  c.restore();
  if(reduced)return;
  renderRainBands(c,width,height,time,rain,storm,wind,lowDetail,false,speed,motion);
@@ -465,8 +629,28 @@ export function drawForegroundRain(context,width,height,time,rain,reduced,lowDet
 // mountains. Two batched strokes, bounded particle count, active scene clock.
 export function drawWindGusts(c,w,h,time,wind,low=false,reduced=false,motion=null){
  if(wind<=.01||reduced||w<=0||h<=0)return;
- c.save();c.lineCap='round';c.beginPath();
  const count=low?3:7;
+ const vfx=typeof c.drawImage==='function'?getWeatherVfxSprites():null;
+ c.save();
+ if(vfx){
+  const sway=Math.sin(time*1.7)**2;
+  const aOuter=wind*(.25+.09*sway),aInner=wind*(.49+.12*sway);
+  const posY=rainScratch;
+  for(let i=0;i<count;i++){
+   const x=w+180-rainWrap(i*173.7+time*180+(motion?.wind??time*wind)*90,w+360);
+   const y=45+rainWrap(i*97.1+Math.sin(time*.6+i)*12,Math.max(1,h-90));
+   const length=80+wind*65+(i%3)*16;
+   const slot=posY[i]||(posY[i]={});
+   slot.x=x-length*1.071;slot.y=y-20;slot.w=length*1.143;slot.h=40;
+  }
+  c.globalAlpha=aOuter;
+  for(let i=0;i<count;i++){const s=posY[i];c.drawImage(vfx.gusts,0,0,320,80,s.x,s.y,s.w,s.h);}
+  c.globalAlpha=aInner;
+  for(let i=0;i<count;i++){const s=posY[i];c.drawImage(vfx.gusts,0,80,320,80,s.x,s.y,s.w,s.h);}
+  c.restore();
+  return;
+ }
+ c.lineCap='round';c.beginPath();
  for(let i=0;i<count;i++){
   const x=w+180-rainWrap(i*173.7+time*180+(motion?.wind??time*wind)*90,w+360);
   const y=45+rainWrap(i*97.1+Math.sin(time*.6+i)*12,Math.max(1,h-90));

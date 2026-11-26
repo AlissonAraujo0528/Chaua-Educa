@@ -6,6 +6,7 @@ export const PERF_AB_OPTIONS=Object.freeze([
  'winter-caps-bitmap',
  'winter-caps-stage-cache',
  'winter-caps-stage-prefetch',
+ 'winter-caps-compact-stages',
  'snow-mask-off',
  'snow-flakes-off',
  'static-season-bg',
