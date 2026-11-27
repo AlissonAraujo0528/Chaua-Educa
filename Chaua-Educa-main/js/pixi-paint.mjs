@@ -1,4 +1,4 @@
-import {BufferImageSource, Color, GraphicsPath, Matrix, Texture} from './vendor/pixi/pixi-8.6.6.mjs';
+import {BufferImageSource, GlProgram, Mesh, Shader, UniformGroup, Color, GraphicsPath, Matrix, Texture} from './vendor/pixi/pixi-8.6.6.mjs';
 
 const GRADIENT_STYLES = new WeakMap();
 const GRADIENT_SIZE = 128;
@@ -100,4 +100,69 @@ export function dashPath(source, pattern) {
         }
     }
     return target;
+}
+
+// Fruit frames share one atlas. The ellipse is evaluated in frame-local
+// coordinates so it keeps its size and angle as the animation changes.
+export class WetFruitMesh extends Mesh {
+    constructor(geometry, texture) {
+        const uniforms = new UniformGroup({
+            uFruitRect: {value:new Float32Array(4),type:'vec4<f32>'},
+            uWetness: {value:0,type:'f32'},
+        });
+        const shader = new Shader({
+            glProgram:GlProgram.from({
+                name:'wet-fruit',
+                vertex:`attribute vec2 aPosition;
+                    attribute vec2 aUV;
+                    uniform mat3 uProjectionMatrix;
+                    uniform mat3 uWorldTransformMatrix;
+                    uniform mat3 uTransformMatrix;
+                    varying vec2 vFruitUV;
+                    varying float vEdgeWidth;
+                    void main() {
+                        vFruitUV = aUV;
+                        float pixelSize = min(length(uTransformMatrix[0].xy), length(uTransformMatrix[1].xy));
+                        vEdgeWidth = 128.0 / (10.0 * max(pixelSize, 1.0));
+                        vec3 position = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix * vec3(aPosition, 1.0);
+                        gl_Position = vec4(position.xy, 0.0, 1.0);
+                    }`,
+                fragment:`precision mediump float;
+                    varying vec2 vFruitUV;
+                    varying float vEdgeWidth;
+                    uniform sampler2D uAtlas;
+                    uniform vec4 uFruitRect;
+                    uniform float uWetness;
+                    uniform vec4 uWorldColorAlpha;
+                    uniform vec4 uColor;
+                    void main() {
+                        vec4 fruit = texture2D(uAtlas, uFruitRect.xy + vFruitUV * uFruitRect.zw);
+                        vec2 delta = vFruitUV * 128.0 - vec2(82.0, 48.0);
+                        vec2 rotated = mat2(0.9393727, -0.3428978, 0.3428978, 0.9393727) * delta;
+                        float edge = length(rotated / vec2(5.0, 12.0)) - 1.0;
+                        float highlight = (1.0 - smoothstep(-vEdgeWidth, vEdgeWidth, edge)) * uWetness * 0.32;
+                        // The atlas is premultiplied. Tint only its existing coverage.
+                        vec3 shine = vec3(210.0, 236.0, 245.0) / 255.0 * fruit.a;
+                        gl_FragColor = vec4(mix(fruit.rgb, shine, highlight), fruit.a) * uWorldColorAlpha * uColor;
+                    }`,
+            }),
+            resources:{uAtlas:texture.source,wetFruitUniforms:uniforms},
+        });
+        shader.addResource('globalUniforms',100,0);
+        shader.addResource('localUniforms',101,0);
+        super({geometry,shader,texture});
+        this.paintUniforms = uniforms;
+    }
+
+    setFrame(texture, [x,y,width,height], wetness) {
+        this.texture = texture;
+        this.shader.resources.uAtlas = texture.source;
+        const uniforms = this.paintUniforms.uniforms;
+        uniforms.uFruitRect[0]=x/texture.source.width;
+        uniforms.uFruitRect[1]=y/texture.source.height;
+        uniforms.uFruitRect[2]=width/texture.source.width;
+        uniforms.uFruitRect[3]=height/texture.source.height;
+        uniforms.uWetness=wetness;
+        this.paintUniforms.update();
+    }
 }

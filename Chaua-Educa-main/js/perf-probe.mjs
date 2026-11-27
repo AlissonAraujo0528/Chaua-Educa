@@ -235,6 +235,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
     snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
     snakeSheetsWarmed:renderer.snakeWarmupIndex||0,
     seasonalBackdrop:renderer.seasonalBackdropMode,
+    wetFruit:renderer.wetFruitMode,
     seasonalSliceRows:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.sliceRows??null:null,
     seasonalBudgetMs:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.budgetMs??null:null,
     ignoredLongLightWorkGaps:quality.ignoredSchedulingGaps??0},

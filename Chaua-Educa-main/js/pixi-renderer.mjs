@@ -1,8 +1,9 @@
 // WebGL presentation for the game and its presentation screens. Keep a single game clock.
 // The existing artwork specifies the drawing order, atlas rectangles and poses.
-import {Container, Sprite, Texture, Rectangle, Matrix, Graphics, GraphicsPath, TextureSource, ImageSource, RenderTexture, Color, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
-import {SceneGradient, dashPath} from './pixi-paint.mjs';
+import {Container, Sprite, Texture, MeshGeometry, Rectangle, Matrix, Graphics, GraphicsPath, TextureSource, ImageSource, RenderTexture, Color, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
+import {SceneGradient, dashPath, WetFruitMesh} from './pixi-paint.mjs';
 import {GLYPHS, GLYPH_URL} from './pixi-glyphs.mjs';
+import {WET_FOOD_CACHE_CONTROL} from './perf-ab.mjs';
 
 let glyphAtlas;
 const sourceCaches=new WeakMap();
@@ -123,7 +124,7 @@ class PixiScene {
   for(let i=0;i<(this.groupCount||0);i++){
    this.groups[i].mask=null;this.groups[i].removeChildren();
   }
-  this.spriteCount=this.graphicCount=this.groupCount=0;
+  this.spriteCount=this.graphicCount=this.groupCount=this.wetFruitCount=0;
  }
  save(){this.stack.push(this.state);this.state={...this.state,matrix:this.state.matrix.clone()};this.parents.push(this.parent);}
  restore(){if(this.stack.length){this.state=this.stack.pop();this.parent=this.parents.pop();}}
@@ -204,6 +205,17 @@ class PixiScene {
   const sprite=this.sprites[i]??=new Sprite();
   sprite.texture=texture;sprite.tint=0xffffff;
   this.position(sprite,dx,dy,dw/texture.width,dh/texture.height);
+ }
+ drawWetFood(image,rect,x,y,size,wetness){
+  if(WET_FOOD_CACHE_CONTROL)return false;
+  const texture=this.source(image).full;
+  this.wetFruitGeometry??=new MeshGeometry();
+  this.wetFruitMeshes??=[];
+  const index=this.wetFruitCount++;
+  const mesh=this.wetFruitMeshes[index]??=new WetFruitMesh(this.wetFruitGeometry,texture);
+  mesh.setFrame(texture,rect,wetness);
+  this.position(mesh,x,y,size,size);
+  return true;
  }
  createPattern(image,repeat){
   const pattern={repeat};

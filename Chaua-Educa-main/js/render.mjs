@@ -1,4 +1,5 @@
 import {createArtSurface} from './art-surface.mjs';
+import {WET_FOOD_CACHE_CONTROL} from './perf-ab.mjs';
 import {flightWarnings} from './flight-warnings.mjs';
 import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
 import {pickupPose} from './pickup-geometry.mjs';
@@ -26,7 +27,7 @@ import { images, loadAssets } from './assets.mjs';
 import { yieldTaskSlice, resetTaskSlice } from './image-loader.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination, prewarmRainWeather, getWeatherMode } from './weather.mjs';
-import {drawFood,prewarmFoodArt,getFrozenFoodAtlas} from './food-art.mjs';
+import {drawFood,getFrozenFoodAtlas,prewarmWetFood} from './food-art.mjs';
 import {surfaceSnow} from './surface-weather.mjs';
 import {WeatherMotion} from './weather-motion.mjs';
 import {TreeDrips} from './weather-art.mjs';
@@ -867,6 +868,9 @@ export class Renderer {
         this.initializeAssets();
         this.resize();
     }
+    get wetFruitMode() {
+        return this.c.drawWetFood && !WET_FOOD_CACHE_CONTROL ? 'shader' : 'cached';
+    }
     get seasonalBackdropMode() {
         return this.c.drawSeasonalAtlas && !this.seasonalCacheControl ? 'atlas-direct' : 'cached-strips';
     }
@@ -897,6 +901,7 @@ export class Renderer {
             this.c.save();
             this.c.setTransform(1,0,0,1,0,0);
             this.c.globalAlpha=0.004;
+            prewarmWetFood(this.c);
             drawCachedText(this.c, '+10', 2, 2, '800 18px Nunito', '#f1ffd4', '#254a35', 3);
             drawCachedText(this.c, 'TURBO', 2, 2, '900 10px Nunito', '#ffe9b6');
             drawCachedText(this.c, '×2', 2, 2, '900 12px Nunito', '#fff4c2');
