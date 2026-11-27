@@ -1,4 +1,5 @@
 import {createArtSurface} from './art-surface.mjs';
+import {WinterStageStream} from './winter-stream.mjs';
 import {WET_FOOD_CACHE_CONTROL} from './perf-ab.mjs';
 import {flightWarnings} from './flight-warnings.mjs';
 import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
@@ -23,7 +24,7 @@ import {hawkAngle} from './collision.mjs';
 import {predictedHawkY} from './animals.mjs';
 import { canvasResolution,identicalCanvasBudgets } from './quality.mjs';
 import { flightViewport, advanceFlightCamera } from './viewport.mjs';
-import { images, loadAssets } from './assets.mjs';
+import { images, loadAssets, STREAM_WINTER_STAGES } from './assets.mjs';
 import { yieldTaskSlice, resetTaskSlice } from './image-loader.mjs';
 import { impactPose, smoothstep } from './motion.mjs';
 import { journeyRain, journeyStorm, journeyWind, journeyFog, drawWindGusts, drawJourneyRain, drawForegroundRain, drawSurfaceRainImpacts, drawJourneyFog, drawLightning, drawLightningIllumination, prewarmRainWeather, getWeatherMode } from './weather.mjs';
@@ -861,6 +862,7 @@ export class Renderer {
         this.scaledForestCacheEnabled = true;
         this.cachedView = null;
         this.winterCapWarmupIndex = 0;
+        this.winterStageStream=STREAM_WINTER_STAGES?new WinterStageStream():null;
         this._countdownWarmFrames = 0;
         this._skyGrads = null;
         this._homeWashGrad = null;
@@ -875,6 +877,7 @@ export class Renderer {
         return this.c.drawSeasonalAtlas && !this.seasonalCacheControl ? 'atlas-direct' : 'cached-strips';
     }
     initializeAssets() {
+        const startedAt=performance.now();
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(async () => {
             resetTaskSlice();
             prepareTreeWeather(this.c, { skipWinterCapGpuWarmup: true });
@@ -927,6 +930,7 @@ export class Renderer {
                 warmSurface(img);
                 await yieldTaskSlice(5);
             }
+            this.winterStageStream?.prepareInitial(this.c);
             while (this.warmNextWinterCap()) {
                 await yieldTaskSlice(0);
             }
@@ -970,10 +974,12 @@ export class Renderer {
             this.c.canvas?.flush?.();
             this.c.clearRect(0, 0, 8, 8);
             this.c.restore();
+            this.assetStartupMs=Math.round(performance.now()-startedAt);
         });
         return this.ready;
     }
     warmNextWinterCap() {
+        if(this.winterStageStream)return false;
         const count = PRECOMPOSED_SNOW_COMPACT_STAGES
             ? Math.max(0, (WINTER_CAP_ART.stagePages?.length || 1) - 1)
             : WINTER_CAP_ART.pages.length;
@@ -1488,6 +1494,7 @@ export class Renderer {
         const fog = journeyFog(game, game.tutorial);
         const wind = journeyWind(game, game.mode, game.tutorial);
         const snow = surfaceSnow(game);
+        if(this.winterStageStream)c.winterDisplayStage=this.winterStageStream.update(c,snow);
         const wet = game.surfaceWeather?.wet ?? rain;
         const winter = winterAmount(game);
         const weatherMotion=this.weatherMotion.advance(sceneTime,{wind,storm,speed:game.speed||250,seed:`${game.seed}:${game.tutorial?'training':'flight'}`});

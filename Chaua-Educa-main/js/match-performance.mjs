@@ -186,7 +186,7 @@ export class MatchPerformance {
     path:typeof location!=='undefined'?location.pathname:null},
    id:c.id,startedAt:c.start,collectedAt:new Date().toISOString(),
    renderer:{backend:renderer.flightBackend??'canvas2d',error:renderer.flightBackendError??null,
-    seasonalBackdrop:renderer.seasonalBackdropMode??null,wetFruit:renderer.wetFruitMode??null},
+    seasonalBackdrop:renderer.seasonalBackdropMode??null,wetFruit:renderer.wetFruitMode??null,winterLoading:renderer.winterStageStream?.report()??null,assetStartupMs:renderer.assetStartupMs??null},
    device:viewportInfo(renderer),
    match:{seed:c.seed,mode:c.mode,training:c.training,score:game.score,
     won:!!game.won,flightSeconds:round(game.elapsed||0),stage:game.stage},

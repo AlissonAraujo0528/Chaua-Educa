@@ -16,8 +16,11 @@ const WINTER_CAP_STAGE_ASSETS=Object.freeze(
  (WINTER_CAP_ART.stagePages||[]).map((p,stage)=>p?`winter-cap:stage-${stage}`:null)
 );
 const COMPACT_STAGE_PACKED_SCRATCH=[0,0,0,0,0];
-function resolveWinterCapArt(kind,stage,variant){
+function resolveWinterCapArt(c,kind,stage,variant){
  if(PRECOMPOSED_SNOW_COMPACT_STAGES){
+  // Stage 15 for living trunks is supplied by the full-snow source atlas.
+  if(stage===WINTER_CAP_ART.stages-1&&kind!=='special')return null;
+  if(stage>0&&Number.isInteger(c.winterDisplayStage))stage=c.winterDisplayStage;
   const f=winterStageFrame(kind,stage,variant);
   if(!f)return null;
   COMPACT_STAGE_PACKED_SCRATCH[0]=stage;
@@ -230,6 +233,7 @@ function drawWinterCap(c,image,packed,dx,dy,dw,dh,kind,stage,variant){
  let source=image,sy=packed[2],usedStageCache=false,usedCompactStage=false;
  if(PRECOMPOSED_SNOW_COMPACT_STAGES){
   usedCompactStage=true;
+  stage=packed[0];
   if(lastCompactStage!==stage){
    lastCompactStage=stage;
    winterStageCacheMetrics.copies++;
@@ -423,13 +427,13 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE?precomposedSnowStage(treeSnow):0;
  maybePrefetchFirstWinterStage(treeSnow,precomposedLevel);
 
- const fullSnow = treeSnow >= 1 - 1e-6;
+ const fullSnow = treeSnow >= 1 - 1e-6 || (precomposedLevel>0&&c.winterDisplayStage===WINTER_CAP_ART.stages-1);
  const snowImg4 = fullSnow ? images.get(`trees-${kind}-snow-04`) : null;
  const image = snowImg4 || images.get(`trees-${kind}`);
  if (!image) return;
 
  const variantIdx=((variant % 4) + 4) % 4;
- const capArt=resolveWinterCapArt(kind,precomposedLevel,variantIdx);
+ const capArt=resolveWinterCapArt(c,kind,precomposedLevel,variantIdx);
  const packed=capArt?.packed??null;
  const capImage=capArt?.image??null;
  const f = FOREST_ART[kind][variantIdx], s = width / (f.core[1] - f.core[0]);
@@ -523,7 +527,7 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
  if(!upper&&breakAge===undefined)maybePrefetchFirstWinterStage(snow,precomposedLevel);
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
- const capArt=resolveWinterCapArt('special',precomposedLevel,index);
+ const capArt=resolveWinterCapArt(c,'special',precomposedLevel,index);
  const packed=capArt?.packed??null;
  const preparedVariant=capArt?.image??null;
  if (!image || index < 0) return;

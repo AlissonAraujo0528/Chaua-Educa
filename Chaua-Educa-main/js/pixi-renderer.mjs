@@ -177,6 +177,16 @@ class PixiScene {
   }
   return entry;
  }
+ prepareImage(image){
+  this.gpu.texture.bind(this.source(image).full);
+ }
+ releaseImage(image){
+  const entry=this.sources.get(image);
+  if(!entry)return;
+  for(const texture of entry.frames.values())texture.destroy();
+  entry.full.destroy(true);
+  this.sources.delete(image);
+ }
  refreshImage(image){
   if(image instanceof RenderSurface){image.flush();return;}
   const entry=this.sources.get(image);

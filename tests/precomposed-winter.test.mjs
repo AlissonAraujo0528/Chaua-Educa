@@ -28,3 +28,54 @@ test('all intermediate cap regions fit on their packed page',()=>{
   }
  }
 });
+
+test('streaming winter preloads adjacent pages and releases textures through snow and thaw',async()=>{
+ const {WinterStageStream}=await import('../Chaua-Educa-main/js/winter-stream.mjs');
+ const {winterStageKey}=await import('../Chaua-Educa-main/js/precomposed-winter.mjs');
+ const bitmap=stage=>({stage,closed:false,close(){this.closed=true;}});
+ const cache=new Map([1,2].map(stage=>[winterStageKey(stage),bitmap(stage)]));
+ const requested=[],released=[];
+ const context={prepareImage(image){assert.equal(image.closed,false);},releaseImage(image){released.push(image);}};
+ const stream=new WinterStageStream({cache,load:async key=>{
+  const stage=Number(key.split('-').at(-1));requested.push(stage);return bitmap(stage);
+ }});
+ const settle=()=>new Promise(resolve=>setImmediate(resolve));
+ stream.prepareInitial(context);
+ for(const stage of [...Array.from({length:16},(_,i)=>i),...Array.from({length:16},(_,i)=>15-i),0,1,2]){
+  // Retain the last uploaded page while a required page is still decoding.
+  for(let frame=0;frame<3;frame++){stream.update(context,stage/15);await settle();}
+  assert.equal(stream.update(context,stage/15),stage);
+  assert.ok(cache.size<=4);
+ }
+ assert.equal(stream.report().peakResident,4);
+ assert.ok(requested.includes(15));
+ assert.ok(released.length>0&&released.every(image=>image.closed));
+});
+
+test('late and failed winter requests preserve displayed art and retry with backoff',async()=>{
+ const {WinterStageStream}=await import('../Chaua-Educa-main/js/winter-stream.mjs');
+ const {winterStageKey}=await import('../Chaua-Educa-main/js/precomposed-winter.mjs');
+ const cache=new Map([[winterStageKey(1),{stage:1}],[winterStageKey(2),{stage:2}]]);
+ const pending=[];let time=10;
+ const stream=new WinterStageStream({cache,now:()=>time,load:key=>new Promise((resolve,reject)=>pending.push({key,resolve,reject}))});
+ const settle=()=>new Promise(resolve=>setImmediate(resolve));
+ const context={};
+ stream.prepareInitial(context);
+ assert.equal(stream.update(context,2/15),2);
+ pending.shift().reject(Error('network offline'));await settle();
+ assert.equal(stream.update(context,3/15),2);
+ const inFlight=pending.shift();
+ assert.equal(inFlight.key,winterStageKey(3));
+ assert.equal(stream.update(context,0),0);
+ const stale={closed:false,close(){this.closed=true;}};
+ inFlight.resolve(stale);await settle();
+ assert.equal(stream.update(context,0),0);
+ assert.equal(stale.closed,true);
+ assert.equal(stream.report().stageMisses,1);
+ assert.equal(pending[0].key,winterStageKey(1));
+ pending.shift().reject(Error('offline'));await settle();
+ stream.update(context,0);assert.equal(pending.length,0);
+ time+=3001;stream.update(context,0);
+ assert.equal(pending[0].key,winterStageKey(1));
+ assert.equal(stream.report().loadErrors,2);
+});
