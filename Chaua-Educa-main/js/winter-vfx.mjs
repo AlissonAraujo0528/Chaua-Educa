@@ -1,3 +1,4 @@
+import {createArtSurface} from './art-surface.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 
 // Winter VFX are procedural and use the original character/tree art intact.
@@ -11,7 +12,7 @@ let snowSpriteSheet=null;
 function getSnowSpriteSheet(){
  if(snowSpriteSheet)return snowSpriteSheet;
  if(typeof document==='undefined')return null;
- const canvas=document.createElement('canvas');
+ const canvas=createArtSurface();
  canvas.width=48;canvas.height=16;
  const sc=canvas.getContext('2d');
  if(!sc)return null;
@@ -135,7 +136,7 @@ export function snowRevealHeight(intensity,column=0){
 const revealPaths=new Map(),REVEAL_PATH_LIMIT=192;
 export function clipSnowReveal(c,x,y,width,height,intensity){
  const columns=32;
- if(typeof Path2D!=='undefined'&&PERF_AB_VARIANT!=='legacy-snow-clips'){
+ if(!c.gpu&&typeof Path2D!=='undefined'&&PERF_AB_VARIANT!=='legacy-snow-clips'){
   const step=Math.round(clamp01(intensity)*256);
   const key=`${x}:${y}:${width}:${height}:${step}`;
   let path=revealPaths.get(key);
