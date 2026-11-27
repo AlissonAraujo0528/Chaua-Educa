@@ -1,6 +1,27 @@
 // WebGL presentation for the game and its presentation screens. Keep a single game clock.
 // The existing artwork specifies the drawing order, atlas rectangles and poses.
-import {Container, Sprite, Texture, Rectangle, Matrix, Graphics, GraphicsPath, CanvasSource, ImageSource, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
+import {Container, Sprite, Texture, Rectangle, Matrix, Graphics, GraphicsPath, TextureSource, ImageSource, RenderTexture, Color, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
+import {SceneGradient, dashPath} from './pixi-paint.mjs';
+import {GLYPHS, GLYPH_URL} from './pixi-glyphs.mjs';
+
+let glyphAtlas;
+const sourceCaches=new WeakMap();
+async function loadGlyphAtlas(){
+ if(glyphAtlas)return glyphAtlas;
+ const atlas=new Image();
+ atlas.src=GLYPH_URL.href;
+ await atlas.decode();
+ glyphAtlas=await createImageBitmap(atlas);
+ return glyphAtlas;
+}
+
+const DEFAULT_STATE={
+ globalAlpha:1,globalCompositeOperation:'source-over',font:'10px Nunito',
+ textAlign:'start',textBaseline:'alphabetic',fillStyle:'#000',strokeStyle:'#000',
+ lineWidth:1,lineCap:'butt',lineJoin:'miter',dash:[]
+};
+const BLEND_MODES={'source-atop':'source-atop','destination-in':'destination-in',screen:'screen'};
+
 
 export async function createPixiRenderer(original, {background = false} = {}){
  const canvas=document.createElement('canvas');
@@ -8,14 +29,21 @@ export async function createPixiRenderer(original, {background = false} = {}){
   ? 'position:absolute;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none'
   : 'position:absolute;inset:0;pointer-events:none';
  canvas.setAttribute('aria-hidden','true');
+ await loadGlyphAtlas();
  const gpu=new WebGLRenderer();
  await gpu.init({canvas,width:original.width,height:original.height,antialias:true,resolution:1,backgroundAlpha:background?1:0});
+ const gl=gpu.gl;
+ gpu.state.blendModesMap['source-atop']=[gl.DST_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ZERO,gl.ONE];
+ gpu.state.blendModesMap['destination-in']=[gl.ZERO,gl.SRC_ALPHA];
  if(!background)original.parentElement.style.position='relative';
  original.after(canvas);
  canvas.hidden=true;
- const scene=new WinterScene(canvas);
+ sourceCaches.set(gpu,new WeakMap());
+ const scene=new PixiScene(canvas,gpu);
  return {
   canvas,
+  context:scene,
+  createSurface:(width,height)=>new RenderSurface(gpu,width,height),
   dispose(){canvas.remove();original.style.visibility='';gpu.destroy();},
   draw(paint){
    if(gpu.gl.isContextLost())throw new Error('Contexto WebGL perdido. Recarregue o teste.');
@@ -29,49 +57,86 @@ export async function createPixiRenderer(original, {background = false} = {}){
  };
 }
 
-class WinterScene {
- constructor(canvas){
+class PixiScene {
+ constructor(canvas,gpu){
   this.canvas=canvas;
-  // The native context holds Canvas drawing state only, never a frame image.
-  this.state=document.createElement('canvas').getContext('2d');
+  this.gpu=gpu;
+  this.state={...DEFAULT_STATE,matrix:new Matrix()};
   this.root=new Container();
-  this.sources=new WeakMap();
+  this.sources=sourceCaches.get(gpu);
   this.patterns=new WeakMap();
-  this.sprites=[];this.graphics=[];this.groups=[];this.patches=[];
+  this.sprites=[];this.graphics=[];this.groups=[];
   this.parents=[];
   this.matrix=new Matrix();
  }
  begin(){
+  this.recycleNodes();
+  this.parent=this.root;
+  this.parents.length=0;
+  this.stack=[];
+  this.state={...DEFAULT_STATE,matrix:new Matrix()};
+  this.dirty=false;
+ }
+ recycleNodes(){
   this.root.removeChildren();
   for(let i=0;i<(this.groupCount||0);i++){
    this.groups[i].mask=null;this.groups[i].removeChildren();
   }
-  this.spriteCount=this.graphicCount=this.groupCount=this.patchCount=0;
-  this.parent=this.root;
-  this.parents.length=0;
-  this.state.reset();
-  this.transformCache=null;
+  this.spriteCount=this.graphicCount=this.groupCount=0;
  }
- save(){this.state.save();this.parents.push(this.parent);}
- restore(){this.state.restore();this.parent=this.parents.pop()||this.root;this.transformCache=null;}
- getTransform(){return this.transformCache??=this.state.getTransform();}
+ save(){this.stack.push(this.state);this.state={...this.state,matrix:this.state.matrix.clone()};this.parents.push(this.parent);}
+ restore(){if(this.stack.length){this.state=this.stack.pop();this.parent=this.parents.pop();}}
+ getTransform(){
+  const {a,b,c,d,tx,ty}=this.state.matrix;
+  return {a,b,c,d,e:tx,f:ty};
+ }
+ setTransform(a,b,c,d,x,y){this.state.matrix.set(a,b,c,d,x,y);}
+ transform(...values){this.state.matrix.append(new Matrix(...values));}
+ translate(x,y){const m=this.state.matrix;m.tx+=m.a*x+m.c*y;m.ty+=m.b*x+m.d*y;}
+ scale(x,y){const m=this.state.matrix;m.a*=x;m.b*=x;m.c*=y;m.d*=y;}
+ rotate(angle){const c=Math.cos(angle),s=Math.sin(angle);this.transform(c,s,-s,c,0,0);}
+ clearRect(x,y,width,height){
+  if(this.canvas instanceof RenderSurface&&x===0&&y===0&&width>=this.canvas.width&&height>=this.canvas.height&&!this.stack.length&&this.state.matrix.isIdentity()){
+   this.recycleNodes();this.canvas.clearPending=true;this.dirty=false;return;
+  }
+  const style=this.fillStyle,alpha=this.globalAlpha;
+  this.fillStyle='#fff';this.globalAlpha=1;
+  this.beginPath();this.rect(x,y,width,height);
+  this.graphic().fill(0xffffff).blendMode='erase';
+  this.fillStyle=style;this.globalAlpha=alpha;
+ }
+ setLineDash(values){
+  const pattern=Array.from(values);
+  if(pattern.some(value=>value<=0))return;
+  this.state.dash=pattern.length%2?[...pattern,...pattern]:pattern;
+ }
+ createLinearGradient(...points){return new SceneGradient(points);}
+ createRadialGradient(...points){return new SceneGradient(points);}
  position(node,x=0,y=0,sx=1,sy=1){
   const m=this.getTransform();
   node.setFromMatrix(this.matrix.set(m.a*sx,m.b*sx,m.c*sy,m.d*sy,m.a*x+m.c*y+m.e,m.b*x+m.d*y+m.f));
   node.alpha=this.globalAlpha;
-  node.blendMode=this.globalCompositeOperation==='screen'?'screen':'normal';
+  node.blendMode=BLEND_MODES[this.globalCompositeOperation]??'normal';
+  this.dirty=true;
   this.parent.addChild(node);
  }
  source(image){
+  if(image instanceof RenderSurface)image.flush();
   let entry=this.sources.get(image);
+  if(entry&&image instanceof RenderSurface&&entry.source!==image.texture.source)entry=null;
   if(!entry){
-   const Source=image instanceof HTMLCanvasElement||(typeof OffscreenCanvas!=='undefined'&&image instanceof OffscreenCanvas)?CanvasSource:ImageSource;
-   const source=new Source({resource:image,resolution:1,autoGenerateMipmaps:false});
+   const options={resource:image,resolution:1,autoGenerateMipmaps:false};
+   const source=image instanceof RenderSurface?image.texture.source
+    : image instanceof HTMLImageElement
+     ? new TextureSource({...options,width:image.naturalWidth,height:image.naturalHeight})
+     : new ImageSource(options);
+   if(image instanceof HTMLImageElement)source.uploadMethodId='image';
    entry={source,full:new Texture({source}),frames:new Map()};this.sources.set(image,entry);
   }
   return entry;
  }
  refreshImage(image){
+  if(image instanceof RenderSurface){image.flush();return;}
   const entry=this.sources.get(image);
   if(!entry)return;
   if(entry.source.width!==image.width||entry.source.height!==image.height)
@@ -96,11 +161,11 @@ class WinterScene {
   }
   const i=this.spriteCount++;
   const sprite=this.sprites[i]??=new Sprite();
-  sprite.texture=texture;
+  sprite.texture=texture;sprite.tint=0xffffff;
   this.position(sprite,dx,dy,dw/texture.width,dh/texture.height);
  }
  createPattern(image,repeat){
-  const pattern=this.state.createPattern(image,repeat);
+  const pattern={repeat};
   this.patterns.set(pattern,image);return pattern;
  }
  fillRect(x,y,w,h){
@@ -129,27 +194,38 @@ class WinterScene {
   }
   tex.frame.x=0;tex.frame.y=offset;tex.frame.width=tile.width;tex.frame.height=height;
   tex.updateUvs();tex.update();
-  sprite.texture=tex;
+  sprite.texture=tex;sprite.tint=0xffffff;
   this.position(sprite,x,y,width/tile.width,1);
  }
- fillText(value,x,y){this.paintText('fillText',value,x,y);}
- strokeText(value,x,y){this.paintText('strokeText',value,x,y);}
- paintText(mode,value,x,y){
-  const m=this.state.measureText(value),pad=Math.ceil(this.lineWidth)+2;
-  const left=Math.floor(x-m.actualBoundingBoxLeft-pad),top=Math.floor(y-m.actualBoundingBoxAscent-pad);
-  const width=Math.ceil(x+m.actualBoundingBoxRight+pad-left),height=Math.ceil(y+m.actualBoundingBoxDescent+pad-top);
-  const canvas=this.patch(width,height),c=canvas.getContext('2d');
-  c.font=this.font;c.textAlign=this.textAlign;c.textBaseline=this.textBaseline;
-  c.fillStyle=this.fillStyle;c.strokeStyle=this.strokeStyle;c.lineWidth=this.lineWidth;
-  c[mode](value,x-left,y-top);
-  this.refreshImage(canvas);this.drawImage(canvas,left,top);
+ fillText(value,x,y){this.paintText(value,x,y,this.fillStyle,false);}
+ strokeText(value,x,y){this.paintText(value,x,y,this.strokeStyle,true);}
+ measureText(value){
+  let width=0;
+  const scale=(Number(this.font.match(/([\d.]+)px/)?.[1])||10)/48;
+  for(const character of String(value))width+=(GLYPHS[character]??GLYPHS['?'])[2]*scale;
+  return {width,actualBoundingBoxLeft:width/2,actualBoundingBoxRight:width/2,
+   actualBoundingBoxAscent:43*scale,actualBoundingBoxDescent:11*scale};
  }
- beginPath(){this.path=new GraphicsPath();this.nativePath=new Path2D();}
- ellipse(x,y,rx,ry,rotation,start,end){
-  this.nativePath.ellipse(x,y,rx,ry,rotation,start,end);
-  // All ellipses in the winter flight are complete.
-  const p=new GraphicsPath().ellipse(0,0,rx,ry);
-  this.path.addPath(p,new Matrix().rotate(rotation).translate(x,y));
+ paintText(value,x,y,color,outline){
+  const scale=(Number(this.font.match(/([\d.]+)px/)?.[1])||10)/48;
+  const width=this.measureText(value).width;
+  let left=x-(this.textAlign==='center'?width/2:this.textAlign==='right'||this.textAlign==='end'?width:0);
+  const baseline=y+(this.textBaseline==='middle'?16*scale:0);
+  const tint=new Color(color);
+  for(const character of String(value)){
+   const [sx,sy,advance]=GLYPHS[character]??GLYPHS['?'];
+   if(character!==' '){
+    this.drawImage(glyphAtlas,sx,sy+(outline?80:0),80,80,left-8*scale,baseline-53*scale,80*scale,80*scale);
+    const sprite=this.sprites[this.spriteCount-1];
+    sprite.tint=tint.toNumber();sprite.alpha*=tint.alpha;
+   }
+   left+=advance*scale;
+  }
+ }
+ beginPath(){this.path=new GraphicsPath();}
+ ellipse(x,y,rx,ry,rotation){
+  const path=new GraphicsPath().ellipse(0,0,rx,ry);
+  this.path.addPath(path,new Matrix().rotate(rotation).translate(x,y));
  }
  graphic(){
   const i=this.graphicCount++;
@@ -164,47 +240,52 @@ class WinterScene {
   this.parent.addChild(group);group.mask=mask;this.parent=group;
  }
  fill(){
-  if(typeof this.fillStyle==='string')this.graphic().fill(this.fillStyle);
-  else this.paintPath('fill');
+  const style=this.fillStyle instanceof SceneGradient?this.fillStyle.style():this.fillStyle;
+  this.graphic().fill(style);
+  if(style?.texture)style.texture.source.style.addressMode='clamp-to-edge';
  }
  stroke(){
-  if(this.state.getLineDash().length||typeof this.strokeStyle!=='string'){this.paintPath('stroke');return;}
-  this.graphic().stroke({color:this.strokeStyle,width:this.lineWidth,cap:this.lineCap,join:this.lineJoin});
- }
- // Preserve the original dashes and gradient art in tightly bounded sprites.
- paintPath(mode){
-  const b=this.path.bounds,pad=2+(mode==='stroke'?this.lineWidth:0);
-  const x=Math.floor(b.minX-pad),y=Math.floor(b.minY-pad);
-  const width=Math.ceil(b.maxX+pad-x),height=Math.ceil(b.maxY+pad-y);
-  if(!(width>0&&height>0))return;
-  const surf=this.patch(width,height);
-  const c=surf.getContext('2d');c.translate(-x,-y);
-  c.fillStyle=this.fillStyle;c.strokeStyle=this.strokeStyle;c.lineWidth=this.lineWidth;
-  c.lineCap=this.lineCap;c.lineJoin=this.lineJoin;c.setLineDash(this.state.getLineDash());
-  c[mode](this.nativePath);
-  this.refreshImage(surf);this.drawImage(surf,x,y,width,height);
- }
- patch(width,height){
-  const i=this.patchCount++;
-  const surface=this.patches[i]??=document.createElement('canvas');
-  if(surface.width!==width)surface.width=width;
-  if(surface.height!==height)surface.height=height;
-  surface.getContext('2d').reset();
-  return surface;
+  const path=this.path;
+  if(this.state.dash.length)this.path=dashPath(path,this.state.dash);
+  const paint=this.strokeStyle instanceof SceneGradient?this.strokeStyle.style():{color:this.strokeStyle};
+  this.graphic().stroke({...paint,width:this.lineWidth,cap:this.lineCap,join:this.lineJoin});
+  if(paint.texture)paint.texture.source.style.addressMode='clamp-to-edge';
+  this.path=path;
  }
 }
 
-for(const name of ['translate','scale','rotate','transform','setTransform']){
- WinterScene.prototype[name]=function(...args){this.state[name](...args);this.transformCache=null;};
+class RenderSurface {
+ constructor(gpu,width,height){
+  this.gpu=gpu;this.size=[width,height];this.clearPending=true;
+  this.scene=new PixiScene(this,gpu);this.scene.begin();
+ }
+ get width(){return this.size[0];}
+ set width(value){this.resize(0,value);}
+ get height(){return this.size[1];}
+ set height(value){this.resize(1,value);}
+ resize(axis,value){
+  this.size[axis]=value;
+  this.texture?.destroy(true);this.texture=null;
+  this.clearPending=true;
+  this.scene.begin();
+ }
+ getContext(){return this.scene;}
+ flush(){
+  if(!this.width||!this.height)throw new Error('Textura gráfica sem dimensões.');
+  this.texture??=RenderTexture.create({width:this.width,height:this.height});
+  if(!this.scene.dirty&&!this.clearPending)return;
+  this.gpu.render({container:this.scene.root,target:this.texture,clear:this.clearPending,clearColor:[0,0,0,0]});
+  // Keep drawing state for subsequent incremental atlas slices.
+  this.scene.recycleNodes();
+  this.scene.dirty=false;this.clearPending=false;
+ }
 }
+
 for(const name of ['moveTo','lineTo','rect','roundRect','arc','closePath','bezierCurveTo','quadraticCurveTo']){
- WinterScene.prototype[name]=function(...args){this.path[name](...args);this.nativePath[name](...args);};
+ PixiScene.prototype[name]=function(...args){this.path[name](...args);};
 }
 for(const name of ['globalAlpha','globalCompositeOperation','font','textAlign','textBaseline','fillStyle','strokeStyle','lineWidth','lineCap','lineJoin']){
- Object.defineProperty(WinterScene.prototype,name,{
+ Object.defineProperty(PixiScene.prototype,name,{
   get(){return this.state[name];},set(value){this.state[name]=value;}
  });
-}
-for(const name of ['setLineDash','createLinearGradient','createRadialGradient']){
- WinterScene.prototype[name]=function(...args){return this.state[name](...args);};
 }

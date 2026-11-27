@@ -1,3 +1,4 @@
+import {createArtSurface} from './art-surface.mjs';
 import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {TREE_WIDTH} from './forest-geometry.mjs';
 import {FOREST_ART} from './forest-art-data.mjs';
@@ -166,9 +167,7 @@ function winterStageCache(stage,sourceImage,expectedPage,warmup=false){
  if(!band||!sourceImage||(expectedPage!==undefined&&band.page!==expectedPage))return null;
  let buf=activeWinterStageBuffer;
  if(!buf){
-  const surface=typeof OffscreenCanvas!=='undefined'
-   ?new OffscreenCanvas(stageBands.maxWidth,stageBands.maxHeight)
-   :typeof document!=='undefined'?document.createElement('canvas'):null;
+  const surface=createArtSurface();
   if(!surface)return null;
   surface.width=stageBands.maxWidth;
   surface.height=stageBands.maxHeight;
@@ -313,7 +312,7 @@ function barkTile(image,key,sx,sy,width,height,reverse){
  let entries=barkTiles.get(image);
  if(!entries){entries=new Map();barkTiles.set(image,entries);}
  if(entries.has(key))return entries.get(key);
- const canvas=typeof document!=='undefined'?document.createElement('canvas'):new OffscreenCanvas(Math.ceil(width),height*2);
+ const canvas=createArtSurface();
  canvas.width=Math.ceil(width);canvas.height=height*2;
  const c=canvas.getContext('2d');
  for(let row=0;row<2;row++){
@@ -345,7 +344,7 @@ function livingBark(image,kind,index,f){
 const wetVariantCaps=new WeakMap();
 function wetVariantCap(image){
  let canvas=wetVariantCaps.get(image);if(canvas)return canvas;
- canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(256,256):document.createElement('canvas');
+ canvas=createArtSurface();
  canvas.width=256;canvas.height=256;
  const c=canvas.getContext('2d');
  drawPackedSection(c,'wet','variants-0',0,0,256,256,0,0,256,256,{recordFirstDraw:false});
@@ -367,7 +366,7 @@ function cachedLivingSnowOverlay(kind, variantIdx, overlay, sx, sy, cx, sourceOf
  const key = `${kind}:${variantIdx}`;
  let entry = snowCapBuffers.get(key);
  if (!entry || entry.w !== cw || entry.h !== sourceHeight) {
-  const surface = entry?.surface ?? new OffscreenCanvas(cw, sourceHeight);
+  const surface = entry?.surface ?? createArtSurface(cw, sourceHeight);
   surface.width = cw; surface.height = sourceHeight;
   const oc = surface.getContext('2d');
   if (!oc) return null;
@@ -395,7 +394,7 @@ function cachedVariantSnowOverlay(index, snowImage, sx, sy, splice, snow) {
  const step = Math.round(Math.min(1, Math.max(0, snow)) * 256);
  let entry = variantSnowCapBuffers.get(index);
  if (!entry || entry.h !== splice) {
-  const surface = entry?.surface ?? new OffscreenCanvas(TREE_CELL, splice);
+  const surface = entry?.surface ?? createArtSurface(TREE_CELL, splice);
   surface.width = TREE_CELL; surface.height = splice;
   const oc = surface.getContext('2d');
   if (!oc) return null;
@@ -786,7 +785,7 @@ function snowOverlay(kind,amount){
  if(!image)return null;
  let buffer=snowMixBuffers.get(kind);
  if(!buffer){
-  const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(1024,1024):typeof document!=='undefined'?document.createElement('canvas'):null;
+  const canvas=createArtSurface();
   // Without a canvas, skip partial cover rather than show full winter at entry.
   if(!canvas)return amount>=1?image:null;
   canvas.width=1024;canvas.height=1024;buffer={canvas,c:canvas.getContext('2d'),amount:-1,image};snowMixBuffers.set(kind,buffer);

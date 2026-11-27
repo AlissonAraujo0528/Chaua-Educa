@@ -1,3 +1,4 @@
+import {createArtSurface} from './art-surface.mjs';
 import {FOODS} from './foods.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
 import {images} from './assets.mjs';
@@ -11,8 +12,7 @@ const wetCache=new Map();
 let frozenSource=null,frozenAtlas=null;
 
 function surface(width,height){
- const canvas=typeof document!=='undefined'?document.createElement('canvas'):
-  typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):null;
+ const canvas=createArtSurface();
  if(!canvas)return null;
  canvas.width=width;canvas.height=height;
  const c=canvas.getContext('2d');

@@ -1,3 +1,4 @@
+import {createArtSurface} from './art-surface.mjs';
 import {getWeatherMode,journeyRain,journeyStorm} from './weather.mjs';
 import {seasonFromFlight} from './climate-timeline.mjs';
 import {drawSnowfall} from './winter-vfx.mjs';
@@ -78,7 +79,7 @@ export class SeasonalBackdrop {
    }
    if(!this.pending){
     const pw=Math.max(1,Math.ceil((w+margin*2)*dpr)),ph=Math.max(1,Math.ceil(h*dpr));
-    const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(pw,ph):document.createElement('canvas');
+    const surface=createArtSurface();
     surface.width=pw;surface.height=ph;
     this.pending={id,surface,ctx:surface.getContext('2d',{alpha:false}),row:0,
      startMs:this.onTelemetry?this.now():0,sliceCount:0,drawMs:0};

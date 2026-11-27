@@ -1,3 +1,4 @@
+import {createArtSurface} from './art-surface.mjs';
 import {flightWarnings} from './flight-warnings.mjs';
 import {playerFlightPlacement,hawkPresentation} from './actor-placement.mjs';
 import {pickupPose} from './pickup-geometry.mjs';
@@ -55,7 +56,7 @@ let shieldRingSprite=null;
 function getShieldRingSprite(){
  if(shieldRingSprite)return shieldRingSprite;
  if(typeof document==='undefined')return null;
- const canvas=document.createElement('canvas');
+ const canvas=createArtSurface();
  canvas.width=288;canvas.height=288;
  const sc=canvas.getContext('2d');
  if(!sc)return null;
@@ -69,7 +70,7 @@ let dustSprite=null;
 function getDustSprite(){
  if(dustSprite)return dustSprite;
  if(typeof document==='undefined')return null;
- const canvas=document.createElement('canvas');
+ const canvas=createArtSurface();
  canvas.width=12;canvas.height=12;
  const sc=canvas.getContext('2d');
  if(!sc)return null;
@@ -82,7 +83,7 @@ let shieldDashedSprite=null;
 function getShieldDashedRingSprite(){
  if(shieldDashedSprite)return shieldDashedSprite;
  if(typeof document==='undefined')return null;
- const canvas=document.createElement('canvas');
+ const canvas=createArtSurface();
  canvas.width=216;canvas.height=216;
  const sc=canvas.getContext('2d');
  if(!sc)return null;
@@ -96,7 +97,7 @@ let miniSparkleSprite=null;
 function getMiniSparkleSprite(){
  if(miniSparkleSprite)return miniSparkleSprite;
  if(typeof document==='undefined')return null;
- const canvas=document.createElement('canvas');
+ const canvas=createArtSurface();
  canvas.width=48;canvas.height=48;
  const sc=canvas.getContext('2d');
  if(!sc)return null;
@@ -121,8 +122,7 @@ function blendSprite(c, first, second, blend, extent=128) {
     if(!buffer){
         const rasterScale=extent===180?320/HAWK_ART.size:2;
         const size=Math.ceil(extent*2*rasterScale);
-        const surface=typeof document!=='undefined'?document.createElement('canvas'):
-            typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(size,size):null;
+        const surface=createArtSurface();
         if(!surface){(blend<.5?first:second)(c);return;}
         surface.width=size;surface.height=size;
         buffer={surface,layer:surface.getContext('2d'),rasterScale};spriteBlendBuffers.set(extent,buffer);
@@ -289,11 +289,7 @@ function getSeedSprite(color = '#a0582c') {
         const sw = 7, sh = sw * 1.65;
         const width = 36, height = 48;
         const cx = 18, cy = 24;
-        const canvas = typeof document !== 'undefined'
-            ? document.createElement('canvas')
-            : typeof OffscreenCanvas !== 'undefined'
-                ? new OffscreenCanvas(width, height)
-                : null;
+        const canvas = createArtSurface();
         if (!canvas) return null;
         canvas.width = width; canvas.height = height;
         const c = canvas.getContext('2d');
@@ -348,11 +344,7 @@ function getFeatherSprite(color) {
         const size = 10;
         const width = 24, height = 30;
         const cx = 12, cy = 14;
-        const canvas = typeof document !== 'undefined'
-            ? document.createElement('canvas')
-            : typeof OffscreenCanvas !== 'undefined'
-                ? new OffscreenCanvas(width, height)
-                : null;
+        const canvas = createArtSurface();
         if (!canvas) return null;
         canvas.width = width; canvas.height = height;
         const c = canvas.getContext('2d');
@@ -478,11 +470,17 @@ let fontCacheHooked = false;
 let textMeasureCtx = null;
 function getTextMeasureCtx() {
     if (textMeasureCtx) return textMeasureCtx;
-    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const canvas = typeof document !== 'undefined' ? createArtSurface() : null;
     textMeasureCtx = canvas?.getContext?.('2d') || null;
     return textMeasureCtx;
 }
 function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, lineWidth = 0, textBaseline = 'alphabetic') {
+    if(c.gpu){
+        c.save();c.font=font;c.textAlign='center';c.textBaseline=textBaseline;
+        if(strokeStyle&&lineWidth>0){c.lineWidth=lineWidth;c.strokeStyle=strokeStyle;c.strokeText(text,x,y);}
+        c.fillStyle=fillStyle;c.fillText(text,x,y);c.restore();
+        return;
+    }
     if (typeof OffscreenCanvas !== 'undefined' && typeof OffscreenCanvasRenderingContext2D !== 'undefined' && typeof document !== 'undefined') {
         if (!fontCacheHooked && document.fonts?.ready) {
             fontCacheHooked = true;
@@ -511,9 +509,7 @@ function drawCachedText(c, text, x, y, font, fillStyle, strokeStyle = null, line
                 const h = Math.max(1, asc + desc + pad * 2);
                 const anchorX = pad + leftExt;
                 const anchorY = pad + asc;
-                const surface = typeof document !== 'undefined'
-                    ? document.createElement('canvas')
-                    : new OffscreenCanvas(w * TEXT_CACHE_SCALE, h * TEXT_CACHE_SCALE);
+                const surface = createArtSurface();
                 surface.width = w * TEXT_CACHE_SCALE;
                 surface.height = h * TEXT_CACHE_SCALE;
                 const oc = surface.getContext('2d');
@@ -768,8 +764,7 @@ function getPickupCache(key, radius, stops) {
     let surface = pickupCaches.get(key);
     if (surface) return surface;
     const size = radius * 2;
-    surface = typeof document !== 'undefined' ? document.createElement('canvas') :
-        typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(size, size) : null;
+    surface = createArtSurface();
     if (!surface) return null;
     surface.width = size; surface.height = size;
     const gc = surface.getContext('2d');
@@ -784,8 +779,7 @@ function getPickupCache(key, radius, stops) {
 let pepperVectorCache = null;
 function getPepperSprite() {
     if (pepperVectorCache) return pepperVectorCache;
-    const surface = typeof document !== 'undefined' ? document.createElement('canvas') :
-        typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(48, 56) : null;
+    const surface = createArtSurface();
     if (!surface) return null;
     surface.width = 48; surface.height = 56;
     const gc = surface.getContext('2d');
@@ -832,7 +826,7 @@ export function homePerchLayout(width, height) {
 }
 
 export class Renderer {
-    constructor(canvas) {
+    constructor(canvas, context = canvas.getContext('2d')) {
         this.quality = 'high';
         this.resolution = 'high';
         this.decoration = 'high';
@@ -842,7 +836,7 @@ export class Renderer {
             new URLSearchParams(location.search).get('snakeWarmup') === '1';
         this.snakeWarmupIndex = 0;
         this.canvas = canvas;
-        this.c = canvas.getContext('2d');
+        this.c = context;
         this.treeDrips = new TreeDrips();
         this.weatherMotion = new WeatherMotion();
         this.animalWeather = new AnimalWeather();
@@ -903,11 +897,10 @@ export class Renderer {
             drawCachedText(this.c, '×2', 2, 2, '900 12px Nunito', '#fff4c2');
             this.c.restore();
             const particlesImg = images.get('season-particles');
-            if (particlesImg && !particlesImg._rasterized) {
+            if (particlesImg && !particlesImg._rasterized && !this.c.gpu) {
                 const pw = particlesImg.naturalWidth || particlesImg.width;
                 const ph = particlesImg.naturalHeight || particlesImg.height;
-                const off = typeof document !== 'undefined' ? document.createElement('canvas') :
-                    typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : null;
+                const off = createArtSurface();
                 if (off) {
                     off.width = pw; off.height = ph;
                     off.getContext('2d').drawImage(particlesImg, 0, 0);
@@ -920,7 +913,7 @@ export class Renderer {
             // Prewarm active GPU surfaces incrementally so first-appearance textures
             // (world, snakes, action sheets, rain, winter caps) never freeze countdown or mid-flight frames.
             for (const [key, img] of images) {
-                if (!img?._rasterized || key.startsWith('winter-caps-')) continue;
+                if ((!this.c.gpu && !img?._rasterized) || key.startsWith('winter-caps-')) continue;
                 warmSurface(img);
                 await yieldTaskSlice(5);
             }
@@ -964,6 +957,7 @@ export class Renderer {
             this.c.restore();
             this.c.save();
             this.c.setTransform(1,0,0,1,0,0);
+            this.c.canvas?.flush?.();
             this.c.clearRect(0, 0, 8, 8);
             this.c.restore();
         });
@@ -1083,7 +1077,7 @@ export class Renderer {
         const width=this.canvas.width,height=this.canvas.height;
         let cache=this.skyCache;
         if(!cache||cache.light!==light||cache.dpr!==this.dpr||cache.w!==this.w||cache.h!==this.h){
-            const surface=cache?.surface??(typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):document.createElement('canvas'));
+            const surface=cache?.surface??createArtSurface();
             surface.width=width;surface.height=height;
             const layer=surface.getContext('2d',{alpha:false});layer.setTransform(this.dpr,0,0,this.dpr,0,0);
             this.paintSky(layer,light);
@@ -1112,8 +1106,7 @@ export class Renderer {
         let cache=this.forestCache;
         if(!cache||cache.viewW!==viewW||cache.viewH!==viewH||cache.dpr!==this.dpr||cache.forest!==forest||cache.pixelW!==pixelW||cache.pixelH!==pixelH){
             if(cache){cache.surface.width=0;cache.surface.height=0;}
-            const surface=typeof OffscreenCanvas!=='undefined'?
-                new OffscreenCanvas(pixelW,pixelH):document.createElement('canvas');
+            const surface=createArtSurface();
             surface.width=pixelW;surface.height=pixelH;
             const c=surface.getContext('2d',{alpha:false});
             if(!c)return null;
@@ -1147,8 +1140,7 @@ export class Renderer {
         let cache=this.fragmentedBackdrop;
         if(!cache||cache.width!==width||cache.height!==height||cache.dpr!==this.dpr||cache.forest!==forest){
             if(cache){cache.surface.width=0;cache.surface.height=0;}
-            const surface=typeof OffscreenCanvas!=='undefined'?
-                new OffscreenCanvas(width,height):document.createElement('canvas');
+            const surface=createArtSurface();
             surface.width=width;surface.height=height;
             const c=surface.getContext('2d',{alpha:false});
             if(!c)return null;
@@ -1186,8 +1178,7 @@ export class Renderer {
         let state=this.transitionBackdrop;
         if(state&&state.width===width&&state.height===height&&state.dpr===this.dpr)return state;
         if(state){state.surface.width=0;state.surface.height=0;}
-        const surface=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(width,height):
-            typeof document!=='undefined'?document.createElement('canvas'):null;
+        const surface=createArtSurface();
         if(!surface)return null;
         surface.width=width;surface.height=height;
         const c=surface.getContext('2d',{alpha:false});
@@ -1238,7 +1229,7 @@ export class Renderer {
         // distributes that work across frames without altering output pixels.
         // On GPUs where readback itself is costly or unsupported, abandon
         // incremental staging rather than making repeated slow frames.
-        if(this.transitionSyncEnabled){
+        if(this.transitionSyncEnabled && !c.gpu){
             let readMs;
             try {
                 const start=performance.now();

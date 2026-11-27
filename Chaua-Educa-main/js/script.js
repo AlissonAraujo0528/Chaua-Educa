@@ -1,3 +1,4 @@
+import {setArtSurfaceFactory} from './art-surface.mjs';
 import {MatchPerformance,exportMatchReports,MATCH_PERF_SETTING} from './match-performance.mjs';
 import {seededRandom} from './encounters.mjs';
 import {FlightCues, nativeKeyboardTarget} from './flight-accessibility.mjs';
@@ -44,7 +45,23 @@ const mobileDevice = isMobileFlightDevice(navigator, screen, matchMedia('(pointe
 app.classList.toggle('mobile-device', mobileDevice);
 document.documentElement.classList.toggle('mobile-device', mobileDevice);
 if(mobileDevice) $('.home-links').append($('#open-credits'));
-const renderer = new Renderer($('#forest'));
+const forestCanvas=$('#forest');
+let pixiScene=null,pixiPortrait=null,backendError=null;
+if(PERF_AB_VARIANT==='pixi-webgl-winter'){
+    try{
+        const {createPixiRenderer}=await import('./pixi-renderer.mjs');
+        pixiScene=await createPixiRenderer(forestCanvas,{background:true});
+        pixiPortrait=await createPixiRenderer($('#result-bird canvas'));
+        setArtSurfaceFactory(pixiScene.createSurface);
+    }catch(error){
+        pixiScene?.dispose();pixiScene=null;
+        backendError=String(error.message||error);
+        console.error('Falha ao inicializar Pixi WebGL',error);
+    }
+}
+const renderer = new Renderer(forestCanvas,pixiScene?.createSurface(8,8).getContext());
+renderer.flightBackend=pixiScene?'pixi-webgl':backendError?'pixi-webgl-failed':'canvas2d';
+renderer.flightBackendError=backendError;
 renderer.homeMobileLayout=mobileDevice;
 const quality=new VisualQuality(DB.readObject('chaua-visual-quality','auto'));
 // Deterministic seed for controlled winter A/B/C tests; normal gameplay is random.
@@ -55,25 +72,21 @@ const matchDownloadButtons=document.querySelectorAll('[data-match-download]');
 
 const seedQuery=diagnosticParams.get('test-seed');
 let benchmarkFlight=null;
-let pixiScene=null;
-let pixiPortrait=null;
 
 function drawScene(paint){
     if(pixiScene){
         try{
-            pixiScene.draw(context=>{
-                const previous=renderer.c;
-                renderer.c=context;
-                try{paint();}
-                finally{renderer.c=previous;}
-            });
+            pixiScene.draw(paint);
             return;
         }catch(error){
             renderer.flightBackend='pixi-webgl-failed';
             renderer.flightBackendError=String(error.message||error);
-            pixiScene.dispose();pixiScene=null;
-            pixiPortrait?.dispose();pixiPortrait=null;
             console.error('Falha ao desenhar a cena com Pixi WebGL',error);
+            finishMatchPerformance('webgl-failed');
+            const fallback=new URL(location.href);
+            fallback.searchParams.set('perf-ab','precomposed-snow');
+            location.replace(fallback);
+            return;
         }
     }
     paint();
@@ -806,7 +819,7 @@ function frame(time) {
     const staticFrozen=game.state==='paused'||game.state==='quiz'||game.state==='trained'||game.state==='ended'||(game.state==='menu'&&openDialogEl!==null);
     const staticKey=staticFrozen?`${game.state}|${renderer.w}x${renderer.h}:${renderer.dpr}|${renderer.decoration}|${game.reducedMotion}|${assetsReady}|${getWeatherMode()}|${game.elapsed}|${game.stage}|${openDialogEl?.id||''}`:'';
     const shouldRender=!staticFrozen||sceneDirty||staticKey!==lastStaticKey;
-    if(shouldRender){
+    if(shouldRender&&(!pixiScene||assetsReady)){
         sceneDirty=false;lastStaticKey=staticKey;
         if (game.state === 'menu'){
             if(assetsReady&&time>=nextIdleWinterWarmAt&&renderer.warmNextWinterCap()){
@@ -879,20 +892,7 @@ async function prepareGameAssets(retry=false) {
     $('#btnStart').disabled=true;updateTrainingButton();updateChapterButtons();
     try {
         await (retry?renderer.initializeAssets():renderer.ready);
-        if(PERF_AB_VARIANT==='pixi-webgl-winter'&&!pixiScene){
-            try{
-                const {createPixiRenderer}=await import('./pixi-renderer.mjs');
-                pixiScene=await createPixiRenderer(renderer.canvas,{background:true});
-                pixiPortrait=await createPixiRenderer($('#result-bird canvas'));
-                renderer.flightBackend='pixi-webgl';
-                renderer.flightBackendError=null;
-            }catch(error){
-                pixiScene?.dispose();pixiScene=null;
-                renderer.flightBackend='pixi-webgl-failed';
-                renderer.flightBackendError=String(error.message||error);
-                console.error('Falha ao inicializar Pixi WebGL',error);
-            }
-        }
+        if(pixiScene)renderer.c=pixiScene.context;
         assetsReady=true;sceneDirty=true;nextIdleWinterWarmAt=performance.now()+900;$('#asset-status').hidden=true;
         $('#btnStart').disabled=$('#inputPlayer').value.trim().length<3;
     } catch(error) {

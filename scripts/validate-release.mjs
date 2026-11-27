@@ -9,6 +9,7 @@ import {RUNTIME_ART} from '../Chaua-Educa-main/js/runtime-art-data.mjs';
 import {JOURNAL_PHOTOS,CONSERVATION_SOURCES} from '../Chaua-Educa-main/js/journal-content.mjs';
 import {SOURCES} from '../Chaua-Educa-main/js/questions.mjs';
 import {GAME_VERSION} from '../Chaua-Educa-main/js/version.mjs';
+import {GLYPH_URL} from '../Chaua-Educa-main/js/pixi-glyphs.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),app=resolve(root,'Chaua-Educa-main'),js=resolve(app,'js');
 const files=new Set(),modules=new Set(),externals=new Set(),errors=[];
 const fail=m=>errors.push(m),read=p=>readFileSync(p,'utf8'),hash=p=>createHash('sha256').update(readFileSync(p)).digest('hex');
@@ -33,6 +34,7 @@ for(const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)){
 for(const m of html.matchAll(/\b(?:for|aria-labelledby|aria-controls)="([^"]+)"/g))for(const id of m[1].split(/\s+/))if(!ids.has(id)&&!dynamicIds.has(id))fail(`Missing control/label: ${id}`);
 for(const m of read(cssPath).matchAll(/url\(['"]?([^)'"\s]+)['"]?\)/g))if(!m[1].startsWith('data:'))requireFile(resolve(dirname(cssPath),m[1]),'CSS URL');
 for(const p of Object.values(ASSET_PATHS))requireFile(resolve(js,p),'ASSET_PATHS');
+requireFile(fileURLToPath(GLYPH_URL),'Pixi glyph atlas');
 const winterArtDir=resolve(app,'assets/Seasons/Winter/Precomposed');
 const winterManifest=JSON.parse(read(resolve(winterArtDir,'manifest.json')));
 if(winterManifest.stages!==16)fail('Invalid winter stage count');
