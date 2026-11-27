@@ -239,6 +239,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
     winterLoadingMode:renderer.winterStageStream?'streamed':'eager',
     winterLoading:renderer.winterStageStream?.report()??null,
     assetStartupMs:renderer.assetStartupMs??null,
+    sceneGraph:renderer.c.sceneGraphReport?.()??null,
     seasonalSliceRows:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.sliceRows??null:null,
     seasonalBudgetMs:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.budgetMs??null:null,
     ignoredLongLightWorkGaps:quality.ignoredSchedulingGaps??0},

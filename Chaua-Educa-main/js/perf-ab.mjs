@@ -25,7 +25,7 @@ export function resolvePerfVariant(search='') {
 }
 export function buildPerfTestUrl(currentHref='http://127.0.0.1/',options={}){
  const url=new URL(currentHref);
- const clearKeys=['perf-test','perf-ab','perf-level','perf-hz','perf-replay','perf-seasonal','perf-wet-food','perf-winter','clima','weather'];
+ const clearKeys=['perf-test','perf-ab','perf-level','perf-hz','perf-replay','perf-seasonal','perf-wet-food','perf-winter','perf-scene','clima','weather'];
  for(const key of clearKeys)url.searchParams.delete(key);
  if(options.enabled===false)return url.toString();
  url.searchParams.set('perf-test','1');
@@ -41,6 +41,7 @@ export function buildPerfTestUrl(currentHref='http://127.0.0.1/',options={}){
  return url.toString();
 }
 const pageSearch=new URLSearchParams(typeof location==='undefined'?'':location.search);
+export const SCENE_REBUILD_CONTROL=pageSearch.get('perf-test')==='1'&&pageSearch.get('perf-scene')==='rebuild';
 export const WINTER_EAGER_CONTROL=pageSearch.get('perf-test')==='1'&&pageSearch.get('perf-winter')==='eager';
 export const WET_FOOD_CACHE_CONTROL=pageSearch.get('perf-test')==='1'&&pageSearch.get('perf-wet-food')==='cached';
 export const PERF_AB_VARIANT=typeof location==='undefined'?'precomposed-snow':resolvePerfVariant(location.search);

@@ -3,7 +3,7 @@
 import {Container, Sprite, Texture, MeshGeometry, Rectangle, Matrix, Graphics, GraphicsPath, TextureSource, ImageSource, RenderTexture, Color, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
 import {SceneGradient, dashPath, WetFruitMesh} from './pixi-paint.mjs';
 import {GLYPHS, GLYPH_URL} from './pixi-glyphs.mjs';
-import {WET_FOOD_CACHE_CONTROL} from './perf-ab.mjs';
+import {SCENE_REBUILD_CONTROL,WET_FOOD_CACHE_CONTROL} from './perf-ab.mjs';
 
 let glyphAtlas;
 const sourceCaches=new WeakMap();
@@ -40,7 +40,7 @@ export async function createPixiRenderer(original, {background = false} = {}){
  original.after(canvas);
  canvas.hidden=true;
  sourceCaches.set(gpu,new WeakMap());
- const scene=new PixiScene(canvas,gpu);
+ const scene=new PixiScene(canvas,gpu,background&&!SCENE_REBUILD_CONTROL);
  const presentation=new Container();
  presentation.addChild(scene.root);
  if(background){
@@ -54,12 +54,13 @@ export async function createPixiRenderer(original, {background = false} = {}){
   canvas,
   context:scene,
   createSurface:(width,height)=>new RenderSurface(gpu,width,height),
-  dispose(){canvas.remove();original.style.visibility='';presentation.destroy({children:true});gpu.destroy();},
+  dispose(){canvas.remove();original.style.visibility='';scene.resetEntities();presentation.destroy({children:true});gpu.destroy();},
   draw(paint){
    if(gpu.gl.isContextLost())throw new Error('Contexto WebGL perdido. Recarregue o teste.');
    if(canvas.width!==original.width||canvas.height!==original.height)gpu.resize(original.width,original.height);
    scene.begin();
    paint(scene);
+   scene.finish();
    gpu.render(presentation);
    canvas.hidden=false;
    original.style.visibility='hidden';
@@ -98,21 +99,87 @@ class SeasonalAtlasLayer {
  }
 }
 
+class DrawPool {
+ constructor(){
+  this.sprites=[];this.graphics=[];this.groups=[];this.wetFruits=[];
+  this.begin();
+ }
+ begin(){this.spriteCount=this.graphicCount=this.groupCount=this.wetFruitCount=0;}
+ releaseUnusedMasks(){
+  for(let i=this.groupCount;i<this.groups.length;i++)this.groups[i].mask=null;
+ }
+ destroy(){
+  for(const group of this.groups){group.mask=null;group.destroy();}
+  for(const sprite of this.sprites){sprite.barkTexture?.destroy();sprite.destroy();}
+  for(const graphic of this.graphics)graphic.destroy();
+  for(const mesh of this.wetFruits){mesh.shader.destroy();mesh.destroy();}
+ }
+}
+
+// Preserve insertion order and only touch the scene graph when a child
+// enters, leaves, or moves relative to other children.
+class RetainedChildren {
+ constructor(){
+  this.parents=new WeakMap();
+  this.touched=[];
+  this.frame=0;
+ }
+ begin(){this.frame++;this.touched.length=0;this.edits=0;}
+ visit(parent){
+  let cursor=this.parents.get(parent);
+  if(!cursor){cursor={parent,frame:-1,count:0};this.parents.set(parent,cursor);}
+  if(cursor.frame!==this.frame){
+   cursor.frame=this.frame;
+   cursor.count=0;
+   this.touched.push(cursor);
+  }
+  return cursor;
+ }
+ place(parent,node){
+  const cursor=this.visit(parent),index=cursor.count++;
+  if(parent.children[index]!==node){
+   if(node.parent===parent)parent.setChildIndex(node,index);
+   else parent.addChildAt(node,index);
+   this.edits++;
+  }
+ }
+ finish(){
+  for(const {parent,count} of this.touched){
+   if(parent.children.length>count){
+    this.edits+=parent.children.length-count;
+    parent.removeChildren(count);
+   }
+  }
+ }
+}
+
 class PixiScene {
- constructor(canvas,gpu){
+ constructor(canvas,gpu,retain=false){
   this.canvas=canvas;
   this.gpu=gpu;
   this.state={...DEFAULT_STATE,matrix:new Matrix()};
   this.root=new Container();
   this.sources=sourceCaches.get(gpu);
   this.patterns=new WeakMap();
-  this.sprites=[];this.graphics=[];this.groups=[];
+  this.framePool=new DrawPool();
+  this.pool=this.framePool;
+  this.retained=retain?new RetainedChildren():null;
+  this.entities=new Map();
+  this.entityScope=null;
+  this.entitiesCreated=0;this.entitiesReleased=0;this.peakEntities=0;
+  this.frameEdits=0;this.totalEdits=0;this.renderedFrames=0;
   this.parents=[];
   this.matrix=new Matrix();
  }
  begin(){
   if(this.seasonalLayer)this.seasonalLayer.visible=false;
-  this.recycleNodes();
+  this.frameEdits=0;
+  this.pool=this.framePool;
+  if(this.retained){
+   this.retained.begin();
+   this.retained.visit(this.root);
+   this.pool.begin();
+  }else this.recycleNodes();
   this.parent=this.root;
   this.parents.length=0;
   this.stack=[];
@@ -120,11 +187,72 @@ class PixiScene {
   this.dirty=false;
  }
  recycleNodes(){
+  if(this.seasonalLayer)this.frameEdits+=this.root.children.length;
   this.root.removeChildren();
-  for(let i=0;i<(this.groupCount||0);i++){
-   this.groups[i].mask=null;this.groups[i].removeChildren();
+  for(let i=0;i<this.pool.groupCount;i++){
+   const group=this.pool.groups[i];
+   if(this.seasonalLayer)this.frameEdits+=group.children.length;
+   group.mask=null;group.removeChildren();
   }
-  this.spriteCount=this.graphicCount=this.groupCount=this.wetFruitCount=0;
+  this.pool.begin();
+ }
+ attach(node){
+  if(this.retained)this.retained.place(this.parent,node);
+  else{
+   this.parent.addChild(node);
+   if(this.seasonalLayer)this.frameEdits++;
+  }
+ }
+ beginEntity(key){
+  if(!this.retained||key==null)return;
+  let entry=this.entities.get(key);
+  if(!entry){
+   entry={container:new Container(),pool:new DrawPool(),parent:null,frame:0};
+   this.entities.set(key,entry);
+   this.entitiesCreated++;
+  }
+  this.attach(entry.container);
+  this.retained.visit(entry.container);
+  entry.frame=this.retained.frame;
+  entry.parent=this.parent;
+  this.entityScope=entry;
+  this.parent=entry.container;
+  this.pool=entry.pool;
+  this.pool.begin();
+ }
+ endEntity(){
+  if(!this.entityScope)return;
+  this.parent=this.entityScope.parent;
+  this.entityScope=null;
+  this.pool=this.framePool;
+ }
+ releaseEntity(key,entry){
+  entry.pool.destroy();
+  entry.container.destroy();
+  this.entities.delete(key);
+  this.entitiesReleased++;
+ }
+ resetEntities(){
+  for(const [key,entry] of this.entities)this.releaseEntity(key,entry);
+ }
+ finish(){
+  if(this.retained){
+   this.retained.finish();
+   this.frameEdits=this.retained.edits;
+   this.framePool.releaseUnusedMasks();
+   for(const [key,entry] of this.entities){
+    if(entry.frame!==this.retained.frame)this.releaseEntity(key,entry);
+    else entry.pool.releaseUnusedMasks();
+   }
+   this.peakEntities=Math.max(this.peakEntities,this.entities.size);
+  }
+  this.renderedFrames++;
+  this.totalEdits+=this.frameEdits;
+ }
+ sceneGraphReport(){
+  return {mode:this.retained?'persistent':'rebuild',activeEntities:this.entities.size,
+   peakEntities:this.peakEntities,created:this.entitiesCreated,released:this.entitiesReleased,
+   renderedFrames:this.renderedFrames,totalChildEdits:this.totalEdits,lastFrameChildEdits:this.frameEdits};
  }
  save(){this.stack.push(this.state);this.state={...this.state,matrix:this.state.matrix.clone()};this.parents.push(this.parent);}
  restore(){if(this.stack.length){this.state=this.stack.pop();this.parent=this.parents.pop();}}
@@ -160,7 +288,7 @@ class PixiScene {
   node.alpha=this.globalAlpha;
   node.blendMode=BLEND_MODES[this.globalCompositeOperation]??'normal';
   this.dirty=true;
-  this.parent.addChild(node);
+  this.attach(node);
  }
  source(image){
   if(image instanceof RenderSurface)image.flush();
@@ -211,8 +339,8 @@ class PixiScene {
   }else{
    [dx,dy,dw=texture.width,dh=texture.height]=args;
   }
-  const i=this.spriteCount++;
-  const sprite=this.sprites[i]??=new Sprite();
+  const i=this.pool.spriteCount++;
+  const sprite=this.pool.sprites[i]??=new Sprite();
   sprite.texture=texture;sprite.tint=0xffffff;
   this.position(sprite,dx,dy,dw/texture.width,dh/texture.height);
  }
@@ -220,9 +348,8 @@ class PixiScene {
   if(WET_FOOD_CACHE_CONTROL)return false;
   const texture=this.source(image).full;
   this.wetFruitGeometry??=new MeshGeometry();
-  this.wetFruitMeshes??=[];
-  const index=this.wetFruitCount++;
-  const mesh=this.wetFruitMeshes[index]??=new WetFruitMesh(this.wetFruitGeometry,texture);
+  const index=this.pool.wetFruitCount++;
+  const mesh=this.pool.wetFruits[index]??=new WetFruitMesh(this.wetFruitGeometry,texture);
   mesh.setFrame(texture,rect,wetness);
   this.position(mesh,x,y,size,size);
   return true;
@@ -248,8 +375,8 @@ class PixiScene {
   this.beginPath();this.rect(x,y,w,h);this.fill();
  }
  barkBand(tile,x,y,width,height,offset){
-  const entry=this.source(tile),i=this.spriteCount++;
-  const sprite=this.sprites[i]??=new Sprite();
+  const entry=this.source(tile),i=this.pool.spriteCount++;
+  const sprite=this.pool.sprites[i]??=new Sprite();
   let tex=sprite.barkTexture;
   if(!tex||tex.source!==entry.source){
    tex?.destroy(false);
@@ -279,7 +406,7 @@ class PixiScene {
    const [sx,sy,advance]=GLYPHS[character]??GLYPHS['?'];
    if(character!==' '){
     this.drawImage(glyphAtlas,sx,sy+(outline?80:0),80,80,left-8*scale,baseline-53*scale,80*scale,80*scale);
-    const sprite=this.sprites[this.spriteCount-1];
+    const sprite=this.pool.sprites[this.pool.spriteCount-1];
     sprite.tint=tint.toNumber();sprite.alpha*=tint.alpha;
    }
    left+=advance*scale;
@@ -291,16 +418,19 @@ class PixiScene {
   this.path.addPath(path,new Matrix().rotate(rotation).translate(x,y));
  }
  graphic(){
-  const i=this.graphicCount++;
-  const node=this.graphics[i]??=new Graphics();
+  const i=this.pool.graphicCount++;
+  const node=this.pool.graphics[i]??=new Graphics();
   node.clear().path(this.path);this.position(node);return node;
  }
  clip(){
   const mask=this.graphic().fill(0xffffff);
   mask.alpha=1;
-  const i=this.groupCount++;
-  const group=this.groups[i]??=new Container();
-  this.parent.addChild(group);group.mask=mask;this.parent=group;
+  const i=this.pool.groupCount++;
+  const group=this.pool.groups[i]??=new Container();
+  this.attach(group);
+  if(group.mask!==mask)group.mask=mask;
+  this.parent=group;
+  this.retained?.visit(group);
  }
  fill(){
   const style=this.fillStyle instanceof SceneGradient?this.fillStyle.style():this.fillStyle;

@@ -1285,6 +1285,7 @@ export class Renderer {
     resetFlightPresentation(){
         // Checkpoint attempts can reuse the same seed and scene time. Clear
         // short-lived visual state explicitly while retaining loaded art/caches.
+        this.c.resetEntities?.();
         this.treeDrips=new TreeDrips();this.animalWeather=new AnimalWeather();this.weatherMotion=new WeatherMotion();
         this.cameraTime=undefined;this.cameraTop=undefined;
     }
@@ -1545,7 +1546,11 @@ export class Renderer {
             const e = game.entities[i];
             if (e.kind === 'wood' && (this.drawOffscreenEntitiesForTest === true ||
                 !Number.isFinite(e.x) || (e.x >= view.worldLeft - 320 &&
-                e.x <= view.worldLeft + view.worldWidth + 320))) this.obstacle(e, game, reduced, renderBounds);
+                e.x <= view.worldLeft + view.worldWidth + 320))){
+                c.beginEntity?.(e.id);
+                this.obstacle(e, game, reduced, renderBounds);
+                c.endEntity?.();
+            }
         }
         const dripsBounds=this._treeDripsBoundsScratch??(this._treeDripsBoundsScratch={left:0,right:0,bottom:0});
         dripsBounds.left=view.worldLeft;
@@ -1654,6 +1659,7 @@ export class Renderer {
                 !Number.isFinite(e.x)||(e.x>=visibleLeft-margin&&e.x<=visibleRight+margin);
             if (e.kind === 'wood') continue;
             if (e.kind === 'hawk') {
+                c.beginEntity?.(e.id);
                 if (e.warning > 0 || (!e.harmless && e.x>game.x+180)) {
                     c.save(); c.lineWidth = 2; c.setLineDash(HAWK_LINE_DASH);
                     c.strokeStyle=e.targetLocked?'#a85b34aa':'#755a45aa';
@@ -1663,7 +1669,12 @@ export class Renderer {
                     c.stroke(); c.restore();
                 }
                 if(e.warning<=0&&drawSprite)this.hawk(e, reduced ? 0 : sceneTime, reduced, false, 0, false, snow, rain, this.decoration==='low',winter);
-            } else if (!e.collected&&drawSprite) this.pickup(e, game.elapsed, reduced, snow, wet);
+                c.endEntity?.();
+            } else if (!e.collected&&drawSprite){
+                c.beginEntity?.(e.id);
+                this.pickup(e, game.elapsed, reduced, snow, wet);
+                c.endEntity?.();
+            }
         }
         const auraAt=probe&&probe.deep?probe.begin('render.shieldAura'):0;
         if (game.shield || game.invincible > 0) {
@@ -1722,7 +1733,9 @@ export class Renderer {
 
         if(game.refuge) {
             const support=320+birdFoot(1.04);
+            c.beginEntity?.('refuge');
             drawRefugeTree(c,game.refuge,support,reduced?0:sceneTime,215,7,snow,wet);
+            c.endEntity?.();
         }
         const isDefeated = (game.state === 'ended' && !game.won) || game.state === 'impact';
         // Recoil lasts just .32s; the final dazed pose stays fixed while
@@ -1744,9 +1757,12 @@ export class Renderer {
         bProps.defeated=isDefeated;bProps.impactProgress=impactProg;bProps.turbo=(game.pepper||0)>0;
         bProps.stamina=game.stamina!==undefined?game.stamina:1;bProps.won=game.state==='ended'&&game.won;
         bProps.snow=snow;bProps.rain=rain;bProps.low=this.decoration==='low';bProps.weather=this.animalWeather;
+        c.beginEntity?.('chaua');
         drawBird(c, bProps);
+        c.endEntity?.();
         if(probe&&probe.deep)probe.end('render.bird',birdAt);
         const particlesAt=probe&&probe.deep?probe.begin('render.particles'):0;
+        c.beginEntity?.('flight-particles');
         if (!reduced) {
             const pList = game.particles;
             const pLimit = this.decoration==='low'?Math.min(32,pList.length):pList.length;
@@ -1790,6 +1806,7 @@ export class Renderer {
             }
         }
         this.animalWeather.draw(c);
+        c.endEntity?.();
         if(probe&&probe.deep)probe.end('render.particles',particlesAt,{count:game.particles.length});
         c.globalAlpha = 1;
         if(game.popups.length) {
@@ -1801,6 +1818,7 @@ export class Renderer {
             c.globalAlpha=1;
         }
         c.restore();
+        c.beginEntity?.('foreground-weather');
         if(rain>0&&!reduced){
             const rWind=journeyWind(game,game.mode,game.tutorial);
             const rStorm=journeyStorm(game,game.mode,game.tutorial);
@@ -1813,6 +1831,7 @@ export class Renderer {
         // The original sky flash runs behind birds/trees. This second pass
         // illuminates the complete scene without whitening warning labels.
         drawLightningIllumination(c,this.w,this.h,sceneTime,storm,reduced);
+        c.endEntity?.();
         // Natural viewport flight boundary
         const {boxes}=flightWarnings(game,view,reduced,shakeX,shakeY);
         if(boxes.length){
