@@ -6,7 +6,7 @@ import {snakeAttack,HAWK_ATTACKS} from './attack-patterns.mjs';
 import {breeze,treeBend,winterAmount} from './living-motion.mjs';
 import {drawForestLife,prewarmForestLife} from './forest-life.mjs';
 import {HAWK_ART} from './hawk-geometry.mjs';
-import {SeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
+import {SeasonalBackdrop,drawDirectSeasonalBackdrop,drawSeasonParticles} from './seasons.mjs';
 import {activeProbe} from './perf-hooks.mjs';
 import {drawSnowfall,drawSnowContact,winterBreathSettings,prewarmWinterVfx} from './winter-vfx.mjs';
 import {drawSnakeA2,snakeA2ArtScale,SNAKE_SHEET_KEYS,snakeA2Pose,snakeA2NeedsMirror,preloadSnakeA2,warmupSnakeA2,snakeA2HeadRect,snakePlacement} from './snake-a2.mjs';
@@ -836,6 +836,8 @@ export class Renderer {
             new URLSearchParams(location.search).get('snakeWarmup') === '1';
         this.snakeWarmupIndex = 0;
         this.canvas = canvas;
+        const params=new URLSearchParams(typeof location==='undefined'?'':location.search);
+        this.seasonalCacheControl=params.get('perf-test')==='1'&&params.get('perf-seasonal')==='cached';
         this.c = context;
         this.treeDrips = new TreeDrips();
         this.weatherMotion = new WeatherMotion();
@@ -864,6 +866,9 @@ export class Renderer {
         this._mobileWashGrad = null;
         this.initializeAssets();
         this.resize();
+    }
+    get seasonalBackdropMode() {
+        return this.c.drawSeasonalAtlas && !this.seasonalCacheControl ? 'atlas-direct' : 'cached-strips';
     }
     initializeAssets() {
         this.ready = Promise.all([loadAssets(),preloadSnakeA2(),preloadActionSheets()]).then(async () => {
@@ -1319,7 +1324,9 @@ export class Renderer {
             this.seasonalBackdrop ??= new SeasonalBackdrop();
             const backdropProbe=activeProbe;
             const backdropAt=backdropProbe?backdropProbe.begin('render.seasonalBackdrop'):0;
-            this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
+            if(this.seasonalBackdropMode==='atlas-direct')
+                drawDirectSeasonalBackdrop(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
+            else this.seasonalBackdrop.draw(c,seasonal,w,h,this.dpr,time,seasonDistance,reduced);
             if(backdropProbe)backdropProbe.end('render.seasonalBackdrop',backdropAt);
         }
         if (!images.has('forest') && !seasonal) {
@@ -1455,7 +1462,8 @@ export class Renderer {
             // Prewarm it rather than rebuilding large unused v3 forest caches.
             const seasonal=!game.tutorial&&images.get('season-backgrounds');
             if(seasonal){
-                this.seasonalBackdrop?.prepare(seasonal,this.w,this.h,this.dpr,game);
+                if(this.seasonalBackdropMode==='cached-strips')
+                    this.seasonalBackdrop?.prepare(seasonal,this.w,this.h,this.dpr,game);
             }else{
                 this.prepareSky(BACKGROUND_PALETTE[2]);
                 const forest=images.get('forest');

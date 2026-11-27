@@ -234,8 +234,9 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
      }),
     snakeWarmupEnabled:!!renderer.snakeWarmupEnabled,
     snakeSheetsWarmed:renderer.snakeWarmupIndex||0,
-    seasonalSliceRows:renderer.seasonalBackdrop?.sliceRows??null,
-    seasonalBudgetMs:renderer.seasonalBackdrop?.budgetMs??null,
+    seasonalBackdrop:renderer.seasonalBackdropMode,
+    seasonalSliceRows:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.sliceRows??null:null,
+    seasonalBudgetMs:renderer.seasonalBackdropMode==='cached-strips'?renderer.seasonalBackdrop?.budgetMs??null:null,
     ignoredLongLightWorkGaps:quality.ignoredSchedulingGaps??0},
    // Causality is NEVER inferred merely from proximity. Long Animation Frames
    // and measured operation timings are provided as separate evidence.

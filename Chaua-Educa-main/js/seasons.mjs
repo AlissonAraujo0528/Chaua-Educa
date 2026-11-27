@@ -20,6 +20,25 @@ export function journeySeason(game) {
  return seasonFromFlight(game);
 }
 
+const BACKDROP_MARGIN = 26;
+const BACKDROP_OVERSCAN = 1.08;
+
+function backdropOffset(time, dpr, reduced) {
+ const drift=reduced||PERF_AB_VARIANT==='static-season-bg'?0:Math.sin(time*.035)*24;
+ return Math.round((drift-BACKDROP_MARGIN)*dpr);
+}
+
+export function drawDirectSeasonalBackdrop(scene, atlas, width, height, dpr, time, game, reduced) {
+ const state=journeySeason(game);
+ const cellWidth=atlas.naturalWidth/2,cellHeight=Math.floor(atlas.naturalHeight/2);
+ const paddedWidth=width+BACKDROP_MARGIN*2;
+ const scale=Math.max(paddedWidth/cellWidth,height/cellHeight)*BACKDROP_OVERSCAN;
+ const drawWidth=cellWidth*scale,drawHeight=cellHeight*scale;
+ const x=backdropOffset(time,dpr,reduced)+(paddedWidth-drawWidth)*dpr/2;
+ const y=(height-drawHeight)*dpr/2;
+ scene.drawSeasonalAtlas(atlas,state,x,y,drawWidth*dpr,drawHeight*dpr);
+}
+
 // Cache only the two visible frames at viewport resolution. Resizing or changing
 // quality releases the old surfaces; there is no per-frame atlas resampling.
 // Small incremental cache slices keep scene preparation off the critical path.
@@ -43,7 +62,7 @@ export class SeasonalBackdrop {
   this.pending=null;this.frames.clear();this.key='';this.atlas=null;
  }
  prepare(atlas,w,h,dpr,game){
-  const state=journeySeason(game),margin=26;
+  const state=journeySeason(game),margin=BACKDROP_MARGIN;
   const key=`${w}:${h}:${dpr}`;
   if(this.key!==key || this.atlas!==atlas){
    this.onTelemetry?.('cache-reset',{width:w,height:h,dpr});
@@ -90,7 +109,7 @@ export class SeasonalBackdrop {
    if(visible && p.row<p.surface.height)
     this.onTelemetry?.('surface-urgent',{seasonId:id,remainingRows:p.surface.height-p.row});
    const sw=atlas.naturalWidth/2,sh=Math.floor(atlas.naturalHeight/2),sy=id<2?0:atlas.naturalHeight-sh;
-   const scale=Math.max((w+margin*2)/sw,h/sh)*1.08;
+   const scale=Math.max((w+margin*2)/sw,h/sh)*BACKDROP_OVERSCAN;
    // Even if the budget is exhausted, do one forward-progress slice on the
    // speculative target; measuring time after every slice prevents a long loop.
    let processed=0;
@@ -121,11 +140,10 @@ export class SeasonalBackdrop {
  }
  draw(c,atlas,w,h,dpr,time,game,reduced){
   const probe=activeProbe,prepAt=probe?probe.begin('render.seasonalPrepare'):0;
-  const state=this.prepare(atlas,w,h,dpr,game),margin=26;
+  const state=this.prepare(atlas,w,h,dpr,game);
   if(probe)probe.end('render.seasonalPrepare',prepAt);
   const blitAt=probe?probe.begin('render.seasonalBlit'):0;
-  const drift=reduced||PERF_AB_VARIANT==='static-season-bg'?0:Math.sin(time*.035)*24;
-  const dx=Math.round((drift-margin)*dpr);
+  const dx=backdropOffset(time,dpr,reduced);
   c.save();c.setTransform(1,0,0,1,0,0);
   c.globalAlpha=1;
   if(state.mix>=.998||state.mix<=.002){

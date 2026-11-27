@@ -40,21 +40,61 @@ export async function createPixiRenderer(original, {background = false} = {}){
  canvas.hidden=true;
  sourceCaches.set(gpu,new WeakMap());
  const scene=new PixiScene(canvas,gpu);
+ const presentation=new Container();
+ presentation.addChild(scene.root);
+ if(background){
+  const backdrop=new SeasonalAtlasLayer();
+  presentation.addChildAt(backdrop.container,0);
+  scene.drawSeasonalAtlas=(atlas,state,x,y,width,height)=>
+   backdrop.draw(scene.source(atlas).source,atlas,state,x,y,width,height);
+  scene.seasonalLayer=backdrop.container;
+ }
  return {
   canvas,
   context:scene,
   createSurface:(width,height)=>new RenderSurface(gpu,width,height),
-  dispose(){canvas.remove();original.style.visibility='';gpu.destroy();},
+  dispose(){canvas.remove();original.style.visibility='';presentation.destroy({children:true});gpu.destroy();},
   draw(paint){
    if(gpu.gl.isContextLost())throw new Error('Contexto WebGL perdido. Recarregue o teste.');
    if(canvas.width!==original.width||canvas.height!==original.height)gpu.resize(original.width,original.height);
    scene.begin();
    paint(scene);
-   gpu.render(scene.root);
+   gpu.render(presentation);
    canvas.hidden=false;
    original.style.visibility='hidden';
   }
  };
+}
+
+// A backdrop keeps the same sprite pair and the same four atlas views across frames.
+class SeasonalAtlasLayer {
+ constructor(){
+  this.container=new Container();
+  this.container.visible=false;
+  this.layers=[new Sprite(),new Sprite()];
+  this.container.addChild(...this.layers);
+  this.textures=[];
+ }
+ draw(source,atlas,{from,to,mix},x,y,width,height){
+  if(source!==this.source){
+   for(const texture of this.textures)texture.destroy();
+   const cellWidth=atlas.naturalWidth/2,cellHeight=Math.floor(atlas.naturalHeight/2);
+   this.textures=Array.from({length:4},(_,index)=>new Texture({source,
+    frame:new Rectangle((index%2)*cellWidth,index<2?0:atlas.naturalHeight-cellHeight,cellWidth,cellHeight)
+   }));
+   this.source=source;
+  }
+  const crossfade=from!==to&&mix>.002&&mix<.998;
+  const [base,overlay]=this.layers;
+  base.texture=this.textures[mix>=.998?to:from];
+  base.position.set(x,y);base.setSize(width,height);
+  overlay.visible=crossfade;
+  if(crossfade){
+   overlay.texture=this.textures[to];
+   overlay.position.set(x,y);overlay.setSize(width,height);overlay.alpha=mix;
+  }
+  this.container.visible=true;
+ }
 }
 
 class PixiScene {
@@ -70,6 +110,7 @@ class PixiScene {
   this.matrix=new Matrix();
  }
  begin(){
+  if(this.seasonalLayer)this.seasonalLayer.visible=false;
   this.recycleNodes();
   this.parent=this.root;
   this.parents.length=0;

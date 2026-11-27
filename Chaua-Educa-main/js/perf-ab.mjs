@@ -25,7 +25,7 @@ export function resolvePerfVariant(search='') {
 }
 export function buildPerfTestUrl(currentHref='http://127.0.0.1/',options={}){
  const url=new URL(currentHref);
- const clearKeys=['perf-test','perf-ab','perf-level','perf-hz','perf-replay','clima','weather'];
+ const clearKeys=['perf-test','perf-ab','perf-level','perf-hz','perf-replay','perf-seasonal','clima','weather'];
  for(const key of clearKeys)url.searchParams.delete(key);
  if(options.enabled===false)return url.toString();
  url.searchParams.set('perf-test','1');
