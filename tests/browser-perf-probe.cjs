@@ -63,6 +63,24 @@ const root=(process.env.GAME_URL||'http://127.0.0.1:5501/').replace(/\/?$/,'/');
    assert.deepEqual(flightErrors,[]);
    await flight.close();
   }
-  console.log('PASS opt-in local-only physical-device diagnostics, download JSON, native frames and no regular UI');
+  // In-game DEV Test in Settings launches Teste A / Teste B + winter replay without manual URL edits.
+  const labPage=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2});
+  const labErrors=[];labPage.on('pageerror',e=>labErrors.push(e.message));
+  await labPage.goto(root,{waitUntil:'networkidle'});
+  assert.equal(await labPage.locator('#chaua-qa-panel').count(),0);
+  await labPage.locator('#open-settings').click();
+  await labPage.locator('#perf-lab-details summary').click();
+  await labPage.locator('[data-perf-preset="winter-compact"]').click();
+  await labPage.locator('#chaua-qa-panel').waitFor();
+  assert.match(await labPage.locator('#chaua-qa-panel').textContent(),/winter-caps-compact-stages/);
+  await labPage.locator('#chaua-qa-panel').getByRole('button',{name:'Executar voo de referência'}).waitFor();
+  await labPage.locator('#chaua-perf-switch-a').click();
+  await labPage.waitForFunction(()=>document.querySelector('#chaua-qa-panel')?.textContent.includes('precomposed-snow'));
+  await labPage.locator('#chaua-perf-exit').click();
+  await labPage.locator('#start-training:not([disabled])').waitFor();
+  assert.equal(await labPage.locator('#chaua-qa-panel').count(),0,'exit returns to normal game');
+  assert.deepEqual(labErrors,[]);
+  await labPage.close();
+  console.log('PASS opt-in local-only physical-device diagnostics, DEV Test A/B, download JSON, native frames and no regular UI');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

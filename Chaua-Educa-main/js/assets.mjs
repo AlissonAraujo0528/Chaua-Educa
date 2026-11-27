@@ -2,8 +2,15 @@ import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {loadImage} from './image-loader.mjs';
 import {RUNTIME_ART} from './runtime-art-data.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_STAGE_CACHE,winterCapKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_COMPACT_STAGES,PRECOMPOSED_SNOW_STAGE_CACHE,winterCapKey,winterStageKey} from './precomposed-winter.mjs';
 // One cache for gameplay, menus and results. All files are local.
+const precomposedWinterAssetEntries=PRECOMPOSED_SNOW_COMPACT_STAGES
+ ? (WINTER_CAP_ART.stagePages||[]).filter(Boolean).map(page=>[
+  winterStageKey(page.stage),'../assets/Seasons/Winter/Precomposed/'+page.file
+ ])
+ : WINTER_CAP_ART.pages.map((page,index)=>[
+  winterCapKey(index),'../assets/Seasons/Winter/Precomposed/'+page.file
+ ]);
 export const ASSET_PATHS = Object.fromEntries([
  ...['chaua','hawk'].map(k=>[`${k}-atlas`,`../assets/v6/${k}-atlas.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}`,`../assets/v7/trees-${k}.webp`]),
@@ -11,9 +18,7 @@ export const ASSET_PATHS = Object.fromEntries([
  // surface; overlays 01-03 are unused at runtime.
  ...['lower','upper'].map(k=>[`trees-${k}-snow-04`,`../assets/Seasons/Winter/trees-${k}-snow-04.webp`]),
  ...['lower','upper'].map(k=>[`trees-${k}-overlay-04`,`../assets/Seasons/Winter/trees-${k}-overlay-04.webp`]),
- ...(PRECOMPOSED_SNOW_ACTIVE?WINTER_CAP_ART.pages.map((page,index)=>[
-  winterCapKey(index),'../assets/Seasons/Winter/Precomposed/'+page.file
- ]):[]),
+ ...(PRECOMPOSED_SNOW_ACTIVE?precomposedWinterAssetEntries:[]),
  ...Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((page,i)=>[`runtime-${family}-${i}`,page.path])),
  ...['forest'].map(k=>[k,`../assets/v3/${k}.webp`]),
  ...['feather','shield'].map(k=>[k,`../assets/v4/${k}.webp`]),
@@ -26,11 +31,20 @@ export const ASSET_PATHS = Object.fromEntries([
 export const images = new Map();
 const runtimeDimensions=new Map(Object.entries(RUNTIME_ART).flatMap(([family,def])=>def.pages.map((p,i)=>[`runtime-${family}-${i}`,[p.width,p.height]])));
 const winterCapKeys=new Set();
-WINTER_CAP_ART.pages.forEach((page,index)=>{
- const key=winterCapKey(index);
- winterCapKeys.add(key);
- runtimeDimensions.set(key,[page.width,page.height]);
-});
+if(PRECOMPOSED_SNOW_COMPACT_STAGES){
+ for(const page of WINTER_CAP_ART.stagePages||[]){
+  if(!page)continue;
+  const key=winterStageKey(page.stage);
+  winterCapKeys.add(key);
+  runtimeDimensions.set(key,[page.width,page.height]);
+ }
+}else{
+ WINTER_CAP_ART.pages.forEach((page,index)=>{
+  const key=winterCapKey(index);
+  winterCapKeys.add(key);
+  runtimeDimensions.set(key,[page.width,page.height]);
+ });
+}
 let pending;
 export function loadAssets() {
  if(typeof Image==='undefined')return Promise.resolve([]);

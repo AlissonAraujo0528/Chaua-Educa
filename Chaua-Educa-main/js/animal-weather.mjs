@@ -80,7 +80,13 @@ export class AnimalWeather {
   if(this.particles.length>this.limit)this.particles.length=this.limit;
   for(let i=this.particles.length-1;i>=0;i--){
    const p=this.particles[i];p.age+=this.dt;
-   if(p.age>=p.life){this.particles.splice(i,1);continue;}
+   if(p.age>=p.life){
+    const last=this.particles.pop();
+    if(i<this.particles.length)this.particles[i]=last;
+    this._deadParticles??=[];
+    if(this._deadParticles.length<24)this._deadParticles.push(p);
+    continue;
+   }
    p.vy+=p.snow?80*this.dt:200*this.dt;
    p.x+=(p.vx-this.speed+this.wind*8)*this.dt;p.y+=p.vy*this.dt;
   }
@@ -111,7 +117,11 @@ export class AnimalWeather {
      const pt=points[(i+state.releaseAt|0)%points.length];
      transform(matrix,pt[0],pt[1],this._ptA);
      transform(this.worldInverse,this._ptA[0],this._ptA[1],this._ptB);
-     this.particles.push({x:this._ptB[0],y:this._ptB[1],vx:(i-1)*12,vy:shake?-22-i*7:15,age:0,life:snowy?.72:.48,snow:snowy});
+     const particle=this._deadParticles?.length?this._deadParticles.pop():{};
+     particle.x=this._ptB[0];particle.y=this._ptB[1];
+     particle.vx=(i-1)*12;particle.vy=shake?-22-i*7:15;
+     particle.age=0;particle.life=snowy?.72:.48;particle.snow=snowy;
+     this.particles.push(particle);
     }
     if(shake)state.load*=.3;
    }

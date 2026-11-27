@@ -2,7 +2,11 @@
 export function nativeKeyboardTarget(target) {
     return !!target?.closest?.('button,a,input,select,textarea,summary,[contenteditable="true"],[role="tab"]');
 }
-const snakeActive=e=>e.kind==='wood'&&['warning','windup','striking'].includes(e.snake?.phase);
+const snakeActive = e => {
+ if (e.kind !== 'wood') return false;
+ const phase = e.snake?.phase;
+ return phase === 'warning' || phase === 'windup' || phase === 'striking';
+};
 const hawkActive=(e,g)=>e.kind==='hawk'&&!e.harmless&&e.x>g.x+100;
 export class FlightCues {
     constructor(){this.reset();}

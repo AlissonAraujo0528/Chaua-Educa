@@ -6,11 +6,29 @@ import {drawPackedSection} from './weather-art.mjs';
 import {clipSnowReveal} from './winter-vfx.mjs';
 import {PERF_AB_VARIANT} from './perf-ab.mjs';
 import {activeProbe} from './perf-hooks.mjs';
-import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_STAGE_CACHE,PRECOMPOSED_SNOW_STAGE_PREFETCH,precomposedSnowStage,winterCapFrame,winterCapKey} from './precomposed-winter.mjs';
+import {PRECOMPOSED_SNOW_ACTIVE,PRECOMPOSED_SNOW_COMPACT_STAGES,PRECOMPOSED_SNOW_STAGE_CACHE,PRECOMPOSED_SNOW_STAGE_PREFETCH,precomposedSnowStage,winterCapFrame,winterCapKey,winterStageFrame,winterStageKey} from './precomposed-winter.mjs';
 
 const WINTER_CAP_PAGE_ASSETS=Object.freeze(
  WINTER_CAP_ART.pages.map((_,page)=>`winter-cap:page-${page}`)
 );
+const WINTER_CAP_STAGE_ASSETS=Object.freeze(
+ (WINTER_CAP_ART.stagePages||[]).map((p,stage)=>p?`winter-cap:stage-${stage}`:null)
+);
+const COMPACT_STAGE_PACKED_SCRATCH=[0,0,0,0,0];
+function resolveWinterCapArt(kind,stage,variant){
+ if(PRECOMPOSED_SNOW_COMPACT_STAGES){
+  const f=winterStageFrame(kind,stage,variant);
+  if(!f)return null;
+  COMPACT_STAGE_PACKED_SCRATCH[0]=stage;
+  COMPACT_STAGE_PACKED_SCRATCH[1]=f[0];
+  COMPACT_STAGE_PACKED_SCRATCH[2]=f[1];
+  COMPACT_STAGE_PACKED_SCRATCH[3]=f[2];
+  COMPACT_STAGE_PACKED_SCRATCH[4]=f[3];
+  return {packed:COMPACT_STAGE_PACKED_SCRATCH,image:images.get(winterStageKey(stage))||null};
+ }
+ const packed=winterCapFrame(kind,stage,variant);
+ return {packed,image:packed?images.get(winterCapKey(packed[0]))||null:null};
+}
 
 export const winterStageCacheMetrics={
  copies:0,
@@ -208,9 +226,34 @@ function winterStageCache(stage,sourceImage,expectedPage,warmup=false){
  return buf;
 }
 
+let lastCompactStage=-1;
 function drawWinterCap(c,image,packed,dx,dy,dw,dh,kind,stage,variant){
- let source=image,sy=packed[2],usedStageCache=false;
- if(PRECOMPOSED_SNOW_STAGE_CACHE){
+ let source=image,sy=packed[2],usedStageCache=false,usedCompactStage=false;
+ if(PRECOMPOSED_SNOW_COMPACT_STAGES){
+  usedCompactStage=true;
+  if(lastCompactStage!==stage){
+   lastCompactStage=stage;
+   winterStageCacheMetrics.copies++;
+   winterStageCacheMetrics.predecodedHits++;
+   winterStageCacheMetrics.activeStage=stage;
+   winterStageCacheMetrics.activePage=stage;
+   const probe=activeProbe;
+   const measure=probe?.deep&&probe.currentFrame&&probe.game?.state==='playing';
+   const details={
+    stage,page:stage,
+    width:image.naturalWidth||image.width,
+    height:image.naturalHeight||image.height,
+    predecoded:true,compact:true,warmup:false,copyMs:0
+   };
+   if(measure){
+    probe.event('winter-stage-cache-copy',{
+     ...details,
+     rafTimestamp:probe.currentFrame.rafTimestamp
+    });
+   }
+   winterStageCacheMetrics.onCopy?.(details);
+  }
+ }else if(PRECOMPOSED_SNOW_STAGE_CACHE){
   const cached=winterStageCache(stage,image,packed[0],false);
   const localY=cached?packed[2]-cached.y:-1;
   if(
@@ -229,10 +272,12 @@ function drawWinterCap(c,image,packed,dx,dy,dw,dh,kind,stage,variant){
  const probe=activeProbe;
  if(probe?.deep&&probe.currentFrame&&probe.game?.state==='playing'){
   const page=packed[0];
-  const asset=WINTER_CAP_PAGE_ASSETS[page]??`winter-cap:page-${page}`;
+  const asset=usedCompactStage
+   ?(WINTER_CAP_STAGE_ASSETS[page]??`winter-cap:stage-${page}`)
+   :(WINTER_CAP_PAGE_ASSETS[page]??`winter-cap:page-${page}`);
   if(!probe.firstDraws.has(asset)){
    const op='winterCap.firstDrawCpu';
-   const details={page,kind,stage,variant,stageCache:usedStageCache};
+   const details={page,kind,stage,variant,stageCache:usedStageCache,compactStage:usedCompactStage};
    const drawAt=probe.begin(op);
    c.drawImage(source,packed[1],sy,packed[3],packed[4],dx,dy,dw,dh);
    const drawCpuMs=probe.end(op,drawAt,details);
@@ -268,7 +313,7 @@ function barkTile(image,key,sx,sy,width,height,reverse){
  let entries=barkTiles.get(image);
  if(!entries){entries=new Map();barkTiles.set(image,entries);}
  if(entries.has(key))return entries.get(key);
- const canvas=typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(Math.ceil(width),height*2):document.createElement('canvas');
+ const canvas=typeof document!=='undefined'?document.createElement('canvas'):new OffscreenCanvas(Math.ceil(width),height*2);
  canvas.width=Math.ceil(width);canvas.height=height*2;
  const c=canvas.getContext('2d');
  for(let row=0;row<2;row++){
@@ -385,8 +430,9 @@ export function drawLivingTrunk(c, {x, y, upper = false, width = TREE_WIDTH, len
  if (!image) return;
 
  const variantIdx=((variant % 4) + 4) % 4;
- const packed=winterCapFrame(kind,precomposedLevel,variantIdx);
- const capImage=packed?images.get(winterCapKey(packed[0])):null;
+ const capArt=resolveWinterCapArt(kind,precomposedLevel,variantIdx);
+ const packed=capArt?.packed??null;
+ const capImage=capArt?.image??null;
  const f = FOREST_ART[kind][variantIdx], s = width / (f.core[1] - f.core[0]);
  const sx = f.rect[0], sy = f.rect[1], cx = f.content[0], cy = f.content[1], cw = f.content[2], ch = f.content[3];
  const px = x + (cx - f.anchor[0]) * s, py = y + (cy - f.anchor[1]) * s;
@@ -478,8 +524,9 @@ export function drawTreeVariant(c, x, y, upper, kind, breakAge, snow = 0, rain =
  const precomposedLevel=PRECOMPOSED_SNOW_ACTIVE&&!upper&&breakAge===undefined?precomposedSnowStage(snow):0;
  if(!upper&&breakAge===undefined)maybePrefetchFirstWinterStage(snow,precomposedLevel);
  const index = TREE_VARIANT_INDEX[kind] ?? -1;
- const packed=winterCapFrame('special',precomposedLevel,index);
- const preparedVariant=packed?images.get(winterCapKey(packed[0])):null;
+ const capArt=resolveWinterCapArt('special',precomposedLevel,index);
+ const packed=capArt?.packed??null;
+ const preparedVariant=capArt?.image??null;
  if (!image || index < 0) return;
  const sx = (index % 2) * TREE_CELL;
  const sy = Math.floor(index / 2) * TREE_CELL;
@@ -661,18 +708,49 @@ export function drawRefugeTree(c, r, support, time = 0, width = 215, footX = 7, 
 }
 
 const snowMixBuffers=new Map();
-export function prepareTreeWeather(context){
+export function warmWinterCapPage(context,page){
+ if(!PRECOMPOSED_SNOW_ACTIVE||!context)return false;
+ const img=images.get(PRECOMPOSED_SNOW_COMPACT_STAGES?winterStageKey(page):winterCapKey(page));
+ if(!img)return false;
+ context.save();
+ context.setTransform(1,0,0,1,0,0);
+ context.globalAlpha=.004;
+ context.drawImage(img,2,2,20,20,0,0,1,1);
+ context.restore();
+ return true;
+}
+export function prepareTreeWeather(context,options={}){
+ const skipWinterCapGpuWarmup=options?.skipWinterCapGpuWarmup===true;
+ const warmPattern=(pattern)=>{
+  if(!context||!pattern)return;
+  context.save();
+  context.setTransform(1,0,0,1,0,0);
+  context.globalAlpha=.004;
+  context.fillStyle=pattern;
+  context.fillRect(0,0,1,1);
+  context.restore();
+ };
  for(const kind of ['lower','upper']){
   if(PERF_AB_VARIANT==='legacy-snow-rebuild')snowOverlay(kind,0);
   const image=images.get('trees-'+kind);
   if(image)FOREST_ART[kind].forEach((f,index)=>{
    const tile=livingBark(image,kind,index,f);
-   if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+   if(context){
+    const pattern=context.createPattern(tile.canvas,'repeat');
+    tile.patterns.set(context,pattern);
+    warmPattern(pattern);
+   }
   });
  }
  // Validate bands and warm only the compact active-stage surface in the
- // experimental stage-cache variant; control keeps warming all 4 pages.
- if(PRECOMPOSED_SNOW_STAGE_CACHE){
+ // experimental stage-cache variant; control keeps warming all pages unless deferred.
+ if(PRECOMPOSED_SNOW_COMPACT_STAGES){
+  if(context&&!skipWinterCapGpuWarmup){
+   for(const page of WINTER_CAP_ART.stagePages||[]){
+    if(page)warmWinterCapPage(context,page.stage);
+   }
+  }
+ }else if(PRECOMPOSED_SNOW_STAGE_CACHE){
   const stageBands=getWinterStageBands();
   const firstBand=stageBands.bands[1];
   const firstImage=firstBand?images.get(winterCapKey(firstBand.page)):null;
@@ -682,7 +760,7 @@ export function prepareTreeWeather(context){
    context.drawImage(cached.surface,2,2,20,20,0,0,1,1);
    context.restore();
   }
- }else if(PRECOMPOSED_SNOW_ACTIVE&&context){
+ }else if(PRECOMPOSED_SNOW_ACTIVE&&context&&!skipWinterCapGpuWarmup){
   context.save();
   for(let page=0;page<WINTER_CAP_ART.pages.length;page++){
    const img=images.get(winterCapKey(page));
@@ -694,7 +772,11 @@ export function prepareTreeWeather(context){
  if(image)wetVariantCap(image);
  if(image)for(let index=0;index<4;index++){
   const tile=variantBark(image,index);
-  if(context)tile.patterns.set(context,context.createPattern(tile.canvas,'repeat'));
+  if(context){
+   const pattern=context.createPattern(tile.canvas,'repeat');
+   tile.patterns.set(context,pattern);
+   warmPattern(pattern);
+  }
  }
 }
 function snowOverlay(kind,amount){

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolvePerfVariant,PERF_AB_VARIANT} from '../Chaua-Educa-main/js/perf-ab.mjs';
+import {resolvePerfVariant,buildPerfTestUrl,PERF_AB_VARIANT} from '../Chaua-Educa-main/js/perf-ab.mjs';
 import {diagnosticStutterSlot} from '../Chaua-Educa-main/js/perf-sampling.mjs';
 import {clipSnowReveal,snowRevealHeight} from '../Chaua-Educa-main/js/winter-vfx.mjs';
 import {readFileSync} from 'node:fs';
@@ -11,10 +11,23 @@ test('A/B modes never affect game unless perf-test is enabled',()=>{
  assert.equal(resolvePerfVariant('?perf-ab=winter-caps-bitmap'),'precomposed-snow');
  assert.equal(resolvePerfVariant('?perf-ab=winter-caps-stage-cache'),'precomposed-snow');
  assert.equal(resolvePerfVariant('?perf-ab=winter-caps-stage-prefetch'),'precomposed-snow');
- for(const v of ['winter-caps-stage-prefetch','winter-caps-stage-cache','winter-caps-bitmap','baseline','direct-snow','snow-mask-off','snow-flakes-off','static-season-bg','legacy-snow-clips','legacy-snow-rebuild']){
+ assert.equal(resolvePerfVariant('?perf-ab=winter-caps-compact-stages'),'precomposed-snow');
+ for(const v of ['winter-caps-compact-stages','winter-caps-stage-prefetch','winter-caps-stage-cache','winter-caps-bitmap','baseline','direct-snow','snow-mask-off','snow-flakes-off','static-season-bg','legacy-snow-clips','legacy-snow-rebuild']){
   assert.equal(resolvePerfVariant('?perf-test=1&perf-ab='+v),v);
  }
  assert.equal(resolvePerfVariant('?perf-test=1&perf-ab=invalid'),'precomposed-snow');
+ const built=buildPerfTestUrl('https://example.test/Chaua-Educa/Chaua-Educa-main/?foo=bar',{ab:'winter-caps-compact-stages',level:'deep',hz:120,replay:true,weather:'winter'});
+ const u=new URL(built);
+ assert.equal(u.pathname,'/Chaua-Educa/Chaua-Educa-main/');
+ assert.equal(u.searchParams.get('foo'),'bar');
+ assert.equal(u.searchParams.get('perf-test'),'1');
+ assert.equal(u.searchParams.get('perf-ab'),'winter-caps-compact-stages');
+ assert.equal(u.searchParams.get('perf-level'),'deep');
+ assert.equal(u.searchParams.get('perf-hz'),'120');
+ assert.equal(u.searchParams.get('perf-replay'),'1');
+ assert.equal(u.searchParams.get('clima'),'winter');
+ const exited=new URL(buildPerfTestUrl(built,{enabled:false}));
+ assert.equal(exited.search,'?foo=bar');
 });
 test('clip reveal preserves all 32 columns on the fallback path',()=>{
  const calls=[],ctx={beginPath(){calls.push('begin');},rect(...args){calls.push(args);},clip(){calls.push('clip');}};

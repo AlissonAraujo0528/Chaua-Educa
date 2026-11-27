@@ -8,6 +8,7 @@ import {createFlightLearning,advanceFlightLearning,flightLearningEntries} from '
 import {challengeAt} from './challenge.mjs';
 import { VisualQuality } from './quality.mjs';
 import { activeProbe } from './perf-hooks.mjs';
+import { PERF_AB_VARIANT, buildPerfTestUrl } from './perf-ab.mjs';
 import { LESSONS, resultAdvice, tutorialInstruction } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
@@ -57,12 +58,15 @@ let benchmarkFlight=null;
 const beforeBenchmarkTick=game=>benchmarkFlight.replay.beforeTick(game);
 const fixedTestSeed=seedQuery!==null&&/^\d{1,10}$/.test(seedQuery)&&
  Number(seedQuery)<=0xffffffff?Number(seedQuery):null;
+const SCORE_KEYFRAMES = Object.freeze([{ transform: 'scale(1)' }, { transform: 'scale(1.16)' }, { transform: 'scale(1)' }]);
+const SCORE_ANIM_OPTS = Object.freeze({ duration: 240 });
+let lastHudTime = 0, sceneDirty = true, lastStaticKey = '', wasDocumentHidden = false, nextIdleWinterWarmAt = 0;
 function applyVisualQuality() {
     if(quality.mode==='auto')renderer.setAutomaticQuality(quality.level);
     else renderer.setQuality(quality.level);
+    sceneDirty = true;
 }
 applyVisualQuality();
-let lastHudTime=0;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dialogs = [...document.querySelectorAll('dialog')];
 let player = '', selectedMode = 'aventura', previousState = '', board = 'aventura';
@@ -84,10 +88,10 @@ forestAudio.setVolume(DB.readObject('chaua-volume',.7));
 function sound(type) { forestAudio.setEnabled(soundOn);if(!audioInterrupted&&!document.hidden)forestAudio.play(type); }
 
 function toast(text) {
-    $('#toast').textContent = text;
-    $('#toast').classList.add('visible');
+    hudText('#toast', text);
+    hudClass('#toast', 'visible', true);
     toastUntil = game.elapsed + 3;
-    $('#screen-reader-status').textContent = text;
+    hudText('#screen-reader-status', text);
 }
 
 export const game = new Game({ onEvent(event) {
@@ -127,12 +131,16 @@ export const game = new Game({ onEvent(event) {
     if(event.type==='route-offer')toast('Trilha dourada opcional · +4 sem contato. O centro continua livre.');
     if(event.type==='route-complete')toast(`Trilha completa · +${event.points} pontos`);
     if (event.type === 'points') {
-        $('#score-bonus').textContent = `+${event.value}`; pointsUntil = game.elapsed + 1;
+        hudText('#score-bonus', `+${event.value}`); pointsUntil = game.elapsed + 1;
         if(!reducedMotion.matches) {
-            const score=$('#score');
-            scoreAnim?.cancel();
+            const score=hud('#score');
             const t=probe?probe.begin('ui.scoreAnimationSetup'):0;
-            scoreAnim=score.animate([{transform:'scale(1)'},{transform:'scale(1.16)'},{transform:'scale(1)'}],{duration:240});
+            if (scoreAnim) {
+                scoreAnim.currentTime = 0;
+                scoreAnim.play();
+            } else {
+                scoreAnim = score.animate(SCORE_KEYFRAMES, SCORE_ANIM_OPTS);
+            }
             if(probe)probe.end('ui.scoreAnimationSetup',t);
         }
     }
@@ -143,10 +151,19 @@ const flightInput = new FlightInput(game, held => $('#flap-button').classList.to
 function resize() {
     const resizeProbe=activeProbe,resizeAt=resizeProbe?resizeProbe.begin('ui.resize'):0;
     const style=getComputedStyle(app);
-    renderer.safeInsets=Object.fromEntries(['top','right','bottom','left'].map(side=>[side,parseFloat(style.getPropertyValue(`--safe-${side}`))||0]));
+    const insets=renderer.safeInsets||(renderer.safeInsets={top:0,right:0,bottom:0,left:0});
+    insets.top=parseFloat(style.getPropertyValue('--safe-top'))||0;
+    insets.right=parseFloat(style.getPropertyValue('--safe-right'))||0;
+    insets.bottom=parseFloat(style.getPropertyValue('--safe-bottom'))||0;
+    insets.left=parseFloat(style.getPropertyValue('--safe-left'))||0;
     renderer.resize();
-    const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
-    renderer.homePreview=slot?.width>0&&slot.height>0?{x:slot.x-app.getBoundingClientRect().x+slot.width/2,y:slot.y-app.getBoundingClientRect().y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170),clip:{x:slot.x-app.getBoundingClientRect().x,y:slot.y-app.getBoundingClientRect().y,width:slot.width,height:slot.height}}:null;
+    if(!$('#home').hidden){
+        const preview=$('.home-preview'),slot=preview?.getBoundingClientRect();
+        if(slot?.width>0&&slot.height>0){
+            const appRect=app.getBoundingClientRect();
+            renderer.homePreview={x:slot.x-appRect.x+slot.width/2,y:slot.y-appRect.y+slot.height/2,scale:Math.min(slot.width/165,slot.height/170),clip:{x:slot.x-appRect.x,y:slot.y-appRect.y,width:slot.width,height:slot.height}};
+        }else renderer.homePreview=null;
+    }else renderer.homePreview=null;
     const orientation=innerWidth>innerHeight?'landscape':'portrait';
     if(!openingFlight && lastOrientation && lastOrientation!==orientation && ['playing','countdown','arrival'].includes(game.state)) {
         pauseFlight('A tela mudou de orientação. Confira os controles e continue quando estiver pronto.');
@@ -157,14 +174,15 @@ function resize() {
         game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
         game.viewLeft = Math.floor(view.worldLeft);
     }
+    needsResize=false;sceneDirty=true;
     if(resizeProbe)resizeProbe.end('ui.resize',resizeAt);
 }
-// Canvas mutations belong to the next animation frame, outside observer delivery.
-// Coalesce app/canvas notifications to avoid WebKit's undelivered resize loop.
-let observedResize=0;
+// Coalesce app/canvas resize observations and execute inside the next frame()
+// pass before drawing, preventing WebKit observer loops and avoiding stale
+// pre-layout backdrop allocations (e.g. menu height -> in-flight height).
+let needsResize=false;
 const layoutObserver=new ResizeObserver(()=>{
-    if(observedResize)return;
-    observedResize=requestAnimationFrame(()=>{observedResize=0;resize();});
+    needsResize=true;sceneDirty=true;
 });
 layoutObserver.observe(app);
 layoutObserver.observe($('#forest'));
@@ -192,15 +210,21 @@ syncMobileViewport();
 function clearInputs() { flightInput.clear(); }
 function hold(source) { if(!benchmarkFlight)flightInput.press(source); }
 function release(source) { flightInput.release(source); }
-function closeDialogs() { dialogs.forEach(dialog => { if (dialog.open) dialog.close(); }); }
+function closeDialogs() {
+    let closed=false;
+    for(const dialog of dialogs) if (dialog.open) { dialog.close(); closed=true; }
+    if(closed) sceneDirty=true;
+}
 function resetPanelScroll(dialog) {
-    dialog.scrollTop=0; const body=dialog.querySelector('.panel-body'); if(body)body.scrollTop=0;
+    if(dialog.scrollTop)dialog.scrollTop=0;
+    const body=dialog.querySelector('.panel-body');
+    if(body&&body.scrollTop)body.scrollTop=0;
 }
 function openDialog(id) {
     const dialog=$(id);
     if(dialog.open)return;
     const probe=activeProbe,at=probe?probe.begin('ui.dialogOpen'):0;
-    dialog.showModal(); resetPanelScroll(dialog);
+    dialog.showModal(); resetPanelScroll(dialog); sceneDirty=true;
     if(probe)probe.end('ui.dialogOpen',at,{dialog:id});
 }
 
@@ -225,8 +249,16 @@ async function launchFlight(training = false, checkpoint = null, benchmark = nul
     openingFlight = true;
     if(mobileDevice)document.activeElement?.blur();
     const mobile = isMobileFlightDevice(navigator, screen, matchMedia('(pointer: coarse)').matches);
+    const wasFullscreen = document.fullscreenElement;
+    const wasLandscape = innerWidth > innerHeight;
     try {
-        if(mobile){await requestFlightLandscape(app, document, screen);await settleOpeningViewport();resize();}
+        if(mobile){
+            await requestFlightLandscape(app, document, screen);
+            if(document.fullscreenElement!==wasFullscreen||(innerWidth>innerHeight)!==wasLandscape){
+                await settleOpeningViewport();
+            }
+            resize();
+        }
     } finally {
         openingFlight = false;
     }
@@ -249,6 +281,7 @@ function start(training = false, checkpoint = null, benchmark = null) {
     // Otherwise the renderer may synchronously measure DOM during this transition.
     if(quality.beginFlight())applyVisualQuality();
     app.classList.add('in-flight'); document.documentElement.classList.add('in-flight'); $('#home').hidden = true; $('#hud').hidden = false;
+    needsResize = true; sceneDirty = true;
     flightMissionIds = completedMissions(DB.missionProgress(player)).map(m=>m.id);
     // The new in-flight layout is observed after browser layout by the
     // app/canvas ResizeObserver. A synchronous resize here forced style/layout
@@ -355,6 +388,7 @@ function updateWeatherUI() {
         btnWeather.title = `Clima atual: ${m.label} (clique para alternar)`;
     }
     if (weatherSelect) weatherSelect.value = cur;
+    sceneDirty = true;
 }
 
 if (btnWeather) {
@@ -470,6 +504,7 @@ updateSoundButton();
 
 const unlockAudio = () => {
     if(document.hidden)return;
+    if(!audioInterrupted && forestAudio.visible && (!soundOn || forestAudio.context?.state === 'running'))return;
     audioInterrupted=false;
     forestAudio.visible=true;
     if (soundOn) {
@@ -479,6 +514,8 @@ const unlockAudio = () => {
         }
     }
 };
+for (const dialog of dialogs) dialog.addEventListener('close', () => { sceneDirty = true; });
+document.fonts?.ready?.then(() => { sceneDirty = true; }).catch(() => {});
 ['pointerdown', 'keydown', 'touchstart'].forEach(evt => window.addEventListener(evt, unlockAudio, { passive: true }));
 
 
@@ -703,6 +740,7 @@ function frame(time) {
     const delta = lastTime ? Math.min(.25, Math.max(0, (time - lastTime) / 1000)) : 0;
     lastTime = time;
     game.reducedMotion=!benchmarkFlight&&reducedMotion.matches;
+    if (needsResize) resize();
     const clockAt=probe?probe.begin('engine.advance'):0;
     if(benchmarkFlight&&game.state==='quiz'){
         benchmarkFlight.replay.answerQuiz(game);
@@ -721,28 +759,40 @@ function frame(time) {
         journeyRain(game, game.tutorial), journeyStorm(game, game.mode, game.tutorial),
         journeyWind(game, game.mode, game.tutorial));
     if(document.hidden){
+        wasDocumentHidden=true;
         matchPerformance.frame(time,game,quality,renderer,0,false);
         if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
         quality.sample(delta,false);
         if(probe)probe.endFrame();
         requestAnimationFrame(frame);return;
     }
-    if (game.state === 'menu'){
-        const homeAt=probe?probe.begin('render.home'):0;
-        renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
-        if(probe)probe.end('render.home',homeAt);
-    }else{
-        if(!benchmarkFlight){
-            const view = renderer.getViewport();
-            game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
-            game.viewLeft = Math.floor(view.worldLeft);
+    if(wasDocumentHidden){wasDocumentHidden=false;sceneDirty=true;}
+    const openDialogEl=dialogs.find(d=>d.open)||null;
+    const staticFrozen=game.state==='paused'||game.state==='quiz'||game.state==='trained'||game.state==='ended'||(game.state==='menu'&&openDialogEl!==null);
+    const staticKey=staticFrozen?`${game.state}|${renderer.w}x${renderer.h}:${renderer.dpr}|${renderer.decoration}|${game.reducedMotion}|${assetsReady}|${getWeatherMode()}|${game.elapsed}|${game.stage}|${openDialogEl?.id||''}`:'';
+    const shouldRender=!staticFrozen||sceneDirty||staticKey!==lastStaticKey;
+    if(shouldRender){
+        sceneDirty=false;lastStaticKey=staticKey;
+        if (game.state === 'menu'){
+            if(assetsReady&&time>=nextIdleWinterWarmAt&&renderer.warmNextWinterCap()){
+                nextIdleWinterWarmAt=time+500;
+            }
+            const homeAt=probe?probe.begin('render.home'):0;
+            renderer.home(reducedMotion.matches ? 0 : time / 1000, reducedMotion.matches);
+            if(probe)probe.end('render.home',homeAt);
+        }else{
+            if(!benchmarkFlight){
+                const view = renderer.getViewport();
+                game.viewWidth = Math.max(960, Math.ceil(view.worldLeft + view.worldWidth));
+                game.viewLeft = Math.floor(view.worldLeft);
+            }
+            const visualAt=probe?probe.begin('engine.visual'):0;
+            const frameView=game.visual(clock.accumulator / (1 / 120));
+            if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
+            const drawAt=probe?probe.begin('render.game'):0;
+            renderer.game(frameView, game.reducedMotion, time / 1000);
+            if(probe)probe.end('render.game',drawAt);
         }
-        const visualAt=probe?probe.begin('engine.visual'):0;
-        const frameView=game.visual(clock.accumulator / (1 / 120));
-        if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
-        const drawAt=probe?probe.begin('render.game'):0;
-        renderer.game(frameView, game.reducedMotion, time / 1000);
-        if(probe)probe.end('render.game',drawAt);
     }
     if(probe)probe.endFrame();
     if(betaRuntime?.active)betaRuntime.frame(time,betaStateBefore);
@@ -794,7 +844,7 @@ async function prepareGameAssets(retry=false) {
     $('#btnStart').disabled=true;updateTrainingButton();updateChapterButtons();
     try {
         await (retry?renderer.initializeAssets():renderer.ready);
-        assetsReady=true;$('#asset-status').hidden=true;
+        assetsReady=true;sceneDirty=true;nextIdleWinterWarmAt=performance.now()+900;$('#asset-status').hidden=true;
         $('#btnStart').disabled=$('#inputPlayer').value.trim().length<3;
     } catch(error) {
         $('#asset-status').textContent=`As artes não carregaram. Verifique a conexão e tente novamente. ${error.message}`;
@@ -848,7 +898,50 @@ function showSettings(fromPause=false){
     $('#settings-sound').checked=soundOn;
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
+    syncPerfLabControls();
     openDialog('#settings-dialog');
+}
+const PERF_LAB_PRESETS=Object.freeze({
+    'winter-default':{ab:'precomposed-snow',level:'deep',hz:60,replay:true,weather:'winter'},
+    'winter-compact':{ab:'winter-caps-compact-stages',level:'deep',hz:60,replay:true,weather:'winter'},
+    'storm-deep':{ab:'precomposed-snow',level:'deep',hz:60,replay:false,weather:'storm'}
+});
+function syncPerfLabControls(){
+    const details=$('#perf-lab-details');
+    if(!details)return;
+    $('#perf-lab-ab').value=PERF_AB_VARIANT;
+    $('#perf-lab-level').value=diagnosticParams.get('perf-level')==='deep'?'deep':'normal';
+    $('#perf-lab-hz').value=diagnosticParams.get('perf-hz')==='120'?'120':'60';
+    $('#perf-lab-weather').value=getWeatherMode();
+    $('#perf-lab-replay').checked=diagnosticParams.get('perf-replay')==='1';
+    $('#perf-lab-exit').hidden=!diagnosticLink;
+    if(diagnosticLink)details.open=true;
+}
+function launchPerfLab(options){
+    location.assign(buildPerfTestUrl(location.href,options));
+}
+if($('#perf-lab-details')){
+    $('#perf-lab-replay').addEventListener('change',event=>{
+        if(event.target.checked&&$('#perf-lab-weather').value!=='winter')$('#perf-lab-weather').value='winter';
+    });
+    for(const btn of document.querySelectorAll('[data-perf-preset]')){
+        btn.addEventListener('click',()=>{
+            const preset=PERF_LAB_PRESETS[btn.dataset.perfPreset];
+            if(preset)launchPerfLab(preset);
+        });
+    }
+    $('#perf-lab-apply').addEventListener('click',()=>{
+        const replay=$('#perf-lab-replay').checked;
+        const weather=replay?'winter':$('#perf-lab-weather').value;
+        launchPerfLab({
+            ab:$('#perf-lab-ab').value,
+            level:$('#perf-lab-level').value,
+            hz:Number($('#perf-lab-hz').value),
+            replay,
+            weather
+        });
+    });
+    $('#perf-lab-exit').addEventListener('click',()=>launchPerfLab({enabled:false}));
 }
 function saveSetting(key,value){
     DB.writeObject(key,value);
