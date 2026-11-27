@@ -7,6 +7,8 @@ export const PERF_AB_OPTIONS=Object.freeze([
  'winter-caps-stage-cache',
  'winter-caps-stage-prefetch',
  'winter-caps-compact-stages',
+ 'compact-batched-flakes',
+ 'pixi-webgl-winter',
  'snow-mask-off',
  'snow-flakes-off',
  'static-season-bg',

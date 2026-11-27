@@ -133,6 +133,7 @@ function blendSprite(c, first, second, blend, extent=128) {
     layer.globalCompositeOperation='source-over';layer.globalAlpha=1;first(layer);
     layer.globalAlpha=blend;second(layer);
     layer.globalAlpha=1;
+    c.refreshImage?.(surface);
     c.drawImage(surface,-extent,-extent,extent*2,extent*2);
 }
 
