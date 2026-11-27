@@ -58,8 +58,9 @@ export function drawSnowfall(c,w,h,time,intensity,reduced=false,low=false,wind=0
  if(amount<=.012||reduced||w<=0||h<=0||PERF_AB_VARIANT==='snow-flakes-off')return;
  const layers=foreground?(low?FOREGROUND_LAYERS_LOW:FOREGROUND_LAYERS_NORMAL):
   (low?BACKGROUND_LAYERS_LOW:BACKGROUND_LAYERS_NORMAL);
- const sprites=typeof c.drawImage==='function'?getSnowSpriteSheet():null;
- const needClip=!sprites||!isFullSurfaceViewport(c,w,h);
+ const sheet=typeof c.drawImage==='function'?getSnowSpriteSheet():null;
+ const sprites=PERF_AB_VARIANT==='compact-batched-flakes'?null:sheet;
+ const needClip=!sheet||!isFullSurfaceViewport(c,w,h);
  c.save();
  if(needClip){c.beginPath();c.rect(0,0,w,h);c.clip();}
  for(const {depth,count} of layers){

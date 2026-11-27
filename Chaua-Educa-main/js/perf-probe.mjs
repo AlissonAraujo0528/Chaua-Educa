@@ -221,7 +221,8 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
     switches:stageCacheSwitches,
     prefetchEvents:stagePrefetchEvents
    },
-   experiments:{perfAB:PERF_AB_VARIANT,
+   experiments:{perfAB:PERF_AB_VARIANT,flightBackend:renderer.flightBackend??'canvas2d',
+    backendError:renderer.flightBackendError??null,
     winterCapRepresentations:PRECOMPOSED_SNOW_COMPACT_STAGES
      ?(WINTER_CAP_ART.stagePages||[]).filter(Boolean).map(page=>{
       const asset=images.get(winterStageKey(page.stage));
@@ -422,7 +423,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
   try{
    await replayLaunch(startCapture);
   }catch(error){
-   label.textContent='Não foi possível iniciar o voo de referência.';
+   label.textContent='Falha ao iniciar o voo de referência: '+error.message;
    console.error(error);
   }finally{
    replay.disabled=active;

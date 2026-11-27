@@ -55,6 +55,7 @@ const matchDownloadButtons=document.querySelectorAll('[data-match-download]');
 
 const seedQuery=diagnosticParams.get('test-seed');
 let benchmarkFlight=null;
+let winterWebGL=null;
 const beforeBenchmarkTick=game=>benchmarkFlight.replay.beforeTick(game);
 const fixedTestSeed=seedQuery!==null&&/^\d{1,10}$/.test(seedQuery)&&
  Number(seedQuery)<=0xffffffff?Number(seedQuery):null;
@@ -274,6 +275,9 @@ function start(training = false, checkpoint = null, benchmark = null) {
     if (!assetsReady || !['menu','ended','trained'].includes(game.state)) return;
     const leavingBenchmark=benchmarkFlight&&!benchmark;
     benchmarkFlight=benchmark;
+    renderer.flightBackendError=null;
+    if(winterWebGL)winterWebGL.canvas.hidden=true;
+    renderer.flightBackend=winterWebGL&&benchmark?'pixi-webgl':'canvas2d';
     game.cosmeticRandom=benchmark?seededRandom(benchmark.fixture.seed ^ 0xa5b35705):null;
     closeDialogs(); clearInputs(); flightCues.reset(); $('#flight-alert').textContent='';
     cancelAnimationFrame(resultAnimation);
@@ -315,6 +319,7 @@ function start(training = false, checkpoint = null, benchmark = null) {
     syncUI();
 }
 function home() {
+    if(winterWebGL)winterWebGL.canvas.hidden=true;
     finishMatchPerformance('returned-to-menu');
     closeDialogs(); clearInputs(); cancelAnimationFrame(resultAnimation);
     game.reset(); flightCues.reset(); previousState = ''; clock.reset(); lastTime = 0;
@@ -790,7 +795,18 @@ function frame(time) {
             const frameView=game.visual(clock.accumulator / (1 / 120));
             if(probe)probe.end('engine.visual',visualAt,{particles:frameView.particles.length});
             const drawAt=probe?probe.begin('render.game'):0;
-            renderer.game(frameView, game.reducedMotion, time / 1000);
+            if(winterWebGL&&benchmarkFlight){
+                try{
+                    winterWebGL.draw(renderer,frameView,game.reducedMotion,time/1000);
+                }catch(error){
+                    renderer.flightBackend='pixi-webgl-failed';
+                    renderer.flightBackendError=String(error.message||error);
+                    winterWebGL.dispose();winterWebGL=null;
+                    console.error('Falha no experimento Pixi WebGL',error);
+                    toast('Falha no WebGL. Esta medição está invalidada.');
+                    renderer.game(frameView,game.reducedMotion,time/1000);
+                }
+            }else renderer.game(frameView, game.reducedMotion, time / 1000);
             if(probe)probe.end('render.game',drawAt);
         }
     }
@@ -904,6 +920,8 @@ function showSettings(fromPause=false){
 const PERF_LAB_PRESETS=Object.freeze({
     'winter-default':{ab:'precomposed-snow',level:'deep',hz:60,replay:true,weather:'winter'},
     'winter-compact':{ab:'winter-caps-compact-stages',level:'deep',hz:60,replay:true,weather:'winter'},
+    'winter-batched':{ab:'compact-batched-flakes',level:'deep',hz:60,replay:true,weather:'winter'},
+    'winter-pixi':{ab:'pixi-webgl-winter',level:'deep',hz:60,replay:true,weather:'winter'},
     'storm-deep':{ab:'precomposed-snow',level:'deep',hz:60,replay:false,weather:'storm'}
 });
 function syncPerfLabControls(){
@@ -990,6 +1008,10 @@ if(diagnosticLink){
         const replayLaunch=reference?async startCapture=>{
             if(getWeatherMode()!=='winter')throw new Error('O voo de referência requer ?clima=winter.');
             await renderer.ready;
+            if(PERF_AB_VARIANT==='pixi-webgl-winter'&&!winterWebGL){
+                const {createWinterRenderer}=await import('./pixi-winter.mjs');
+                winterWebGL=await createWinterRenderer(renderer.canvas);
+            }
             await launchFlight(false,null,{
                 fixture:reference.WINTER_REPLAY,replay:new reference.WinterReplay(),startCapture
             });
