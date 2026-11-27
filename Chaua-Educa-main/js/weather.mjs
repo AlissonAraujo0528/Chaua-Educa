@@ -191,7 +191,7 @@ export function lightningFlashStrength(time, storm=1, reduced=false) {
 }
 
 let lightningBoltCache=null;
-function getLightningBoltSprite(strikeIndex,width,height){
+function getLightningBoltSprite(strikeIndex,width,height,consumer){
  if(typeof document==='undefined')return null;
  if(lightningBoltCache&&lightningBoltCache.index===strikeIndex&&lightningBoltCache.w===width&&lightningBoltCache.h===height){
   return lightningBoltCache.canvas;
@@ -223,6 +223,7 @@ function getLightningBoltSprite(strikeIndex,width,height){
  lc.lineTo(startX+(targetX-startX)*.5+65,targetY*.78);
  lc.stroke();
  lc.restore();
+ consumer?.refreshImage?.(canvas);
  lightningBoltCache={index:strikeIndex,w:width,h:height,x:minX,bw,bh,canvas};
  return canvas;
 }
@@ -243,7 +244,7 @@ export function drawLightning(context, width, height, time, storm, reduced) {
     // 2. Visible jagged electric lightning bolt tearing through the sky
     if (!reduced && flash > 0.25) {
         const boltSprite = typeof context.drawImage === 'function'
-            ? getLightningBoltSprite(strike.index, width, height) : null;
+            ? getLightningBoltSprite(strike.index, width, height, context) : null;
         if (boltSprite) {
             context.globalAlpha = Math.min(1, flash * 1.1);
             context.drawImage(boltSprite, lightningBoltCache.x, 0, lightningBoltCache.bw, lightningBoltCache.bh);

@@ -4,9 +4,9 @@ import {resolvePerfVariant} from '../Chaua-Educa-main/js/perf-ab.mjs';
 import {precomposedSnowStage,winterCapFrame,PRECOMPOSED_SNOW_STAGES} from '../Chaua-Educa-main/js/precomposed-winter.mjs';
 import {WINTER_CAP_ART} from '../Chaua-Educa-main/js/winter-cap-data.mjs';
 
-test('precomposed snow is the default and legacy controls remain available',()=>{
- assert.equal(resolvePerfVariant(''),'precomposed-snow');
- assert.equal(resolvePerfVariant('?perf-ab=baseline'),'precomposed-snow');
+test('Pixi with precomposed snow is the browser default and legacy controls remain available',()=>{
+ assert.equal(resolvePerfVariant(''),'pixi-webgl-winter');
+ assert.equal(resolvePerfVariant('?perf-ab=baseline'),'pixi-webgl-winter');
  assert.equal(resolvePerfVariant('?perf-test=1&perf-ab=baseline'),'baseline');
 });
 

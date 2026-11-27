@@ -185,6 +185,7 @@ export class MatchPerformance {
    provenance:{gameVersion:GAME_VERSION,build:typeof document==='undefined'?null:document.querySelector('meta[name="chaua-build"]')?.content||null,host:typeof location!=='undefined'?location.host:null,
     path:typeof location!=='undefined'?location.pathname:null},
    id:c.id,startedAt:c.start,collectedAt:new Date().toISOString(),
+   renderer:{backend:renderer.flightBackend??'canvas2d',error:renderer.flightBackendError??null},
    device:viewportInfo(renderer),
    match:{seed:c.seed,mode:c.mode,training:c.training,score:game.score,
     won:!!game.won,flightSeconds:round(game.elapsed||0),stage:game.stage},

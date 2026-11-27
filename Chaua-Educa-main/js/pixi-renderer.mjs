@@ -1,29 +1,30 @@
-// WebGL presentation for the recorded winter flight. Keep a single game clock.
+// WebGL presentation for the game and its presentation screens. Keep a single game clock.
 // The existing artwork specifies the drawing order, atlas rectangles and poses.
 import {Container, Sprite, Texture, Rectangle, Matrix, Graphics, GraphicsPath, CanvasSource, ImageSource, WebGLRenderer} from './vendor/pixi/pixi-8.6.6.mjs';
 
-export async function createWinterRenderer(original){
+export async function createPixiRenderer(original, {background = false} = {}){
  const canvas=document.createElement('canvas');
- canvas.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none';
+ canvas.style.cssText=background
+  ? 'position:absolute;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none'
+  : 'position:absolute;inset:0;pointer-events:none';
  canvas.setAttribute('aria-hidden','true');
  const gpu=new WebGLRenderer();
- await gpu.init({canvas,width:original.width,height:original.height,antialias:true,resolution:1});
+ await gpu.init({canvas,width:original.width,height:original.height,antialias:true,resolution:1,backgroundAlpha:background?1:0});
+ if(!background)original.parentElement.style.position='relative';
  original.after(canvas);
  canvas.hidden=true;
  const scene=new WinterScene(canvas);
  return {
   canvas,
-  dispose(){canvas.remove();gpu.destroy();},
-  draw(renderer,view,reduced,time){
+  dispose(){canvas.remove();original.style.visibility='';gpu.destroy();},
+  draw(paint){
    if(gpu.gl.isContextLost())throw new Error('Contexto WebGL perdido. Recarregue o teste.');
    if(canvas.width!==original.width||canvas.height!==original.height)gpu.resize(original.width,original.height);
    scene.begin();
-   const previous=renderer.c;
-   renderer.c=scene;
-   try{renderer.game(view,reduced,time);}
-   finally{renderer.c=previous;}
+   paint(scene);
    gpu.render(scene.root);
    canvas.hidden=false;
+   original.style.visibility='hidden';
   }
  };
 }
@@ -58,6 +59,7 @@ class WinterScene {
   const m=this.getTransform();
   node.setFromMatrix(this.matrix.set(m.a*sx,m.b*sx,m.c*sy,m.d*sy,m.a*x+m.c*y+m.e,m.b*x+m.d*y+m.f));
   node.alpha=this.globalAlpha;
+  node.blendMode=this.globalCompositeOperation==='screen'?'screen':'normal';
   this.parent.addChild(node);
  }
  source(image){
@@ -69,7 +71,13 @@ class WinterScene {
   }
   return entry;
  }
- refreshImage(image){this.sources.get(image)?.source.update();}
+ refreshImage(image){
+  const entry=this.sources.get(image);
+  if(!entry)return;
+  if(entry.source.width!==image.width||entry.source.height!==image.height)
+   entry.source.resize(image.width,image.height);
+  entry.source.update();
+ }
  drawImage(image,...args){
   const entry=this.source(image);
   let texture=entry.full,dx,dy,dw,dh;
@@ -124,6 +132,18 @@ class WinterScene {
   sprite.texture=tex;
   this.position(sprite,x,y,width/tile.width,1);
  }
+ fillText(value,x,y){this.paintText('fillText',value,x,y);}
+ strokeText(value,x,y){this.paintText('strokeText',value,x,y);}
+ paintText(mode,value,x,y){
+  const m=this.state.measureText(value),pad=Math.ceil(this.lineWidth)+2;
+  const left=Math.floor(x-m.actualBoundingBoxLeft-pad),top=Math.floor(y-m.actualBoundingBoxAscent-pad);
+  const width=Math.ceil(x+m.actualBoundingBoxRight+pad-left),height=Math.ceil(y+m.actualBoundingBoxDescent+pad-top);
+  const canvas=this.patch(width,height),c=canvas.getContext('2d');
+  c.font=this.font;c.textAlign=this.textAlign;c.textBaseline=this.textBaseline;
+  c.fillStyle=this.fillStyle;c.strokeStyle=this.strokeStyle;c.lineWidth=this.lineWidth;
+  c[mode](value,x-left,y-top);
+  this.refreshImage(canvas);this.drawImage(canvas,left,top);
+ }
  beginPath(){this.path=new GraphicsPath();this.nativePath=new Path2D();}
  ellipse(x,y,rx,ry,rotation,start,end){
   this.nativePath.ellipse(x,y,rx,ry,rotation,start,end);
@@ -157,17 +177,20 @@ class WinterScene {
   const x=Math.floor(b.minX-pad),y=Math.floor(b.minY-pad);
   const width=Math.ceil(b.maxX+pad-x),height=Math.ceil(b.maxY+pad-y);
   if(!(width>0&&height>0))return;
-  const i=this.patchCount++;
-  const surf=this.patches[i]??=document.createElement('canvas');
-  if(surf.width!==width)surf.width=width;
-  if(surf.height!==height)surf.height=height;
-  const c=surf.getContext('2d');c.reset();c.translate(-x,-y);
+  const surf=this.patch(width,height);
+  const c=surf.getContext('2d');c.translate(-x,-y);
   c.fillStyle=this.fillStyle;c.strokeStyle=this.strokeStyle;c.lineWidth=this.lineWidth;
   c.lineCap=this.lineCap;c.lineJoin=this.lineJoin;c.setLineDash(this.state.getLineDash());
   c[mode](this.nativePath);
-  const previous=this.sources.get(surf);
-  if(previous){previous.source.resize(width,height);previous.source.update();}
-  this.drawImage(surf,x,y,width,height);
+  this.refreshImage(surf);this.drawImage(surf,x,y,width,height);
+ }
+ patch(width,height){
+  const i=this.patchCount++;
+  const surface=this.patches[i]??=document.createElement('canvas');
+  if(surface.width!==width)surface.width=width;
+  if(surface.height!==height)surface.height=height;
+  surface.getContext('2d').reset();
+  return surface;
  }
 }
 
@@ -177,7 +200,7 @@ for(const name of ['translate','scale','rotate','transform','setTransform']){
 for(const name of ['moveTo','lineTo','rect','roundRect','arc','closePath','bezierCurveTo','quadraticCurveTo']){
  WinterScene.prototype[name]=function(...args){this.path[name](...args);this.nativePath[name](...args);};
 }
-for(const name of ['globalAlpha','fillStyle','strokeStyle','lineWidth','lineCap','lineJoin']){
+for(const name of ['globalAlpha','globalCompositeOperation','font','textAlign','textBaseline','fillStyle','strokeStyle','lineWidth','lineCap','lineJoin']){
  Object.defineProperty(WinterScene.prototype,name,{
   get(){return this.state[name];},set(value){this.state[name]=value;}
  });

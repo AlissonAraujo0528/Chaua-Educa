@@ -53,7 +53,7 @@ export function prewarmFoodArt(){
 
 // 64 surfaces = at most ~4 MiB of RGBA storage (plus browser overhead).
 // Reuse the oldest canvas on misses, never allocate a return wrapper on hits.
-function wetSurface(image,rect,slot,frame,wetStep){
+function wetSurface(c,image,rect,slot,frame,wetStep){
  const key=(slot*4+frame)*(WET_STEPS+1)+wetStep;
  let entry=wetCache.get(key);
  if(entry){
@@ -74,6 +74,7 @@ function wetSurface(image,rect,slot,frame,wetStep){
  b.fillStyle='#d2ecf5';b.globalAlpha=wetStep/WET_STEPS*.32;
  b.beginPath();b.ellipse(82,48,5,12,.35,0,TAU);b.fill();
  b.globalAlpha=1;b.globalCompositeOperation='source-over';
+ c.refreshImage?.(entry.canvas);
  wetCache.set(key,entry);
  return entry.canvas;
 }
@@ -92,7 +93,7 @@ export function drawFood(c,variety,x,y,size=50,time=0,reduced=false,phase=0,snow
  }
  if(wet>0){
   const step=Math.max(1,Math.min(WET_STEPS,Math.round(Math.min(1,wet)*WET_STEPS)));
-  const cached=wetSurface(image,rect,food.slot,frame,step);
+  const cached=wetSurface(c,image,rect,food.slot,frame,step);
   if(cached){c.drawImage(cached,x-half,y-half,size,size);return;}
  }
  c.drawImage(image,rect[0],rect[1],rect[2],rect[3],x-half,y-half,size,size);

@@ -1264,6 +1264,7 @@ export class Renderer {
         if(pending.rowsDone===pending.stripeCount){
             const previousSurface=normal.surface,previousContext=normal.c;
             normal.surface=pending.surface;normal.c=pending.c;
+            this.c.refreshImage?.(normal.surface);
             normal.light=pending.target.light;
             normal.forestAlpha=pending.target.forestAlpha;
             normal.sourceDrift=pending.target.sourceDrift;

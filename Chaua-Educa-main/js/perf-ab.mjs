@@ -19,7 +19,7 @@ export function resolvePerfVariant(search='') {
  const params=new URLSearchParams(search);
  // The original-art Test C can be enabled on ordinary game URLs.
  if(params.get('perf-ab')==='precomposed-snow')return 'precomposed-snow';
- if(params.get('perf-test')!=='1')return 'precomposed-snow';
+ if(params.get('perf-test')!=='1')return 'pixi-webgl-winter';
  const requested=params.get('perf-ab')||'precomposed-snow';
  return PERF_AB_OPTIONS.includes(requested)?requested:'precomposed-snow';
 }
@@ -40,4 +40,4 @@ export function buildPerfTestUrl(currentHref='http://127.0.0.1/',options={}){
  }
  return url.toString();
 }
-export const PERF_AB_VARIANT=resolvePerfVariant(typeof location==='undefined'?'':location.search);
+export const PERF_AB_VARIANT=typeof location==='undefined'?'precomposed-snow':resolvePerfVariant(location.search);
