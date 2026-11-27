@@ -2569,6 +2569,16 @@ select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline:
 #settings-dialog .settings-group > p { font-size:12px; line-height:1.4; margin:6px 0 12px; }
 #settings-dialog select { font-size:14px; padding:8px; margin:0; }
 #settings-dialog #audio-volume { margin:0; }
+#settings-dialog .perf-lab { margin-top:16px; border:1px solid #cdd8ba; border-radius:14px; padding:4px 14px 10px; background:#f7f9ef; text-align:left; }
+#settings-dialog .perf-lab summary { padding:8px 0; min-height:44px; display:flex; align-items:center; color:#1f442f; }
+#settings-dialog .perf-lab-body { display:grid; gap:12px; padding-top:4px; }
+#settings-dialog .perf-lab-body > p { margin:0; font-size:12px; color:#455b46; }
+#settings-dialog .perf-lab-presets { display:flex; flex-wrap:wrap; gap:8px; }
+#settings-dialog .perf-lab-presets .text-button { margin:0; padding:8px 12px; min-height:44px; border:1px solid #b8cba0; border-radius:10px; background:#edf2df; font-weight:800; font-size:13px; text-decoration:none; }
+#settings-dialog .perf-lab-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 16px; }
+#settings-dialog .perf-lab-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+#settings-dialog .perf-lab-actions .primary { min-height:44px; padding:10px 16px; font-size:15px; }
+#settings-dialog .perf-lab-actions .text-button { margin:0; min-height:44px; }
 #observation-dialog { --panel-width:820px; }
 #observation-dialog .panel-heading-area { padding-right:44px; }
 #observation-dialog #observation-close { top:0; right:0; }
@@ -2955,6 +2965,7 @@ select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline:
   .managed-panel > .panel-layout { padding:14px; --panel-gutter:14px; gap:8px; }
   #settings-dialog .settings-grid { grid-template-columns:1fr; gap:8px; }
   #settings-dialog .settings-appearance { grid-row:auto; }
+  #settings-dialog .perf-lab-fields { grid-template-columns:1fr; gap:8px; }
   #observation-dialog .observation-layout { grid-template-columns:1fr; }
   #observation-dialog figure { width:min(150px,100%); }
   #collection-dialog .journal-intro { grid-template-columns:minmax(0,1.4fr) minmax(0,.6fr); }

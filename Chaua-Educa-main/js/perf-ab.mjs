@@ -21,4 +21,21 @@ export function resolvePerfVariant(search='') {
  const requested=params.get('perf-ab')||'precomposed-snow';
  return PERF_AB_OPTIONS.includes(requested)?requested:'precomposed-snow';
 }
+export function buildPerfTestUrl(currentHref='http://127.0.0.1/',options={}){
+ const url=new URL(currentHref);
+ const clearKeys=['perf-test','perf-ab','perf-level','perf-hz','perf-replay','clima','weather'];
+ for(const key of clearKeys)url.searchParams.delete(key);
+ if(options.enabled===false)return url.toString();
+ url.searchParams.set('perf-test','1');
+ const ab=PERF_AB_OPTIONS.includes(options.ab)?options.ab:'precomposed-snow';
+ url.searchParams.set('perf-ab',ab);
+ if(options.level==='deep')url.searchParams.set('perf-level','deep');
+ if(Number(options.hz)===120)url.searchParams.set('perf-hz','120');
+ if(options.replay)url.searchParams.set('perf-replay','1');
+ const weather=typeof options.weather==='string'?options.weather.toLowerCase():'';
+ if(['winter','storm','rain','autumn','summer','spring'].includes(weather)){
+  url.searchParams.set('clima',weather);
+ }
+ return url.toString();
+}
 export const PERF_AB_VARIANT=resolvePerfVariant(typeof location==='undefined'?'':location.search);

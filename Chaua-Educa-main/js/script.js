@@ -8,6 +8,7 @@ import {createFlightLearning,advanceFlightLearning,flightLearningEntries} from '
 import {challengeAt} from './challenge.mjs';
 import { VisualQuality } from './quality.mjs';
 import { activeProbe } from './perf-hooks.mjs';
+import { PERF_AB_VARIANT, buildPerfTestUrl } from './perf-ab.mjs';
 import { LESSONS, resultAdvice, tutorialInstruction } from './tutorial.mjs';
 import { MISSIONS, completedMissions, progressTitle, renderMissions } from './missions.mjs';
 import { ENTRIES, discoveriesFor, renderCollection } from './collection.mjs';
@@ -897,7 +898,50 @@ function showSettings(fromPause=false){
     $('#settings-sound').checked=soundOn;
     $('#audio-volume').value=Math.round(forestAudio.volume*100);
     $('#volume-value').textContent=`${Math.round(forestAudio.volume*100)}%`;
+    syncPerfLabControls();
     openDialog('#settings-dialog');
+}
+const PERF_LAB_PRESETS=Object.freeze({
+    'winter-default':{ab:'precomposed-snow',level:'deep',hz:60,replay:true,weather:'winter'},
+    'winter-compact':{ab:'winter-caps-compact-stages',level:'deep',hz:60,replay:true,weather:'winter'},
+    'storm-deep':{ab:'precomposed-snow',level:'deep',hz:60,replay:false,weather:'storm'}
+});
+function syncPerfLabControls(){
+    const details=$('#perf-lab-details');
+    if(!details)return;
+    $('#perf-lab-ab').value=PERF_AB_VARIANT;
+    $('#perf-lab-level').value=diagnosticParams.get('perf-level')==='deep'?'deep':'normal';
+    $('#perf-lab-hz').value=diagnosticParams.get('perf-hz')==='120'?'120':'60';
+    $('#perf-lab-weather').value=getWeatherMode();
+    $('#perf-lab-replay').checked=diagnosticParams.get('perf-replay')==='1';
+    $('#perf-lab-exit').hidden=!diagnosticLink;
+    if(diagnosticLink)details.open=true;
+}
+function launchPerfLab(options){
+    location.assign(buildPerfTestUrl(location.href,options));
+}
+if($('#perf-lab-details')){
+    $('#perf-lab-replay').addEventListener('change',event=>{
+        if(event.target.checked&&$('#perf-lab-weather').value!=='winter')$('#perf-lab-weather').value='winter';
+    });
+    for(const btn of document.querySelectorAll('[data-perf-preset]')){
+        btn.addEventListener('click',()=>{
+            const preset=PERF_LAB_PRESETS[btn.dataset.perfPreset];
+            if(preset)launchPerfLab(preset);
+        });
+    }
+    $('#perf-lab-apply').addEventListener('click',()=>{
+        const replay=$('#perf-lab-replay').checked;
+        const weather=replay?'winter':$('#perf-lab-weather').value;
+        launchPerfLab({
+            ab:$('#perf-lab-ab').value,
+            level:$('#perf-lab-level').value,
+            hz:Number($('#perf-lab-hz').value),
+            replay,
+            weather
+        });
+    });
+    $('#perf-lab-exit').addEventListener('click',()=>launchPerfLab({enabled:false}));
 }
 function saveSetting(key,value){
     DB.writeObject(key,value);

@@ -10,7 +10,7 @@ import {WINTER_CAP_ART} from './winter-cap-data.mjs';
 import {PRECOMPOSED_SNOW_COMPACT_STAGES,PRECOMPOSED_SNOW_STAGE_CACHE,PRECOMPOSED_SNOW_STAGE_PREFETCH,precomposedSnowStage,winterCapFrame,winterCapKey,winterStageKey} from './precomposed-winter.mjs';
 import {ForensicRecorder} from './perf-forensics.mjs';
 import {setActiveProbe} from './perf-hooks.mjs';
-import {PERF_AB_VARIANT} from './perf-ab.mjs';
+import {PERF_AB_VARIANT,buildPerfTestUrl} from './perf-ab.mjs';
 import {GAME_VERSION} from './version.mjs';
 import {diagnosticStutterSlot} from './perf-sampling.mjs';
 
@@ -56,10 +56,25 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  const panel=document.createElement('div');
  panel.id='chaua-qa-panel';
  panel.style.cssText='position:fixed;z-index:99999;bottom:8px;left:8px;max-width:calc(100vw - 16px);padding:8px;border-radius:9px;background:#122d24e8;color:#fff;font:12px/1.4 system-ui;box-shadow:0 4px 14px #0006;display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
- const label=document.createElement('span');label.textContent='Diagnóstico local · meta '+budget.targetHz+' Hz';
+ const label=document.createElement('span');label.textContent='DEV Test · '+PERF_AB_VARIANT+' · '+budget.targetHz+' Hz';
  const start=document.createElement('button');start.type='button';start.textContent='Iniciar';
  const stop=document.createElement('button');stop.type='button';stop.textContent='Baixar relatório';stop.disabled=true;
  for(const button of [start,stop])button.style.cssText='font:inherit;border:1px solid #b6dec7;border-radius:5px;background:#ecfff2;color:#173a2b;padding:5px 8px;cursor:pointer;';
+ const makeNavLink=(id,text,href,activeLink=false,title='')=>{
+  const a=document.createElement('a');
+  a.id=id;a.href=href;a.textContent=text;
+  if(title)a.title=title;
+  a.style.cssText=`font:inherit;border:1px solid ${activeLink?'#b7f0ca':'#89b99e'};border-radius:5px;padding:4px 8px;text-decoration:none;color:${activeLink?'#122d24':'#ecfff2'};background:${activeLink?'#b7f0ca':'transparent'};font-weight:${activeLink?'700':'400'};`;
+  return a;
+ };
+ const switchA=makeNavLink('chaua-perf-switch-a','Teste A',
+  buildPerfTestUrl(location.href,{ab:'precomposed-snow',level:'deep',hz:budget.targetHz,replay:true,weather:'winter'}),
+  PERF_AB_VARIANT==='precomposed-snow','Rodar Teste A (Padrão · Inverno + Replay)');
+ const switchB=makeNavLink('chaua-perf-switch-b','Teste B',
+  buildPerfTestUrl(location.href,{ab:'winter-caps-compact-stages',level:'deep',hz:budget.targetHz,replay:true,weather:'winter'}),
+  PERF_AB_VARIANT==='winter-caps-compact-stages','Rodar Teste B (Faixas compactas · Inverno + Replay)');
+ const exitLink=makeNavLink('chaua-perf-exit','Sair',
+  buildPerfTestUrl(location.href,{enabled:false}),false,'Desativar DEV Test e voltar ao jogo normal');
  const level=document.createElement('select');
  level.id='chaua-perf-level';
  level.setAttribute('aria-label','Detalhamento da telemetria');
@@ -71,6 +86,7 @@ export function mountPerformanceProbe({game,quality,renderer,replayLaunch=null,g
  const replay=start.cloneNode(false);replay.textContent='Executar voo de referência';
  panel.append(label,level,start,stop);
  if(replayLaunch)panel.append(replay);
+ panel.append(switchA,switchB,exitLink);
  document.body.append(panel);
 
  let active=false,startTime=0,previous=0,lastUI=0,hasPlayed=false,nextClimate=0,nextSeasonCheck=0;
